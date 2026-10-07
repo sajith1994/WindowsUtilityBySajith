@@ -1,0 +1,1155 @@
+<Window x:Class="CentricDeviceMonitor.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Windows Utility by Sajith"
+        Width="1220"
+        Height="780"
+        MinWidth="820"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+    <Window.Resources>
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="Margin" Value="0,0,0,16" />
+            <Setter Property="Effect" Value="{StaticResource AppleCardShadow}" />
+        </Style>
+
+        <Style x:Key="MetricCardStyle" TargetType="Border" BasedOn="{StaticResource CardStyle}">
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,12,16" />
+            <Setter Property="MinHeight" Value="126" />
+        </Style>
+
+        <Style x:Key="CardTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="CardDescriptionStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="LineHeight" Value="17" />
+        </Style>
+
+        <Style x:Key="SectionEyebrowStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="FontSize" Value="26" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,3,0,4" />
+        </Style>
+
+        <Style x:Key="SectionDescriptionStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,18" />
+        </Style>
+
+        <Style x:Key="InfoLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="InfoValueStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+
+        <Style x:Key="HeaderMiniButton" TargetType="Button" BasedOn="{StaticResource CompactButton}">
+            <Setter Property="Padding" Value="7,3" />
+            <Setter Property="MinHeight" Value="25" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+        </Style>
+
+        <Style x:Key="SidebarItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="12,9" />
+            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="NavBackground"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="NavBackground" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="NavBackground" Property="Background" Value="{DynamicResource SelectedBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="IconGlyphStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Width" Value="26" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="{DynamicResource PageBrush}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="218" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- macOS-style navigation sidebar -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SidebarBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0">
+            <Grid Margin="14,18,14,14">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="8,0,8,20">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="38" Height="38" CornerRadius="9" Margin="0,0,10,0" ClipToBounds="True">
+                            <Image Source="pack://application:,,,/Assets/app-logo.png"
+                                   Stretch="UniformToFill"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Windows Utility" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Text="by Sajith" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock Grid.Row="1"
+                           Text="TOOLS"
+                           FontSize="9"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TertiaryTextBrush}"
+                           Margin="12,0,0,5" />
+
+                <ListBox x:Name="NavigationList"
+                         Grid.Row="2"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         SelectionChanged="NavigationList_SelectionChanged"
+                         ItemContainerStyle="{StaticResource SidebarItemStyle}">
+                    <ListBoxItem>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE9D2;" Style="{StaticResource IconGlyphStyle}" />
+                            <TextBlock Text="System Stats" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE721;" Style="{StaticResource IconGlyphStyle}" />
+                            <TextBlock Text="Network Diagnostics" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE772;" Style="{StaticResource IconGlyphStyle}" />
+                            <TextBlock Text="Utility Tools" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE83F;" Style="{StaticResource IconGlyphStyle}" />
+                            <TextBlock Text="Power &amp; Battery" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListBoxItem>
+                </ListBox>
+
+                <StackPanel Grid.Row="3">
+                    <Separator Margin="8,8,8,10" Background="{DynamicResource BorderBrush}" />
+                    <Button Content="About Windows Utility"
+                            Tag="&#xEA1F;"
+                            Style="{StaticResource IconButton}"
+                            HorizontalContentAlignment="Left"
+                            Click="AboutButton_Click"
+                            Margin="0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main shell: translucent toolbar, content, status bar -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="68" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="32" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Background="{DynamicResource ToolbarBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="22,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <TextBlock x:Name="HeaderTitleText"
+                                   Text="System Stats"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="HeaderSubtitleText"
+                                   Text="Live health, hardware inventory and monitoring overview"
+                                   Foreground="{DynamicResource MutedTextBrush}"
+                                   FontSize="10"
+                                   Margin="0,2,0,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <Border Grid.Column="1"
+                            Background="{DynamicResource SecondarySurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="2"
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="SystemThemeRadio"
+                                         Content="System"
+                                         GroupName="ThemePreference"
+                                         Tag="System"
+                                         Style="{StaticResource SegmentedRadioButton}"
+                                         Checked="ThemePreferenceRadio_Checked" />
+                            <RadioButton x:Name="LightThemeRadio"
+                                         Content="Light"
+                                         GroupName="ThemePreference"
+                                         Tag="Light"
+                                         Style="{StaticResource SegmentedRadioButton}"
+                                         Checked="ThemePreferenceRadio_Checked" />
+                            <RadioButton x:Name="DarkThemeRadio"
+                                         Content="Dark"
+                                         GroupName="ThemePreference"
+                                         Tag="Dark"
+                                         Style="{StaticResource SegmentedRadioButton}"
+                                         Checked="ThemePreferenceRadio_Checked" />
+                        </StackPanel>
+                    </Border>
+
+                    <Button x:Name="HeaderPrimaryActionButton"
+                            Grid.Column="2"
+                            Content="Refresh"
+                            Tag="&#xE72C;"
+                            Style="{StaticResource IconPrimaryButton}"
+                            Click="HeaderPrimaryActionButton_Click"
+                            Margin="0"
+                            MinWidth="104"
+                            VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <!-- SYSTEM STATS -->
+                <ScrollViewer x:Name="SystemStatsPage"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="24,22,24,32" MaxWidth="1180" HorizontalAlignment="Stretch">
+                        <TextBlock Text="OVERVIEW" Style="{StaticResource SectionEyebrowStyle}" />
+                        <TextBlock Text="System at a glance" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Live resource health, hardware inventory, sensors and background monitoring in one clean view."
+                                   Style="{StaticResource SectionDescriptionStyle}" />
+
+                        <!-- Verdict-first summary. Everything below it is the supporting detail. -->
+                        <Border Style="{StaticResource MetricCardStyle}" Margin="0,4,0,12">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border x:Name="HealthStatusDot" Width="12" Height="12" CornerRadius="6"
+                                            Background="#16A34A" VerticalAlignment="Center" Margin="0,0,9,0" />
+                                    <TextBlock x:Name="HealthOverallText" Text="Checking this PC..."
+                                               FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock x:Name="HealthSummaryText" Text="Reading sensors and storage."
+                                           Style="{StaticResource CardDescriptionStyle}" Margin="21,2,0,8" TextWrapping="Wrap" />
+                                <ItemsControl x:Name="HealthDomainList" Margin="21,0,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="4" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,16,0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,6,0"
+                                                            VerticalAlignment="Center" Background="{Binding StatusBrush}" />
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Headline}" FontSize="12" Margin="14,1,0,0" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Reason}" Style="{StaticResource CardDescriptionStyle}"
+                                                           Margin="14,1,0,0" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <UniformGrid Columns="2" Margin="0,0,-12,0">
+                            <!-- One card per physical component. Click to open live graphs. -->
+                            <Border Style="{StaticResource MetricCardStyle}" Cursor="Hand"
+                                    MouseLeftButtonUp="CpuCard_Click" ToolTip="Open live CPU graphs">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE957;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Processor" Style="{StaticResource InfoLabelStyle}" />
+                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" Opacity="0.5"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="CpuTemperatureText" Text="Checking..." FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
+                                    <UniformGrid Columns="2" Margin="0,0,0,4">
+                                        <StackPanel>
+                                            <TextBlock Text="Usage" Style="{StaticResource CardDescriptionStyle}" />
+                                            <TextBlock x:Name="CpuUsageText" Text="--%" FontSize="15" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Package power" Style="{StaticResource CardDescriptionStyle}" />
+                                            <TextBlock x:Name="CpuPackagePowerText" Text="Checking..." FontSize="15" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock x:Name="CpuUsageDetailText" Text="CPU model" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <TextBlock x:Name="CpuTemperatureDetailText" Text="Detecting sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <TextBlock x:Name="CpuPackagePowerAverageText" Text="Average this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
+                                    <TextBlock x:Name="CpuPackagePowerMaxText" Text="Max this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
+                                    <TextBlock x:Name="CpuPackagePowerSensorText" Text="Detecting power sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <TextBlock x:Name="CpuFanSpeedText" Text="CPU fan: Checking..." Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <TextBlock x:Name="CaseFanSpeedText" Text="Case fans: Checking..." Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource MetricCardStyle}" Cursor="Hand"
+                                    MouseLeftButtonUp="GpuCard_Click" ToolTip="Open live GPU graphs">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE7F8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Graphics" Style="{StaticResource InfoLabelStyle}" />
+                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" Opacity="0.5"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="GpuTemperatureText" Text="Temperature: Checking..." FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
+                                    <UniformGrid Columns="2" Margin="0,0,0,4">
+                                        <StackPanel>
+                                            <TextBlock Text="Utilisation" Style="{StaticResource CardDescriptionStyle}" />
+                                            <TextBlock x:Name="GpuUtilisationText" Text="Checking..." FontSize="15" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="Power" Style="{StaticResource CardDescriptionStyle}" />
+                                            <TextBlock x:Name="GpuPowerText" Text="Checking..." FontSize="15" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <TextBlock x:Name="GpuMemoryText" Text="VRAM: Checking..." Style="{StaticResource CardDescriptionStyle}" />
+                                    <TextBlock x:Name="GpuPowerAverageText" Text="Average this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
+                                    <TextBlock x:Name="GpuPowerMaxText" Text="Max this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
+                                    <TextBlock x:Name="GpuFanSpeedText" Text="GPU fans: Checking..." Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <TextBlock x:Name="GpuPowerSensorText" Text="Detecting GPU power sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource MetricCardStyle}" Cursor="Hand"
+                                    MouseLeftButtonUp="MemoryCard_Click" ToolTip="Open live memory graph">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE7F1;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Memory" Style="{StaticResource InfoLabelStyle}" />
+                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" Opacity="0.5"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="RamUsageText" Text="--%" FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
+                                    <TextBlock x:Name="RamUsageDetailText" Text="RAM speed" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <TextBlock x:Name="RamModuleCountText" Text="Modules: checking..." Style="{StaticResource CardDescriptionStyle}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE749;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Print Spooler" Style="{StaticResource InfoLabelStyle}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="SpoolerStatusHeaderText" Text="Checking..." FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8" />
+                                    <UniformGrid Columns="3">
+                                        <Button Content="Start" Style="{StaticResource HeaderMiniButton}" Click="StartSpoolerButton_Click" />
+                                        <Button Content="Stop" Style="{StaticResource HeaderMiniButton}" Click="StopSpoolerButton_Click" />
+                                        <Button Content="Restart" Style="{StaticResource HeaderMiniButton}" Click="RestartSpoolerButton_Click" Margin="0" />
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                        <TextBlock Text="&#xE7EF;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Background Monitoring" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="92"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="Status" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/><TextBlock Grid.Row="0" Grid.Column="1" x:Name="BackgroundServiceStatusText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="1" Text="Startup" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/><TextBlock Grid.Row="1" Grid.Column="1" x:Name="BackgroundServiceStartupText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="2" Text="Account" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/><TextBlock Grid.Row="2" Grid.Column="1" x:Name="BackgroundServiceAccountText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="3" Text="Last started" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/><TextBlock Grid.Row="3" Grid.Column="1" x:Name="BackgroundServiceLastStartedText" Text="Not available" Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="4" Text="Dashboard" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/><TextBlock Grid.Row="4" Grid.Column="1" x:Name="DashboardPrivilegeText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
+                                    </Grid>
+                                    <ToggleButton x:Name="StartupCheckBox"
+                                                  Content="Open elevated dashboard after sign-in"
+                                                  Style="{StaticResource ToggleSwitch}"
+                                                  FontSize="11"
+                                                  Checked="StartupCheckBox_Changed"
+                                                  Unchecked="StartupCheckBox_Changed" />
+                                    <TextBlock Text="Uses a 20-second startup delay. Background monitoring remains service-based."
+                                               Style="{StaticResource CardDescriptionStyle}"
+                                               Margin="0,5,0,8" />
+
+                                    <ToggleButton x:Name="TrayIconToggle"
+                                                  Content="Show notification area icon"
+                                                  Style="{StaticResource ToggleSwitch}"
+                                                  FontSize="11"
+                                                  Checked="TrayIconToggle_Changed"
+                                                  Unchecked="TrayIconToggle_Changed" />
+                                    <TextBlock x:Name="TrayIconHintText"
+                                               Text="The icon shows background service status and reopens the dashboard."
+                                               Style="{StaticResource CardDescriptionStyle}"
+                                               TextWrapping="Wrap" Margin="0,5,0,8" />
+
+                                    <ToggleButton x:Name="DesktopNotificationsToggle"
+                                                  Content="Show desktop notifications"
+                                                  Style="{StaticResource ToggleSwitch}"
+                                                  FontSize="11"
+                                                  Checked="DesktopNotificationsToggle_Changed"
+                                                  Unchecked="DesktopNotificationsToggle_Changed" />
+                                    <TextBlock Text="Turns off balloon alerts from the dashboard, including the CPU temperature alert. The sound alert is controlled separately under CPU Sensor and Alerts."
+                                               Style="{StaticResource CardDescriptionStyle}"
+                                               TextWrapping="Wrap" Margin="0,5,0,8" />
+                                    <TextBlock x:Name="BackgroundServiceControlHelpText"
+                                               Text="Enable starts monitoring now and at future Windows startups. Disable stops unattended device checks, background sensor alerts and power schedules; dashboard-only readings can continue while this app is open."
+                                               Style="{StaticResource ShortcutHelpStyle}"
+                                               Margin="0,0,0,12" />
+                                    <UniformGrid Columns="3">
+                                        <Button x:Name="EnableBackgroundServiceButton" Content="Enable &amp; start" Tag="&#xE768;" Style="{StaticResource IconCompactPrimaryButton}" Click="EnableBackgroundServiceButton_Click" IsEnabled="False" Margin="0,0,6,0"/>
+                                        <Button x:Name="DisableBackgroundServiceButton" Content="Disable &amp; stop" Tag="&#xE71A;" Style="{StaticResource IconCompactButton}" Click="DisableBackgroundServiceButton_Click" IsEnabled="False" Margin="0,0,6,0"/>
+                                        <Button x:Name="RestartBackgroundServiceButton" Content="Restart" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="RestartBackgroundServiceButton_Click" IsEnabled="False" Margin="0"/>
+                                    </UniformGrid>
+                                    <Button Content="View service log" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewBackgroundServiceLogButton_Click" Margin="0,8,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="&#xE957;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="CPU Sensor &amp; Alerts" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="CpuSensorHelpText"
+                                               Style="{StaticResource CardDescriptionStyle}"
+                                               MaxHeight="38"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <Grid Margin="0,14,0,12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Alert above" Style="{StaticResource InfoLabelStyle}" />
+                                        <Slider Grid.Column="1" x:Name="CpuTemperatureAlertSlider" Minimum="70" Maximum="105" TickFrequency="1" IsSnapToTickEnabled="True" Margin="10,0" ValueChanged="CpuTemperatureAlertSlider_ValueChanged" />
+                                        <TextBlock Grid.Column="2" x:Name="CpuTemperatureAlertValueText" Text="98 °C" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Grid Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ToggleButton x:Name="CpuTemperatureSoundAlertCheckBox" Content="Sound alert" Style="{StaticResource ToggleSwitch}" FontSize="11" Checked="CpuTemperatureSoundAlertCheckBox_Changed" Unchecked="CpuTemperatureSoundAlertCheckBox_Changed" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <TextBlock Text="Repeat" Style="{StaticResource InfoLabelStyle}" />
+                                            <ComboBox x:Name="CpuTemperatureAlertIntervalComboBox" Width="82" Margin="8,0,0,0" FontSize="11" SelectionChanged="CpuTemperatureAlertIntervalComboBox_SelectionChanged">
+                                                <ComboBoxItem Content="1 min" Tag="60"/><ComboBoxItem Content="2 min" Tag="120"/><ComboBoxItem Content="5 min" Tag="300"/><ComboBoxItem Content="10 min" Tag="600"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                    </Grid>
+                                    <UniformGrid Columns="3">
+                                        <Button Content="CPU log" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewCpuTemperatureLogButton_Click" Margin="0,0,6,0"/>
+                                        <Button Content="Rescan" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RescanCpuSensorsButton_Click" Margin="0,0,6,0"/>
+                                        <Button Content="Fan diagnostics" Tag="&#xE9D9;" Style="{StaticResource IconCompactButton}" Click="FanDiagnosticsButton_Click" Margin="0"/>
+                                    </UniformGrid>
+                                    <Button x:Name="RestartAsAdministratorButton" Visibility="Collapsed" Content="Restart elevated" Click="RestartAsAdministratorButton_Click" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                        <TextBlock Text="&#xE770;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="PC Identity" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="PC name" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="0" Grid.Column="1" x:Name="PcNameText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="1" Text="Brand" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="1" Grid.Column="1" x:Name="PcBrandText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="2" Text="Model" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="2" Grid.Column="1" x:Name="PcModelText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="3" Text="System SKU" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="3" Grid.Column="1" x:Name="PcSkuText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="4" Text="Serial number" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="4" Grid.Column="1" x:Name="PcSerialText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="&#xE7F1;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Installed Memory" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="RamModuleSummaryText" Text="Checking RAM modules..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,8"/>
+                                    <ItemsControl x:Name="RamModuleInventoryList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="&#xE7F4;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Displays" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="DisplayInventorySummaryText" Text="Checking connected displays..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,8"/>
+                                    <ItemsControl x:Name="DisplayInventoryList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="&#xE7F8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Graphics Adapters" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="GpuInventorySummaryText" Text="Checking graphics adapters..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,8"/>
+                                    <ItemsControl x:Name="GpuInventoryList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3" ToolTip="{Binding}"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="&#xE958;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                    <TextBlock Text="Storage Inventory &amp; Usage" Style="{StaticResource CardTitleStyle}" />
+                                </StackPanel>
+                                <TextBlock x:Name="StorageInventorySummaryText" Text="Checking physical disks and volumes..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,10"/>
+                                <TextBlock Text="Physical disks" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,4"/>
+                                <ItemsControl x:Name="PhysicalDiskInventoryList" Margin="0,0,0,10">
+                                    <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/></DataTemplate></ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Volumes / used capacity" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,4"/>
+                                <ItemsControl x:Name="StorageVolumeInventoryList">
+                                    <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/></DataTemplate></ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="HardwareInventoryUpdatedText" Text="Hardware inventory refreshes when System Stats is refreshed." Style="{StaticResource CardDescriptionStyle}" Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE95E;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                    <TextBlock Text="Windows Overview" Style="{StaticResource CardTitleStyle}" />
+                                </StackPanel>
+                                <TextBlock Text="Operating system and licence state. Network-specific diagnostics live in Network Diagnostics."
+                                           Style="{StaticResource CardDescriptionStyle}"
+                                           Margin="0,7,0,10" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Text="Windows" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="WindowsVersionText" Text="Checking Windows version..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <TextBlock Grid.Row="1" Text="Activation" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="SystemWindowsActivationStatusText" Text="Checking activation..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                    <Button Grid.Row="1" Grid.Column="2" Content="Activation settings" Tag="&#xE713;" Style="{StaticResource IconCompactButton}" Click="OpenWindowsActivationSettingsButton_Click" Margin="10,0,0,0"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- NETWORK DIAGNOSTICS -->
+                <ScrollViewer x:Name="NetworkDiagnosticsPage"
+                              Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="24,22,24,32" MaxWidth="1080" HorizontalAlignment="Stretch">
+                        <TextBlock Text="NETWORK" Style="{StaticResource SectionEyebrowStyle}" />
+                        <TextBlock Text="Network diagnostics" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="See managed-device reachability immediately, scan the local subnet and inspect the current network path."
+                                   Style="{StaticResource SectionDescriptionStyle}" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="0.95*"/></Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="&#xE721;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="IP Scanner &amp; Monitoring" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <TextBlock Text="Discover devices on the local subnet and configure automatic availability checks."
+                                               Style="{StaticResource CardDescriptionStyle}" />
+                                    <Button Content="Open IP scanner &amp; manage addresses"
+                                            Tag="&#xE721;"
+                                            Style="{StaticResource IconPrimaryButton}"
+                                            Click="OpenIpScannerButton_Click"
+                                            Margin="0,16,0,16"
+                                            ToolTip="Scan the local IPv4 subnet, manage monitored IPs and check common TCP ports." />
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ToggleButton x:Name="AutomaticMonitoringCheckBox"
+                                                      Content="Automatic ping monitoring"
+                                                      Style="{StaticResource ToggleSwitch}"
+                                                      FontSize="11"
+                                                      Checked="AutomaticMonitoringCheckBox_Changed"
+                                                      Unchecked="AutomaticMonitoringCheckBox_Changed"
+                                                      ToolTip="Enable background ping checks for saved managed devices and log outages/recoveries." />
+                                        <TextBlock Grid.Column="1" Text="Live status below" Style="{StaticResource InfoLabelStyle}" />
+                                    </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Interval" Style="{StaticResource InfoLabelStyle}" />
+                                        <ComboBox Grid.Column="1" x:Name="PingIntervalComboBox" Margin="8,0,12,0" FontSize="11" SelectionChanged="PingIntervalComboBox_SelectionChanged" ToolTip="Choose how often saved managed devices are checked for reachability.">
+                                            <ComboBoxItem Content="10 seconds" Tag="10"/><ComboBoxItem Content="15 seconds" Tag="15"/><ComboBoxItem Content="30 seconds" Tag="30"/>
+                                            <ComboBoxItem Content="1 minute" Tag="60"/><ComboBoxItem Content="2 minutes" Tag="120"/><ComboBoxItem Content="5 minutes" Tag="300"/><ComboBoxItem Content="10 minutes" Tag="600"/><ComboBoxItem Content="30 minutes" Tag="1800"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Column="2" x:Name="PingCountdownText" Text="Next ping: --:--" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE95E;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                            <TextBlock Text="Current Connection" Style="{StaticResource CardTitleStyle}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="Refresh" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshSystemHealthDetailsButton_Click" Margin="0" ToolTip="Refresh local adapter, gateway/DNS and public connection details." />
+                                    </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="94"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="Network" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="0" Grid.Column="1" x:Name="NetworkStatusText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="1" Text="Wi-Fi" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="1" Grid.Column="1" x:Name="WifiStrengthText" Text="Checking signal..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="2" Text="Local IP" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="2" Grid.Column="1" x:Name="LocalIpText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="3" Text="Gateway / DNS" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="3" Grid.Column="1" x:Name="GatewayDnsText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="4" Text="Public IP" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="4" Grid.Column="1" x:Name="PublicIpText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="5" Text="IP location" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="5" Grid.Column="1" x:Name="PublicLocationText" Text="Checking IP location..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="6" Text="ISP / server" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="6" Grid.Column="1" x:Name="PublicServerText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="7" Text="Adapters" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="7" Grid.Column="1" x:Name="NetworkDetailText" Text="Checking adapters..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="8" Text="Link bandwidth" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="8" Grid.Column="1" x:Name="ActiveLinkSpeedText" Text="Checking active link..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="Negotiated Ethernet/Wi-Fi link rate. Works even when the internet is unavailable."/>
+                                    </Grid>
+                                    <TextBlock x:Name="SystemHealthUpdatedText" Text="Extended details refresh automatically." Style="{StaticResource CardDescriptionStyle}" Margin="0,12,0,10" />
+                                    <UniformGrid Columns="2">
+                                        <Button Content="Packet loss &amp; speed tests" Tag="&#xE721;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenNetworkSpeedTestButton_Click" Margin="0,0,6,0" ToolTip="Tests packet loss and jitter, shows local link bandwidth, opens FAST.com for internet speed, and measures actual PC-to-PC LAN throughput without internet." />
+                                        <Button Content="View system health log" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewSystemHealthLogButton_Click" Margin="0" ToolTip="Review saved system/network health samples and changes." />
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,7">
+                                    <TextBlock Text="&#xE774;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                    <TextBlock Text="Network Troubleshooting Shortcuts" Style="{StaticResource CardTitleStyle}" />
+                                </StackPanel>
+                                <TextBlock Text="Launch common built-in Windows networking commands in a Command Prompt. Target-based tools use the host or IP below."
+                                           Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="240"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Target" Style="{StaticResource InfoLabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBox Grid.Column="1" x:Name="NetworkCommandTargetTextBox" Text="google.com" ToolTip="Hostname or IP address for Ping, Tracert and NSLookup"/>
+                                    <TextBlock Grid.Column="2" Text="Examples: google.com, 8.8.8.8, 192.168.1.1" Style="{StaticResource InfoLabelStyle}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </Grid>
+                                <UniformGrid Columns="5" Rows="2">
+                                    <StackPanel Margin="0,0,6,10"><Button Content="IP config" Tag="&#xE968;" Style="{StaticResource IconCompactButton}" Click="NetworkIpConfigButton_Click" ToolTip="ipconfig /all - inspect IP, DNS, DHCP and gateway settings." Margin="0"/><TextBlock Text="IP, DNS, DHCP and gateways for all adapters." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,10"><Button Content="Interface config" Tag="&#xE968;" Style="{StaticResource IconCompactButton}" Click="NetworkInterfaceConfigButton_Click" ToolTip="netsh interface ip show config - inspect per-interface IPv4 configuration." Margin="0"/><TextBlock Text="Per-interface IPv4 settings and DHCP state." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,10"><Button Content="Route table" Tag="&#xE8AB;" Style="{StaticResource IconCompactButton}" Click="NetworkRouteTableButton_Click" ToolTip="route print - inspect the default route and routing table." Margin="0"/><TextBlock Text="Find default-route and routing problems." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,10"><Button Content="ARP cache" Tag="&#xE95E;" Style="{StaticResource IconCompactButton}" Click="NetworkArpCacheButton_Click" ToolTip="arp -a - inspect cached local IP-to-MAC mappings." Margin="0"/><TextBlock Text="See recent local IP-to-MAC mappings." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><Button Content="Connections" Tag="&#xE774;" Style="{StaticResource IconCompactButton}" Click="NetworkConnectionsButton_Click" ToolTip="netstat -ano - list active/listening connections with process IDs." Margin="0"/><TextBlock Text="Open/listening ports, connections and PIDs." Style="{StaticResource ShortcutHelpStyle}" Margin="4,4,0,0"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="MAC addresses" Tag="&#xE8B7;" Style="{StaticResource IconCompactButton}" Click="NetworkGetMacButton_Click" ToolTip="getmac /v - list adapter names and MAC addresses." Margin="0"/><TextBlock Text="List adapter names and hardware addresses." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Ping target" Tag="&#xE721;" Style="{StaticResource IconCompactPrimaryButton}" Click="NetworkPingButton_Click" ToolTip="ping &lt;target&gt; - check reachability and round-trip latency." Margin="0"/><TextBlock Text="Check reachability, latency and packet loss." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Trace route" Tag="&#xE8A7;" Style="{StaticResource IconCompactButton}" Click="NetworkTraceRouteButton_Click" ToolTip="tracert &lt;target&gt; - trace the route hop by hop." Margin="0"/><TextBlock Text="Find where a network path slows or fails." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="DNS lookup" Tag="&#xE946;" Style="{StaticResource IconCompactButton}" Click="NetworkDnsLookupButton_Click" ToolTip="nslookup &lt;target&gt; - verify DNS name resolution." Margin="0"/><TextBlock Text="Verify hostname-to-IP DNS resolution." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0"><Button Content="Network shares" Tag="&#xE8FD;" Style="{StaticResource IconCompactButton}" Click="NetworkSharesButton_Click" ToolTip="net use - show mapped drives and SMB connections." Margin="0"/><TextBlock Text="Show mapped drives and SMB connections." Style="{StaticResource ShortcutHelpStyle}" Margin="4,4,0,0"/></StackPanel>
+                                </UniformGrid>
+
+                                <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,16,0,14"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="&#xE777;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource WarningBrush}" />
+                                    <TextBlock Text="Network Repair (Administrator)" Style="{StaticResource CardTitleStyle}" />
+                                </StackPanel>
+                                <TextBlock Text="Repair shortcuts change the local network stack. Release/Renew and Full repair can interrupt RDP, VPN or remote-support sessions."
+                                           Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />
+                                <UniformGrid Columns="5">
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Release + Renew IP" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="NetworkReleaseRenewButton_Click" ToolTip="ipconfig /release then /renew - refresh a stale or incorrect DHCP lease." Margin="0"/><TextBlock Text="Refresh DHCP when the local IP is wrong or stale." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Flush DNS" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="NetworkFlushDnsButton_Click" ToolTip="ipconfig /flushdns - clear cached DNS resolver entries." Margin="0"/><TextBlock Text="Clear stale DNS cache after name-resolution issues." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Reset Winsock + TCP/IP" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="NetworkResetStackButton_Click" ToolTip="Reset Winsock/TCP-IP after stack corruption. Restart required." Margin="0"/><TextBlock Text="Repair damaged Windows network stack; restart required." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Clear ARP cache" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Click="NetworkClearArpButton_Click" ToolTip="arp -d * - discard cached local IP-to-MAC mappings." Margin="0"/><TextBlock Text="Discard stale local IP-to-MAC mappings." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0"><Button Content="Run full repair" Tag="&#xE777;" Style="{StaticResource IconCompactPrimaryButton}" Click="NetworkFullRepairButton_Click" ToolTip="Runs Release/Renew, Flush DNS, Winsock/TCP-IP reset and ARP clear. Restart afterwards." Margin="0"/><TextBlock Text="Run all repair steps; can interrupt remote sessions." Style="{StaticResource ShortcutHelpStyle}" Margin="4,4,0,0"/></StackPanel>
+                                </UniformGrid>
+                                <TextBlock Text="Winsock/TCP-IP reset requires a Windows restart before all changes take effect."
+                                           Style="{StaticResource InfoLabelStyle}" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE8B7;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Managed IP Addresses" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock x:Name="DeviceCountText" Text="0 device(s)" Style="{StaticResource InfoLabelStyle}" Margin="10,1,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Content="Check all now" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshAllButton_Click" Margin="0,0,8,0" ToolTip="Immediately ping every saved managed device instead of waiting for the next interval." />
+                                        <Button Content="Manage addresses" Tag="&#xE721;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenIpScannerButton_Click" Margin="0" ToolTip="Add, edit or remove monitored device IP addresses and open the local IP scanner." />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="Live availability from the dashboard or LocalSystem monitoring service. Double-click a device to open its connection history."
+                                           Style="{StaticResource CardDescriptionStyle}" />
+                                <DataGrid x:Name="DeviceGrid"
+                                          ItemsSource="{Binding Devices}"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          CanUserResizeRows="False"
+                                          HeadersVisibility="Column"
+                                          SelectionMode="Single"
+                                          RowHeaderWidth="0"
+                                          MinHeight="280"
+                                          Margin="0,14,0,0"
+                                          SelectionChanged="DeviceGrid_SelectionChanged"
+                                          MouseDoubleClick="DeviceGrid_MouseDoubleClick">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="1.1*" />
+                                        <DataGridTextColumn Header="IP address" Binding="{Binding IpAddress}" Width="1*" />
+                                        <DataGridTemplateColumn Header="Status" Width="90">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Online"><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Offline"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Checking"><Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="Response" Binding="{Binding ResponseDisplay}" Width="85" />
+                                        <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.25*" />
+                                        <DataGridTextColumn Header="Last checked" Binding="{Binding LastCheckedDisplay}" Width="150" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- UTILITY TOOLS -->
+                <ScrollViewer x:Name="UtilityToolsPage"
+                              Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="24,22,24,32" MaxWidth="1120" HorizontalAlignment="Stretch">
+                        <TextBlock Text="TOOLBOX" Style="{StaticResource SectionEyebrowStyle}" />
+                        <TextBlock Text="Utility tools" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Everyday technician actions grouped by purpose. Administrator tools keep their existing elevation behavior."
+                                   Style="{StaticResource SectionDescriptionStyle}" />
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="&#xE772;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                    <TextBlock Text="Windows Shortcuts" Style="{StaticResource CardTitleStyle}" />
+                                </StackPanel>
+                                <TextBlock Text="Open common Windows support consoles. Admin actions still request elevated privileges."
+                                           Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,14" />
+                                <UniformGrid Columns="5" Rows="3">
+                                    <StackPanel Margin="0,0,6,10"><Button Content="Devices &amp; Printers" Tag="&#xE772;" Style="{StaticResource IconCompactButton}" Click="OpenDevicesAndPrintersButton_Click" Margin="0" ToolTip="Manage installed printers, scanners and connected peripherals."/><TextBlock Text="Add/manage printers, scanners and peripherals." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,10"><Button Content="Task Manager" Tag="&#xE7C4;" Style="{StaticResource IconCompactButton}" Click="OpenTaskManagerButton_Click" Margin="0" ToolTip="Inspect apps, processes, startup items and performance."/><TextBlock Text="Processes, startup apps and performance checks." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,10"><Button Content="CMD" Tag="&#xE756;" Style="{StaticResource IconCompactButton}" Click="OpenCommandPromptButton_Click" Margin="0" ToolTip="Open a standard Command Prompt for diagnostics that do not require elevation."/><TextBlock Text="Standard command-line diagnostics." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,10"><Button Content="CMD (Admin)" Tag="&#xE7EF;" Style="{StaticResource IconCompactButton}" Click="OpenCommandPromptAdminButton_Click" Margin="0" ToolTip="Open an elevated Command Prompt for system-level changes."/><TextBlock Text="Elevated commands and system repair." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><Button Content="PowerShell" Tag="&#xE943;" Style="{StaticResource IconCompactButton}" Click="OpenPowerShellButton_Click" Margin="0" ToolTip="Open a normal PowerShell session for scripts and queries."/><TextBlock Text="Standard PowerShell scripts and queries." Style="{StaticResource ShortcutHelpStyle}" Margin="4,4,0,0"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="PowerShell (Admin)" Tag="&#xE7EF;" Style="{StaticResource IconCompactButton}" Click="OpenPowerShellAdminButton_Click" Margin="0" ToolTip="Open an elevated PowerShell session for administrative scripts."/><TextBlock Text="Elevated PowerShell administration." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Disk Cleanup" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Click="OpenDiskCleanupButton_Click" Margin="0" ToolTip="Open Windows Disk Cleanup to remove system and temporary cleanup files."/><TextBlock Text="Free Windows/system cleanup space." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="DiskPart (Admin)" Tag="&#xE7EF;" Style="{StaticResource IconCompactButton}" Click="OpenDiskPartButton_Click" Margin="0" ToolTip="Open the native elevated DiskPart console for advanced disk work."/><TextBlock Text="Advanced command-line disk administration." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Disk Tools" Tag="&#xE7C3;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenDiskPreparationButton_Click" Margin="0" ToolTip="Open the guarded GUI for clean, initialize, partition, format and delete operations."/><TextBlock Text="Guarded clean/init/partition/format workflow." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><Button Content="Disk Management" Tag="&#xE958;" Style="{StaticResource IconCompactButton}" Click="OpenDiskManagementButton_Click" Margin="0" ToolTip="Open the native Windows Disk Management console."/><TextBlock Text="Native Windows volumes and disk layout." Style="{StaticResource ShortcutHelpStyle}" Margin="4,4,0,0"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Smart App Control" Tag="&#xE72E;" Style="{StaticResource IconCompactButton}" Click="OpenSmartAppControlButton_Click" Margin="0" ToolTip="Open Windows Security - Smart App Control. Requires Windows 11 22H2 or later."/><TextBlock Text="Check Smart App Control state (Win11 22H2+)." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE90F;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Essential Windows Repair" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Recovery &amp; offline tools" Tag="&#xE7BA;" Style="{StaticResource IconCompactButton}" Click="OpenWindowsRepairCenterButton_Click" Margin="0" ToolTip="Open BootRec, offline DISM/SFC, drive detection and guarded recovery commands." />
+                                </Grid>
+                                <TextBlock Text="Administrator shortcuts for SFC, DISM and CHKDSK. BootRec and offline DISM/SFC commands are available in the Repair &amp; Recovery window with drive-letter checks and warnings."
+                                           Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,14" />
+                                <UniformGrid Columns="5">
+                                    <StackPanel Margin="0,0,6,0"><Button Content="SFC /scannow" Tag="&#xE9D9;" Style="{StaticResource IconCompactPrimaryButton}" Click="RepairSfcButton_Click" Margin="0" ToolTip="Scan and repair protected Windows system files."/><TextBlock Text="Repair protected Windows system files." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="DISM Check" Tag="&#xE9D9;" Style="{StaticResource IconCompactButton}" Click="RepairDismCheckButton_Click" Margin="0" ToolTip="Quickly check whether Windows component-store corruption is already flagged."/><TextBlock Text="Quick component-store corruption check." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="DISM Scan" Tag="&#xE9D9;" Style="{StaticResource IconCompactButton}" Click="RepairDismScanButton_Click" Margin="0" ToolTip="Perform a deeper scan of the Windows component store for corruption."/><TextBlock Text="Deep Windows image corruption scan." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="DISM Restore" Tag="&#xE9D9;" Style="{StaticResource IconCompactPrimaryButton}" Click="RepairDismRestoreButton_Click" Margin="0" ToolTip="Repair Windows component-store corruption, normally using Windows Update as the repair source."/><TextBlock Text="Repair the component store/image." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                    <StackPanel Margin="0"><Button Content="CHKDSK system drive" Tag="&#xE7C3;" Style="{StaticResource IconCompactButton}" Click="RepairChkdskButton_Click" Margin="0" ToolTip="Repair file-system errors and scan the system volume for bad sectors. May require restart."/><TextBlock Text="File-system repair and bad-sector scan." Style="{StaticResource ShortcutHelpStyle}" Margin="4,4,0,0"/></StackPanel>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8"><TextBlock Text="&#xE756;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="Command Prompt Runner" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                    <TextBlock Text="Run a CMD command or batch sequence in a standard or Administrator console." Style="{StaticResource CardDescriptionStyle}"/>
+                                    <TextBox x:Name="CmdCommandTextBox" Height="76" Margin="0,14,0,12" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" ToolTip="Example: ipconfig /all"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <ToggleButton x:Name="CmdAdminToggle" Content="Administrator" Style="{StaticResource ToggleSwitch}" Checked="CommandModeToggle_Changed" Unchecked="CommandModeToggle_Changed" ToolTip="Run the entered CMD command with Administrator privileges when required."/>
+                                            <TextBlock x:Name="CmdModeText" Text="Normal user" Style="{StaticResource InfoLabelStyle}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="Run CMD" Tag="&#xE756;" Style="{StaticResource IconCompactPrimaryButton}" Width="108" Click="RunCmdCommandButton_Click" Margin="0" ToolTip="Launch the entered command or batch sequence in Command Prompt."/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8"><TextBlock Text="&#xE943;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="PowerShell Runner" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                    <TextBlock Text="Run a PowerShell command or script block in a standard or Administrator session." Style="{StaticResource CardDescriptionStyle}"/>
+                                    <TextBox x:Name="PowerShellCommandTextBox" Height="76" Margin="0,14,0,12" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" ToolTip="Example: Get-ComputerInfo"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <ToggleButton x:Name="PowerShellAdminToggle" Content="Administrator" Style="{StaticResource ToggleSwitch}" Checked="CommandModeToggle_Changed" Unchecked="CommandModeToggle_Changed" ToolTip="Run the entered PowerShell script with Administrator privileges when required."/>
+                                            <TextBlock x:Name="PowerShellModeText" Text="Normal user" Style="{StaticResource InfoLabelStyle}" Margin="10,0,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="Run PowerShell" Tag="&#xE943;" Style="{StaticResource IconCompactPrimaryButton}" Width="124" Click="RunPowerShellCommandButton_Click" Margin="0" ToolTip="Launch the entered PowerShell command or script block."/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <UniformGrid Columns="2" Margin="0,0,-12,0">
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE74D;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="Temporary Files" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                    <TextBlock Text="Clean user and Windows temporary folders with a detailed result report." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,14"/>
+                                    <Button x:Name="ClearTemporaryFilesButton" Content="Clear temporary files" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Click="ClearTemporaryFilesButton_Click" Margin="0" ToolTip="Remove safe user/Windows temporary files and show a reclaimed-space report."/>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE958;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="Storage Health &amp; Speed" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                    <TextBlock Text="SSD/HDD health, NVMe/USB benchmarks, continuous speed tests, capacity verification and Windows Storage Sense." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,14"/>
+                                    <UniformGrid Columns="2">
+                                        <Button Content="Storage diagnostics" Tag="&#xE958;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenStorageDiagnosticsButton_Click" Margin="0,0,6,0" ToolTip="Check drive health, benchmark read/write speed and verify real writable capacity."/>
+                                        <Button Content="Storage Sense" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Click="OpenStorageSenseButton_Click" Margin="0" ToolTip="Open Windows Storage Sense settings for automatic cleanup rules."/>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7C4;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="User Applications" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                    <TextBlock Text="Close visible non-Windows apps in this sign-in session and review the result." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,14"/>
+                                    <Button x:Name="TerminateUserApplicationsButton" Content="Close user applications" Tag="&#xE8BB;" Style="{StaticResource IconCompactButton}" Click="TerminateUserApplicationsButton_Click" Margin="0" ToolTip="Close visible non-Windows user applications in the current sign-in session and review what closed/skipped."/>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE73E;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="Windows Activation" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                    <TextBlock x:Name="WindowsActivationStatusText" Text="Checking Windows activation status..." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,14"/>
+                                    <UniformGrid Columns="2"><Button Content="Settings" Tag="&#xE713;" Style="{StaticResource IconCompactButton}" Click="OpenWindowsActivationSettingsButton_Click" Margin="0,0,6,0" ToolTip="Open Windows Activation settings to review or change licensing."/><Button Content="Help" Tag="&#xE946;" Style="{StaticResource IconCompactButton}" Click="OpenWindowsActivationHelpButton_Click" Margin="0" ToolTip="Open Windows activation/troubleshooting guidance."/></UniformGrid>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,7">
+                                        <TextBlock Text="&#xE957;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource WarningBrush}" />
+                                        <TextBlock Text="CPU &amp; GPU Thermal Load Test" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <TextBlock Text="Run a short supervised CPU, GPU render or combined heat load while watching real temperature sensors. Automatic stops protect the test when a temperature limit is reached, telemetry disappears, time expires or the window closes."
+                                               Style="{StaticResource CardDescriptionStyle}"
+                                               MaxWidth="760"
+                                               HorizontalAlignment="Left" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Content="Open thermal test"
+                                        Tag="&#xE768;"
+                                        Style="{StaticResource IconPrimaryButton}"
+                                        MinWidth="160"
+                                        Margin="18,0,0,0"
+                                        Click="OpenThermalLoadTestButton_Click"
+                                        ToolTip="Create a controlled CPU/GPU load to observe cooler response and thermal stability." />
+                            </Grid>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6"><TextBlock Text="&#xE8EF;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="External Administration Tools" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                <TextBlock Text="Official launchers remain clearly separated from built-in Windows Utility functions." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,14"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="1"/><ColumnDefinition Width="*"/><ColumnDefinition Width="1"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                        <TextBlock Text="Chris Titus Tech WinUtil" FontWeight="SemiBold"/>
+                                        <TextBlock x:Name="ChrisTitusToolStatusText" Text="Checking the official stable WinUtil launch command..." Style="{StaticResource CardDescriptionStyle}" Margin="0,5,0,10"/>
+                                        <UniformGrid Columns="2"><Button Content="Run (Admin)" Tag="&#xE756;" Style="{StaticResource IconCompactPrimaryButton}" Click="RunChrisTitusWinUtilButton_Click" Margin="0,0,5,0" ToolTip="Launch the official Chris Titus Tech WinUtil command as Administrator."/><Button Content="Project" Tag="&#xE774;" Style="{StaticResource IconCompactButton}" Click="OpenChrisTitusProjectButton_Click" Margin="0" ToolTip="Open the official upstream project page before using the external tool."/></UniformGrid>
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Background="{DynamicResource BorderBrush}" />
+                                    <StackPanel Grid.Column="2" Margin="16,0">
+                                        <TextBlock Text="Raphire Win11Debloat" FontWeight="SemiBold"/>
+                                        <TextBlock x:Name="Win11DebloatStatusText" Text="Checking the official Win11Debloat quick-launch command..." Style="{StaticResource CardDescriptionStyle}" Margin="0,5,0,10"/>
+                                        <UniformGrid Columns="2"><Button Content="Run (Admin)" Tag="&#xE7EF;" Style="{StaticResource IconCompactPrimaryButton}" Click="RunWin11DebloatButton_Click" Margin="0,0,5,0" ToolTip="Launch the official Win11Debloat quick-install command as Administrator."/><Button Content="Project" Tag="&#xE774;" Style="{StaticResource IconCompactButton}" Click="OpenWin11DebloatProjectButton_Click" Margin="0" ToolTip="Open the official Win11Debloat project page and documentation."/></UniformGrid>
+                                    </StackPanel>
+                                    <Border Grid.Column="3" Background="{DynamicResource BorderBrush}" />
+                                    <StackPanel Grid.Column="4" Margin="16,0,0,0">
+                                        <TextBlock Text="Winhance" FontWeight="SemiBold"/>
+                                        <TextBlock x:Name="WinhanceStatusText" Text="Checking the official Winhance PowerShell install command..." Style="{StaticResource CardDescriptionStyle}" Margin="0,5,0,10"/>
+                                        <UniformGrid Columns="2"><Button Content="Run (Admin)" Tag="&#xE7EF;" Style="{StaticResource IconCompactPrimaryButton}" Click="RunWinhanceButton_Click" Margin="0,0,5,0" ToolTip="Launch the official Winhance PowerShell install command as Administrator."/><Button Content="Project" Tag="&#xE774;" Style="{StaticResource IconCompactButton}" Click="OpenWinhanceProjectButton_Click" Margin="0" ToolTip="Open the official Winhance project page and documentation."/></UniformGrid>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- POWER & BATTERY -->
+                <ScrollViewer x:Name="PowerBatteryPage"
+                              Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="24,22,24,32" MaxWidth="1040" HorizontalAlignment="Stretch">
+                        <TextBlock Text="POWER" Style="{StaticResource SectionEyebrowStyle}" />
+                        <TextBlock Text="Power &amp; battery" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Control power scheduling, switch the active Windows power plan and open battery or lid settings."
+                                   Style="{StaticResource SectionDescriptionStyle}" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="0.85*"/></Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <Border Style="{StaticResource CardStyle}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12"><TextBlock Text="&#xE7E8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="System Power Schedule" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                        <Grid Margin="0,0,0,14">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="120"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="76"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="76"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="Action" Style="{StaticResource InfoLabelStyle}"/>
+                                            <ComboBox Grid.Column="1" x:Name="PowerActionComboBox" Margin="8,0,18,0" SelectionChanged="PowerScheduleSelection_Changed"><ComboBoxItem Content="Restart" Tag="Restart"/><ComboBoxItem Content="Shutdown" Tag="Shutdown"/></ComboBox>
+                                            <TextBlock Grid.Column="2" Text="Time" Style="{StaticResource InfoLabelStyle}"/>
+                                            <ComboBox Grid.Column="3" x:Name="PowerHourComboBox" Margin="8,0,4,0" SelectionChanged="PowerScheduleSelection_Changed"/>
+                                            <TextBlock Grid.Column="4" Text=":" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            <ComboBox Grid.Column="5" x:Name="PowerMinuteComboBox" Margin="4,0,0,0" SelectionChanged="PowerScheduleSelection_Changed"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <ToggleButton Grid.Column="0" x:Name="PowerScheduleToggle" Content="Power scheduler disabled" Style="{StaticResource ToggleSwitch}" HorizontalAlignment="Left" Checked="PowerScheduleToggle_Changed" Unchecked="PowerScheduleToggle_Changed" ToolTip="Master enable/disable switch for unattended scheduled shutdown or restart."/>
+                                            <ToggleButton Grid.Column="1" x:Name="ForcePowerActionToggle" Content="Force close apps" Style="{StaticResource ToggleSwitch}" HorizontalAlignment="Right" Checked="ForcePowerActionToggle_Changed" Unchecked="ForcePowerActionToggle_Changed"/>
+                                        </Grid>
+                                        <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,14">
+                                            <StackPanel>
+                                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal"><TextBlock Text="Schedule  " Style="{StaticResource InfoLabelStyle}"/><TextBlock x:Name="PowerScheduleEnabledStateText" Text="Disabled" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/></StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal"><TextBlock Text="Countdown  " Style="{StaticResource InfoLabelStyle}"/><TextBlock x:Name="PowerScheduleCountdownText" Text="--:--:--" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/></StackPanel>
+                                                </Grid>
+                                                <TextBlock x:Name="PowerScheduleStatusText" Text="Automatic Windows shutdown/restart is disabled." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock Text="The scheduler settings remain saved when disabled. Unattended execution requires the Background Monitoring service to be enabled and running." Style="{StaticResource ShortcutHelpStyle}" Margin="0,0,0,12"/>
+                                        <UniformGrid Columns="2"><Button Content="Run action now" Tag="&#xE768;" Style="{StaticResource IconCompactPrimaryButton}" Click="RunPowerActionNowButton_Click" Margin="0,0,6,0"/><Button x:Name="PowerScheduleControlButton" Content="Enable scheduler" Tag="&#xE768;" Style="{StaticResource IconCompactButton}" Click="TogglePowerScheduleButton_Click" Margin="0"/></UniformGrid>
+                                    </StackPanel>
+                                </Border>
+
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <Border Style="{StaticResource CardStyle}">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE7E8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/>
+                                                <TextBlock Text="Windows Power Plan" Style="{StaticResource CardTitleStyle}"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Refresh" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshPowerPlansButton_Click" Margin="0"/>
+                                        </Grid>
+                                        <TextBlock Text="Active plan" Style="{StaticResource InfoLabelStyle}" Margin="0,4,0,2" />
+                                        <TextBlock x:Name="ActivePowerPlanText" Text="Checking..." FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="ActivePowerPlanDetailText" Text="Reading Windows power configuration..." Style="{StaticResource CardDescriptionStyle}" Margin="0,4,0,14" TextWrapping="Wrap" />
+
+                                        <TextBlock Text="Change power plan" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,6" />
+                                        <ComboBox x:Name="PowerPlanComboBox" DisplayMemberPath="Name" MinHeight="34" Margin="0,0,0,10" />
+                                        <Button x:Name="SetActivePowerPlanButton" Content="Set selected plan active" Tag="&#xE73E;" Style="{StaticResource IconCompactPrimaryButton}" Click="SetActivePowerPlanButton_Click" Margin="0,0,0,12" />
+
+                                        <UniformGrid Columns="2">
+                                            <Button Content="Power Options" Tag="&#xE713;" Style="{StaticResource IconCompactButton}" Click="OpenPowerOptionsButton_Click" Margin="0,0,5,0" />
+                                            <Button Content="Lid &amp; power buttons" Tag="&#xE7E8;" Style="{StaticResource IconCompactButton}" Click="OpenLidOptionsButton_Click" Margin="5,0,0,0" />
+                                        </UniformGrid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource CardStyle}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE83F;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="Battery Health" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                        <TextBlock x:Name="BatteryPercentText" Text="Checking..." FontSize="24" FontWeight="SemiBold" Margin="0,14,0,4"/>
+                                        <TextBlock Text="Charge, runtime, design/full capacity, health, voltage, cycles and Windows battery report." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,14"/>
+                                        <Button Content="Open battery diagnostics" Tag="&#xE83F;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenBatteryDiagnosticsButton_Click" Margin="0"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <Border Grid.Row="2"
+                    Background="{DynamicResource ToolbarBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="16,6">
+                <TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" />
+            </Border>
+        </Grid>
+
+        <!-- Hidden legacy controls keep the existing device selection/detail logic source-compatible. -->
+        <Grid Visibility="Collapsed">
+            <TabControl x:Name="SidePanelTabs" />
+            <TextBlock x:Name="NoSelectionText" />
+            <StackPanel x:Name="DeviceDetailsPanel">
+                <TextBlock x:Name="DetailNameText"/><TextBlock x:Name="DetailIpText"/><TextBlock x:Name="DetailStatusText"/><TextBlock x:Name="DetailHostnameText"/><TextBlock x:Name="DetailMacText"/><TextBlock x:Name="DetailResponseText"/><TextBlock x:Name="DetailLastCheckedText"/><TextBlock x:Name="DetailErrorText"/>
+            </StackPanel>
+        </Grid>
+
+        <Grid x:Name="DeviceEditorOverlay"
+              Grid.ColumnSpan="2"
+              Background="{DynamicResource OverlayBrush}"
+              Visibility="Collapsed"
+              Panel.ZIndex="100"
+              KeyboardNavigation.TabNavigation="Cycle"
+              KeyDown="DeviceEditorOverlay_KeyDown">
+            <Border Width="420"
+                    MaxWidth="520"
+                    Background="{DynamicResource CardBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Padding="22"
+                    Effect="{StaticResource AppleCardShadow}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock x:Name="DeviceEditorTitleText" Text="Add device" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,16" />
+                    <TextBlock Text="Device name" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,6" />
+                    <TextBox x:Name="DeviceEditorNameTextBox" MaxLength="80" />
+                    <TextBlock Text="IPv4 address" FontWeight="SemiBold" FontSize="11" Margin="0,14,0,6" />
+                    <TextBox x:Name="DeviceEditorIpTextBox" MaxLength="15" ToolTip="Example: 192.168.1.50" />
+                    <TextBlock x:Name="DeviceEditorValidationText" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" MinHeight="20" Margin="0,7,0,0" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                        <Button Content="Cancel" Tag="&#xE711;" Style="{StaticResource IconButton}" Width="92" Click="CancelDeviceEditorButton_Click" />
+                        <Button Content="Save device" Tag="&#xE74E;" Width="112" Margin="8,0,0,0" Style="{StaticResource IconPrimaryButton}" Click="SaveDeviceEditorButton_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

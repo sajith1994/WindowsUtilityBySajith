@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>14.0</LangVersion>
+    <AssemblyName>CentricDeviceMonitorTray</AssemblyName>
+    <RootNamespace>CentricDeviceMonitor.TrayHost</RootNamespace>
+    <Authors>Sajith Varghese</Authors>
+    <Product>Windows Utility Service Status</Product>
+    <Description>Interactive notification-area companion that shows Windows Utility background service and monitoring health.</Description>
+    <ApplicationIcon>..\CentricDeviceMonitor\Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\CentricDeviceMonitor\Models\BackgroundServiceSnapshot.cs" Link="Models\BackgroundServiceSnapshot.cs" />
+    <Compile Include="..\CentricDeviceMonitor\Services\SharedDataPaths.cs" Link="Services\SharedDataPaths.cs" />
+  </ItemGroup>
+</Project>

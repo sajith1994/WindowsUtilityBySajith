@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <!-- Single source of truth for the application, service and tray companion release version. -->
+    <AppVersion>2.0.46</AppVersion>
+    <Version>$(AppVersion)</Version>
+    <AssemblyVersion>$(AppVersion).0</AssemblyVersion>
+    <FileVersion>$(AppVersion).0</FileVersion>
+    <InformationalVersion>$(AppVersion)</InformationalVersion>
+  </PropertyGroup>
+</Project>

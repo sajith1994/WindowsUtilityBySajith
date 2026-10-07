@@ -1,0 +1,95 @@
+<Window x:Class="CentricDeviceMonitor.Dialogs.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About Windows Utility by Sajith"
+        Width="760"
+        Height="720"
+        MinWidth="580"
+        MinHeight="500"
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,9,0" />
+                    <TextBlock Text="Windows Utility" FontSize="25" FontWeight="SemiBold" />
+                    <TextBlock Text="by Sajith" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" Margin="7,8,0,0" />
+                </StackPanel>
+                <TextBlock x:Name="VersionText" Text="Version" Foreground="{DynamicResource MutedTextBrush}" Margin="33,2,0,0" />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <TextBlock Text="Windows monitoring, diagnostics and technician toolkit" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Text="A focused utility for network monitoring, hardware diagnostics, Windows maintenance, storage and battery testing, power scheduling and common support tasks."
+                               Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,12" />
+                    <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,14">
+                        <TextBlock Text="Made for IT technicians by an IT technician." FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </Border>
+
+                    <TextBlock Text="Network scanner &amp; managed devices" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
+                    <TextBlock Text="• Local IPv4 subnet scanner with responsive background scanning and multi-select import&#x0a;• Managed-device live status is visible directly in Network Diagnostics; the scanner window handles discovery and address management&#x0a;• Manual add/edit/remove by IPv4 address, hostname/MAC discovery where available&#x0a;• Configurable automatic ping monitoring with next-test countdown&#x0a;• Incident-based outage/recovery logs with downtime and active duration"
+                               TextWrapping="Wrap" Margin="0,4,0,12" />
+
+                    <TextBlock Text="CPU, RAM &amp; hardware monitoring" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
+                    <TextBlock Text="• CPU model, live utilization, temperature, clock, real package power and fan RPM when exposed&#x0a;• LibreHardwareMonitor with PawnIO low-level sensor access and supported fallbacks&#x0a;• Supervised CPU/GPU thermal loads with integrated-GPU shared-package safety and persistent Start/Stop controls&#x0a;• One-minute CPU temperature samples and configurable repeating high-temperature alerts&#x0a;• CPU >=95% for one minute and RAM >90% incident logging&#x0a;• RAM capacity/speed plus active network-adapter health"
+                               TextWrapping="Wrap" Margin="0,4,0,12" />
+
+                    <TextBlock Text="System health &amp; connectivity" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
+                    <TextBlock Text="• Windows edition/display version and full OS build number&#x0a;• Laptop battery percentage/state when a battery is present&#x0a;• Wi-Fi signal percentage and SSID where Windows reports them&#x0a;• Preferred local IPv4 address, default gateway/DNS and active adapter summary&#x0a;• Public IP, IP-based city/region/country and ISP/ASN/server details with cached HTTPS lookup"
+                               TextWrapping="Wrap" Margin="0,4,0,12" />
+
+                    <TextBlock Text="Storage diagnostics" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
+                    <TextBlock Text="• SSD/HDD/NVMe/USB model, bus, health, wear/endurance, temperature and reliability counters where supported&#x0a;• Sequential read/write benchmarks from 64 MB up to 32 GB for high-speed NVMe testing&#x0a;• Continuous benchmark mode with result history&#x0a;• Real-capacity verification for fixed/removable drives to help detect overstated/counterfeit capacity&#x0a;• Live one-second verification speed, written/verified data, percentages, elapsed time and ETA"
+                               TextWrapping="Wrap" Margin="0,4,0,12" />
+
+                    <TextBlock Text="Battery diagnostics" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
+                    <TextBlock Text="• Charge remaining, estimated runtime, design capacity, full-charge capacity and calculated health&#x0a;• Model, manufacturer, serial/ID, chemistry, voltage, rate and cycle count where Windows exposes them&#x0a;• Windows HTML/XML battery report generation for capacity history"
+                               TextWrapping="Wrap" Margin="0,4,0,12" />
+
+                    <TextBlock Text="Windows administration &amp; maintenance" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
+                    <TextBlock Text="• LocalSystem background monitoring service with Automatic (Delayed Start)&#x0a;• Elevated dashboard startup after sign-in&#x0a;• Print Spooler Start/Stop/Restart directly from the top status card without repeated UAC prompts&#x0a;• Exact daily Windows restart/shutdown schedule with force option and live countdown&#x0a;• Active Windows power-plan detection and switching, plus direct Power Options and lid/power-button shortcuts&#x0a;• Temporary-file cleanup with deleted/skipped file report and reclaimed-space totals&#x0a;• Close visible non-Windows user applications with a detailed termination report"
+                               TextWrapping="Wrap" Margin="0,4,0,12" />
+
+                    <TextBlock Text="Technician shortcuts &amp; external tools" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
+                    <TextBlock Text="• Devices &amp; Printers, Task Manager, elevated Disk Cleanup, DiskPart and Disk Management shortcuts&#x0a;• Guarded disk tools for Clean Disk, RAW initialization, full-size partition creation and selected-partition deletion; Windows boot/system disks are blocked&#x0a;• Command Prompt and PowerShell launchers plus command-entry runners with Normal/Administrator mode toggles&#x0a;• Essential Windows Repair shortcuts for SFC, online/offline DISM, CHKDSK and guarded BootRec/WinRE recovery commands&#x0a;• Windows activation status plus official Microsoft activation settings/help&#x0a;• Chris Titus Tech WinUtil, Raphire Win11Debloat and Winhance launchers; official GitHub README commands refresh at dashboard startup before elevated PowerShell execution"
+                               TextWrapping="Wrap" Margin="0,4,0,14" />
+
+                    <Separator Margin="0,0,0,12" />
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="115"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Developer" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,9"/><TextBlock Grid.Row="0" Grid.Column="1" Text="Sajith Varghese" FontWeight="SemiBold" Margin="0,0,0,9"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Platform" Foreground="{DynamicResource MutedTextBrush}"/><TextBlock Grid.Row="1" Grid.Column="1" Text="Windows • .NET 10 • WPF • LocalSystem background service" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button Content="Terms &amp; Conditions"
+                        Tag="&#xE8D7;"
+                        Style="{StaticResource IconButton}"
+                        MinWidth="170"
+                        Click="TermsButton_Click"
+                        Margin="0,0,8,0" />
+                <Button Content="Check for updates"
+                        Tag="&#xE777;"
+                        Style="{StaticResource IconButton}"
+                        MinWidth="170"
+                        Click="UpdateButton_Click"
+                        Margin="0" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="Close" Tag="&#xE711;" Style="{StaticResource IconPrimaryButton}" HorizontalAlignment="Right" Width="100" Click="CloseButton_Click" Margin="0" />
+        </Grid>
+    </Grid>
+</Window>

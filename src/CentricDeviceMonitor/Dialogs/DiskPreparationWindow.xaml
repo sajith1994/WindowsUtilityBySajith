@@ -1,0 +1,125 @@
+<Window x:Class="CentricDeviceMonitor.Dialogs.DiskPreparationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DiskPart &amp; Disk Management - Windows Utility by Sajith"
+        Width="1080" Height="760" MinWidth="860" MinHeight="640"
+        ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterOwner">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1.55*"/>
+            <RowDefinition Height="1.1*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Text="DiskPart &amp; disk management" FontSize="22" FontWeight="SemiBold"/>
+                <TextBlock Text="Clean, initialize, partition and format non-system disks. Boot/system disks are always protected."
+                           Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button x:Name="RefreshButton" Content="Refresh disks" Tag="&#xE72C;" Style="{StaticResource IconButton}" Click="RefreshButton_Click" Margin="0,0,8,0"/>
+                <Button Content="Open DiskPart (Admin)" Tag="&#xE7EF;" Style="{StaticResource IconPrimaryButton}" Click="OpenDiskPartButton_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10">
+            <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <TextBlock Text="Physical disks" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <DataGrid Grid.Row="1" x:Name="DiskGrid" ItemsSource="{Binding Disks}" AutoGenerateColumns="False" IsReadOnly="True"
+                          SelectionMode="Single" CanUserAddRows="False" SelectionChanged="DiskGrid_SelectionChanged">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Disk" Binding="{Binding Number}" Width="55"/>
+                        <DataGridTextColumn Header="Model" Binding="{Binding FriendlyName}" Width="2*"/>
+                        <DataGridTextColumn Header="Bus" Binding="{Binding BusType}" Width="80"/>
+                        <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" Width="90"/>
+                        <DataGridTextColumn Header="Allocated" Binding="{Binding AllocatedText}" Width="95"/>
+                        <DataGridTextColumn Header="Free" Binding="{Binding UnallocatedText}" Width="95"/>
+                        <DataGridTextColumn Header="Partitions" Binding="{Binding NumberOfPartitions}" Width="80"/>
+                        <DataGridTextColumn Header="Style" Binding="{Binding PartitionStyle}" Width="70"/>
+                        <DataGridTextColumn Header="Health" Binding="{Binding HealthStatus}" Width="80"/>
+                        <DataGridTextColumn Header="Protection" Binding="{Binding ProtectionText}" Width="145"/>
+                        <DataGridTextColumn Header="Serial" Binding="{Binding SerialNumber}" Width="145"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10" Margin="0,10,0,0">
+            <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <TextBlock x:Name="PartitionHeaderText" Text="Partitions - select a disk above" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <DataGrid Grid.Row="1" x:Name="PartitionGrid" ItemsSource="{Binding Partitions}" AutoGenerateColumns="False" IsReadOnly="True"
+                          SelectionMode="Single" CanUserAddRows="False" SelectionChanged="PartitionGrid_SelectionChanged">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="#" Binding="{Binding PartitionNumber}" Width="50"/>
+                        <DataGridTextColumn Header="Drive" Binding="{Binding DriveLetterText}" Width="65"/>
+                        <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" Width="100"/>
+                        <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="2*"/>
+                        <DataGridTextColumn Header="Flags" Binding="{Binding FlagsText}" Width="2*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="3" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,10,0,0">
+            <StackPanel>
+                <TextBlock Text="Disk actions" FontSize="15" FontWeight="SemiBold"/>
+                <TextBlock x:Name="SelectedDiskText" Text="Select a physical disk above. Boot/system disks are always blocked."
+                           Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,2,0,9"/>
+
+                <WrapPanel Margin="0,0,0,8" VerticalAlignment="Center">
+                    <TextBlock Text="Partition style" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="PartitionStyleComboBox" Width="86" SelectedIndex="0" Margin="0,0,14,0">
+                        <ComboBoxItem Content="GPT"/><ComboBoxItem Content="MBR"/>
+                    </ComboBox>
+                    <TextBlock Text="File system" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="FileSystemComboBox" Width="86" SelectedIndex="0" Margin="0,0,14,0">
+                        <ComboBoxItem Content="NTFS"/><ComboBoxItem Content="exFAT"/>
+                    </ComboBox>
+                    <TextBlock Text="Label" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox x:Name="VolumeLabelTextBox" Width="140" Text="New Volume" MaxLength="32" Margin="0,0,14,0"/>
+                    <TextBlock Text="Partition size" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox x:Name="PartitionSizeTextBox" Width="72" Text="100" IsEnabled="False" Margin="0,0,4,0"/>
+                    <TextBlock Text="GB" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <CheckBox x:Name="UseMaximumSizeCheckBox" Content="Use maximum free space" IsChecked="True"
+                              VerticalAlignment="Center" Checked="PartitionSizeMode_Changed" Unchecked="PartitionSizeMode_Changed"/>
+                </WrapPanel>
+
+                <UniformGrid Columns="5" Margin="0,0,0,8">
+                    <Button x:Name="CleanDiskButton" Content="Clean disk" Tag="&#xE74D;" Style="{StaticResource IconButton}"
+                            Click="CleanDiskButton_Click" Margin="0,0,6,0" IsEnabled="False" ToolTip="Erase the complete partition table and return the disk to RAW."/>
+                    <Button x:Name="InitializeButton" Content="Initialize disk" Tag="&#xE7C3;" Style="{StaticResource IconButton}"
+                            Click="InitializeButton_Click" Margin="0,0,6,0" IsEnabled="False" ToolTip="Initialize a RAW disk as GPT or MBR without creating a partition."/>
+                    <Button x:Name="CreatePartitionButton" Content="Create partition" Tag="&#xE710;" Style="{StaticResource IconPrimaryButton}"
+                            Click="CreatePartitionButton_Click" Margin="0,0,6,0" IsEnabled="False" ToolTip="Create and format a partition. Enter a size to create multiple partitions one at a time."/>
+                    <Button x:Name="FormatPartitionButton" Content="Format selected" Tag="&#xE8B7;" Style="{StaticResource IconButton}"
+                            Click="FormatPartitionButton_Click" Margin="0,0,6,0" IsEnabled="False" ToolTip="Quick-format only the selected partition using the chosen file system and label."/>
+                    <Button x:Name="DeletePartitionButton" Content="Delete selected" Tag="&#xE74D;" Style="{StaticResource IconButton}"
+                            Click="DeletePartitionButton_Click" IsEnabled="False" ToolTip="Delete only the selected partition and return its space to unallocated space."/>
+                </UniformGrid>
+
+                <Grid Margin="0,0,0,7">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Button x:Name="PrepareDiskButton" Content="Erase + prepare full disk" Tag="&#xE777;" Style="{StaticResource IconButton}"
+                            Click="PrepareDiskButton_Click" IsEnabled="False" MinWidth="210" Margin="0,0,10,0"
+                            ToolTip="Destructive one-click workflow: clean, initialize, create one maximum-size partition and format it."/>
+                    <TextBlock Grid.Column="1" Text="For a previously formatted SSD that you want to reuse from scratch. This erases the entire selected disk, then initializes and formats it using the options above."
+                               Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                </Grid>
+
+                <TextBlock x:Name="OperationStatusText" Text="Select a disk to see the available operations."
+                           Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="4" Margin="0,10,0,0">
+            <TextBlock Text="WARNING: Clean, Erase + prepare, Format and Delete can destroy data. Always verify disk number, model, size and serial. Boot/system disks remain blocked."
+                       Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,120,0"/>
+            <Button Content="Close" Tag="&#xE711;" Style="{StaticResource IconButton}" Width="100" HorizontalAlignment="Right" Click="CloseButton_Click"/>
+        </Grid>
+    </Grid>
+</Window>

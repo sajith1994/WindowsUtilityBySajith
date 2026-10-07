@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>14.0</LangVersion>
+    <AssemblyName>WindowsUtilityBySajith</AssemblyName>
+    <RootNamespace>CentricDeviceMonitor</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Authors>Sajith Varghese</Authors>
+    <Product>Windows Utility by Sajith</Product>
+    <Description>Windows monitoring, network device management, CPU/RAM/temperature health alerts, controlled CPU/GPU thermal load testing, extended Windows/network health, packet-loss diagnostics, local-link and FAST.com internet testing, visual two-PC LAN throughput testing, storage and battery diagnostics, guarded disk/partition management, command runners, activation status, technician shortcuts, cleanup reporting, user-application shutdown, and external administration tools.</Description>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.7-pre708" />
+    <PackageReference Include="System.Management" Version="10.0.9" />
+    <PackageReference Include="Hwinfo.SharedMemory.Net" Version="2.1.0" />
+    <!-- Direct3D 11 bindings for the GPU compute thermal load. Hand-rolled COM interop for
+         ID3D11Device/Context/ComputeShader is long and easy to get subtly wrong; these are
+         maintained bindings over the same API. -->
+    <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.6.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\app-logo.png" />
+    <Resource Include="Assets\app-artwork.jpg" />
+    <Content Include="..\..\TERMS-AND-CONDITIONS.txt" Link="TERMS-AND-CONDITIONS.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

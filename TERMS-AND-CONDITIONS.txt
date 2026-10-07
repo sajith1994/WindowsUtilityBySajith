@@ -1,0 +1,264 @@
+WINDOWS UTILITY BY SAJITH
+END USER LICENCE AGREEMENT, TERMS OF USE AND DISCLAIMER
+
+Last Updated: 30 August 2026
+
+Please read these Terms and Conditions carefully before installing or using Windows Utility by Sajith (the "Software").
+
+By selecting "I accept the agreement", installing, accessing, or using the Software, you confirm that you have read, understood, and agreed to these Terms.
+
+If you do not agree with these Terms, do not install or use the Software.
+
+1. PURPOSE OF THE SOFTWARE
+
+Windows Utility by Sajith is an IT administration, monitoring, diagnostic and troubleshooting utility intended primarily for IT technicians, system administrators and other authorised users.
+
+The Software may provide capabilities including, but not limited to:
+
+- System health and hardware monitoring
+- CPU temperature, usage and power monitoring
+- Controlled CPU and GPU thermal load testing
+- Memory and Windows system information
+- Storage health and performance testing
+- Storage capacity verification
+- Disk and partition management
+- Disk cleaning, formatting and initialisation
+- Network diagnostics
+- Local link bandwidth and optional internet speed testing
+- IP address and local network scanning
+- TCP port scanning
+- Managed-device availability monitoring
+- Network troubleshooting and repair commands
+- DNS, Winsock, TCP/IP and ARP reset functions
+- Windows power plan management
+- Shutdown and restart scheduling
+- Battery diagnostics
+- Windows service management
+- Print Spooler management
+- Diagnostic and connection-history logging
+- Administrative shortcuts and third-party system tools
+
+Certain functions require Windows Administrator or LocalSystem privileges.
+
+2. AUTHORISED USE
+
+You must only use the Software on computers, networks, storage devices and other systems that you own or have explicit permission to administer.
+
+Network scanning, port scanning, device monitoring or administrative actions must not be performed against systems for which you do not have authorisation.
+
+The user is solely responsible for ensuring that use of the Software complies with applicable laws, organisational policies and network-security requirements.
+
+3. ADMINISTRATIVE AND DESTRUCTIVE OPERATIONS
+
+Some functions of the Software can make significant changes to Windows, networking, storage devices or system configuration.
+
+These functions may include:
+
+- Cleaning or erasing disks
+- Creating or deleting partitions
+- Formatting storage devices
+- Resetting Winsock or TCP/IP
+- Releasing or renewing network addresses
+- Restarting or shutting down Windows
+- Changing power configurations
+- Starting, stopping or restarting Windows services
+- Running elevated administrative commands
+- Performing intensive storage tests
+- Running CPU or GPU thermal load tests
+
+These operations may result in data loss, temporary network disconnection, system restart, service interruption or configuration changes.
+
+The Software includes safeguards where reasonably possible, including protection against certain operations on recognised Windows boot or system disks. However, no automated safeguard can guarantee protection against every possible configuration or user error.
+
+You are responsible for confirming that the correct device, disk, computer, network interface or system has been selected before performing an operation.
+
+4. BACKUP RESPONSIBILITY
+
+Before performing any operation that may modify disks, partitions, Windows configuration, networking or important system settings, you should maintain a current and verified backup of all important data.
+
+The developer is not responsible for data loss resulting from the user's failure to maintain appropriate backups.
+
+5. STORAGE AND PERFORMANCE TESTING
+
+Storage benchmark and capacity-verification features may write large quantities of temporary data to a storage device.
+
+These tests may:
+
+- Take a significant amount of time
+- Generate sustained disk activity
+- Consume available free storage temporarily
+- Increase SSD/HDD write activity
+- Produce heat or additional system load
+
+The user is responsible for deciding whether a particular storage device is suitable for testing.
+
+Storage health, speed, endurance, temperature and SMART information are provided for diagnostic purposes and depend on information made available by Windows, the hardware manufacturer, drivers and third-party hardware-monitoring interfaces.
+
+Results should not be treated as a guarantee of future hardware reliability.
+
+6. CPU AND GPU THERMAL LOAD TESTING
+
+The CPU & GPU Thermal Load Test deliberately creates sustained processor and graphics-rendering activity. It is intended as a short, supervised diagnostic to observe temperature rise, fan response, thermal throttling and cooler behaviour.
+
+The test may increase temperatures, fan speed, power consumption and system noise, and may expose pre-existing cooling, power, driver or hardware instability. It must not be left unattended. Stop immediately if there is unusual noise, smell, smoke, display corruption, severe throttling, instability or any other sign of unsafe operation.
+
+The Software requires relevant temperature telemetry before starting a selected load and attempts to stop when the configured temperature limit is reached, telemetry becomes unavailable, the selected duration ends or the test window closes. For integrated-only graphics that share the processor package, the Software may use the CPU package temperature as the graphics safety sensor when no separate integrated-GPU temperature is exposed. Dedicated, hybrid or unclassified graphics configurations still require separate GPU temperature telemetry. These safeguards depend on sensor, driver, operating-system and application responsiveness and cannot guarantee that hardware will remain below a particular temperature or avoid damage.
+
+The CPU stop-temperature control can be set as high as 105 °C. Depending on the processor, this may be at or above its thermal-throttling or maximum operating threshold. Selecting a high stop temperature does not mean that the temperature is safe for a particular system; the user remains responsible for choosing an appropriate limit and stopping the test immediately if unsafe behaviour is observed.
+
+The built-in GPU workload uses WPF/Direct3D hardware rendering when Windows reports an available rendering tier. It is not a vendor-specific maximum-power benchmark and may not fully load every GPU or multi-GPU configuration. Test results are diagnostic observations, not certification of cooling capacity, stability or future reliability.
+
+7. NETWORK MONITORING AND SCANNING
+
+The Software may discover and monitor devices by using network technologies such as ICMP/ping, DNS, ARP and TCP connectivity checks.
+
+The Software may record technical information including:
+
+- IP addresses
+- MAC addresses
+- Hostnames
+- User-assigned device names
+- Response times
+- Online/offline status
+- Connection timestamps
+- Connection incidents
+- Open TCP ports
+- Network diagnostic results
+
+Device availability is generally determined through network reachability. An unreachable device does not necessarily mean that the computer was shut down or restarted.
+
+Where the Software identifies a shutdown/restart event based solely on loss and restoration of network connectivity, that event should be considered an inferred diagnostic event, not confirmation of the actual cause.
+
+The Network Speed & Bandwidth feature can report negotiated Ethernet/Wi-Fi link information without internet access. For public internet testing, the Software opens the official FAST.com website in the user's default browser; the speed test itself is performed by FAST.com/Netflix and is subject to that service's availability and terms. FAST.com may receive the connection's public IP address and normal browser/network metadata. For local-network testing, the Software can temporarily run a TCP throughput server on one authorised PC and send/receive generated in-memory test data from another authorised PC on the LAN. The LAN test does not read, transfer or upload local user files, but it may generate substantial network traffic for the selected test duration. Internet and LAN throughput tests run only when explicitly started by the user.
+
+8. PRIVACY AND DATA HANDLING
+
+Windows Utility by Sajith is not designed to collect personal information for advertising, profiling, resale or marketing purposes.
+
+The Software does not intentionally transmit personal information, diagnostic information or monitored-device information to the developer as part of its normal operation.
+
+Most application information and diagnostic logs are processed and stored locally on the computer where the Software is installed.
+
+Local information may include:
+
+- Computer and hardware information
+- Windows version information
+- IP and MAC addresses
+- Network hostnames
+- Device names
+- Monitoring results
+- Diagnostic logs
+- Application configuration
+- Connection history
+- Storage information
+- User-entered labels or device names
+
+Some technical information, such as IP addresses, device names or hostnames, may be considered personal data under applicable privacy laws depending on how they are used.
+
+The administrator operating the Software is responsible for ensuring that monitoring of employees, customers, devices or networks complies with applicable privacy and data-protection requirements.
+
+The developer does not sell personal information collected through the Software.
+
+Information will only be shared with the developer if the user or administrator intentionally provides diagnostic logs, screenshots or other information for troubleshooting or support.
+
+9. MALWARE AND SECURITY STATEMENT
+
+Windows Utility by Sajith is developed as a legitimate system administration and diagnostic utility and is not designed to operate as malware, spyware, ransomware, a computer virus or other malicious software.
+
+Because the Software performs administrative activities such as network scanning, service management, hardware access, disk operations and system configuration, some antivirus, endpoint-protection or application-control products may classify or flag certain functions as potentially sensitive.
+
+Such a warning does not by itself establish that the Software is malicious.
+
+Users and organisations remain responsible for evaluating and approving the Software under their own cybersecurity policies before deployment.
+
+10. THIRD-PARTY COMPONENTS
+
+The Software may use or provide access to third-party libraries, drivers, utilities or Windows components.
+
+Third-party software remains subject to the licence terms and conditions of its respective developer or publisher.
+
+The developer of Windows Utility by Sajith does not control and cannot guarantee the continued availability, behaviour, compatibility or security of third-party components.
+
+11. NO GUARANTEE OF AVAILABILITY OR ACCURACY
+
+The Software is provided as an IT administration and diagnostic tool.
+
+Although reasonable efforts are made to provide reliable information and safeguards, the developer does not guarantee that:
+
+- Every hardware sensor will be detected
+- Every device will respond to monitoring
+- Every network issue will be identified
+- Every diagnostic result will be completely accurate
+- Every Windows or hardware configuration will be supported
+- Every third-party component will remain compatible
+- The Software will operate without interruption or error
+
+Hardware manufacturers, Windows updates, drivers, security policies and network configurations may affect the availability and accuracy of individual functions.
+
+12. LIMITATION OF LIABILITY
+
+To the maximum extent permitted by applicable law, the developer and distributor of Windows Utility by Sajith shall not be liable for indirect, incidental, consequential or special loss arising from the installation or use of the Software.
+
+This may include, without limitation:
+
+- Loss of data
+- Disk or partition damage
+- Loss of network connectivity
+- Windows configuration changes
+- System downtime
+- Business interruption
+- Loss of productivity
+- Hardware failure
+- Loss of access to systems
+- Problems arising from incorrect configuration or use
+- Problems caused by third-party software, drivers or Windows updates
+
+The user accepts responsibility for administrative actions deliberately initiated through the Software.
+
+Nothing in these Terms excludes or limits liability that cannot legally be excluded or limited under applicable law.
+
+13. USER RESPONSIBILITY
+
+By using the Software, you acknowledge that IT administration tools can perform powerful system-level operations.
+
+You agree to:
+
+- Verify targets before executing administrative operations
+- Maintain appropriate backups
+- Use the Software only on authorised systems
+- Review warnings before destructive operations
+- Avoid interrupting storage operations unnecessarily
+- Understand the consequences of network-reset operations
+- Restart Windows when instructed after network-stack changes
+- Follow your organisation's IT and security policies
+
+The Software should be operated by users who understand the consequences of the actions being performed.
+
+14. UPDATES AND CHANGES
+
+The Software may be updated periodically to add functionality, improve compatibility, correct defects or improve security.
+
+Features and behaviour may change between versions.
+
+Users should install current versions where reasonably possible.
+
+15. NO WARRANTY
+
+To the maximum extent permitted by applicable law, the Software is provided "as is" and "as available", without warranties of uninterrupted operation, fitness for a particular purpose or compatibility with every computer, network or hardware configuration.
+
+This clause does not affect any statutory rights that cannot legally be waived.
+
+16. ACCEPTANCE
+
+By continuing with the installation, you confirm that:
+
+- You have read and understood these Terms.
+- You are authorised to install the Software on this computer.
+- You understand that the Software contains advanced administrative and diagnostic functions.
+- You understand that some functions can modify system, network, disk or power configuration.
+- You will maintain appropriate backups before performing destructive operations.
+- You accept responsibility for actions you deliberately initiate through the Software.
+- You understand how technical and diagnostic information is processed by the Software.
+- You agree to these Terms and Conditions.
+
+Made for IT technicians by an IT technician.

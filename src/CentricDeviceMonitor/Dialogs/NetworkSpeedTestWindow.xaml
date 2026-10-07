@@ -1,0 +1,325 @@
+<Window x:Class="CentricDeviceMonitor.Dialogs.NetworkSpeedTestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Network Speed &amp; Bandwidth"
+        Width="980"
+        Height="860"
+        MinWidth="820"
+        MinHeight="680"
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterOwner"
+        Closed="Window_Closed">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="Network Speed &amp; Bandwidth" FontSize="25" FontWeight="SemiBold" />
+            <TextBlock Text="Check packet loss and link quality, inspect the active Ethernet/Wi-Fi link, use FAST.com for public internet speed, or measure actual end-to-end LAN throughput between two PCs without internet access."
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,3,0,0" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE968;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                <TextBlock Text="Local link bandwidth" Style="{StaticResource CardTitleStyle}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Refresh link" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshLinkButton_Click" Margin="0" />
+                        </Grid>
+                        <TextBlock Text="Use this for a quick adapter check. It works without internet and shows the negotiated Ethernet/Wi-Fi link rate, local traffic and gateway latency. The negotiated link rate is capacity, not a measured PC-to-PC transfer speed."
+                                   Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,14" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Active adapter" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" x:Name="AdapterNameText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                            <TextBlock Grid.Row="1" Text="Connection type" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="ConnectionTypeText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="2" Text="Local IP / gateway" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LocalAddressText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="3" Text="Negotiated link" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="NegotiatedLinkText" Text="Checking..." FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" Margin="0,4"/>
+                            <TextBlock Grid.Row="4" Text="Wi-Fi receive / transmit" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="WifiRatesText" Text="Not applicable" Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="5" Text="Wi-Fi details" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="5" Grid.Column="1" x:Name="WifiDetailsText" Text="Not applicable" Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="6" Text="Gateway latency" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="6" Grid.Column="1" x:Name="GatewayLatencyText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="7" Text="Current traffic" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="7" Grid.Column="1" x:Name="CurrentTrafficText" Text="Sampling..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="8" Text="Internet" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                            <TextBlock Grid.Row="8" Grid.Column="1" x:Name="InternetAvailabilityText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="&#xE9D9;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                            <TextBlock Text="Packet loss &amp; link quality" Style="{StaticResource CardTitleStyle}" />
+                        </StackPanel>
+                        <TextBlock Text="Send a controlled series of pings to the local gateway or another PC and measure loss, latency and jitter. For a cable-path check, target the gateway or a wired PC on the same LAN: repeated loss can indicate a cable, connector, NIC or switch-port problem. Ping is an indicator and does not replace a physical cable tester."
+                                   Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,14" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.08*" />
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="0.92*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14">
+                                <StackPanel>
+                                    <TextBlock Text="Test target" FontWeight="SemiBold" FontSize="14" />
+                                    <TextBlock Text="The detected default gateway is normally the best first test for the local cable/Wi-Fi path. You can also enter another local PC, router or hostname."
+                                               Style="{StaticResource ShortcutHelpStyle}" Margin="0,4,0,12" />
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBox x:Name="PacketLossTargetText" ToolTip="Gateway, IPv4/IPv6 address or hostname to ping." />
+                                        <Button Grid.Column="1" x:Name="UseGatewayButton" Content="Use gateway" Tag="&#xE968;" Style="{StaticResource IconCompactButton}" Click="UseGatewayButton_Click" Margin="8,0,0,0" />
+                                    </Grid>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="110"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="125"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Packets" Style="{StaticResource InfoLabelStyle}" />
+                                        <ComboBox Grid.Column="1" x:Name="PacketCountComboBox" Margin="8,0,16,0" SelectedIndex="1">
+                                            <ComboBoxItem Content="10 (quick)" Tag="10" />
+                                            <ComboBoxItem Content="25" Tag="25" />
+                                            <ComboBoxItem Content="50" Tag="50" />
+                                            <ComboBoxItem Content="100" Tag="100" />
+                                            <ComboBoxItem Content="Continuous" Tag="0" />
+                                        </ComboBox>
+                                        <TextBlock Grid.Column="2" Text="Interval" Style="{StaticResource InfoLabelStyle}" />
+                                        <ComboBox Grid.Column="3" x:Name="PacketIntervalComboBox" Margin="8,0,0,0" SelectedIndex="4">
+                                            <ComboBoxItem Content="5 ms (stress)" Tag="5" />
+                                            <ComboBoxItem Content="10 ms" Tag="10" />
+                                            <ComboBoxItem Content="25 ms" Tag="25" />
+                                            <ComboBoxItem Content="50 ms" Tag="50" />
+                                            <ComboBoxItem Content="100 ms" Tag="100" />
+                                            <ComboBoxItem Content="250 ms" Tag="250" />
+                                            <ComboBoxItem Content="500 ms" Tag="500" />
+                                            <ComboBoxItem Content="1 second" Tag="1000" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <UniformGrid Columns="2">
+                                        <Button x:Name="RunPacketLossButton" Content="Run packet-loss test" Tag="&#xE9D9;" Style="{StaticResource IconCompactPrimaryButton}" Click="RunPacketLossButton_Click" Margin="0,0,6,0" />
+                                        <Button x:Name="CancelPacketLossButton" Content="Stop / Cancel" Tag="&#xE711;" Style="{StaticResource IconCompactButton}" Click="CancelPacketLossButton_Click" IsEnabled="False" Margin="0" />
+                                    </UniformGrid>
+                                    <ProgressBar x:Name="PacketLossProgressBar" Minimum="0" Maximum="25" Value="0" Height="6" Margin="0,12,0,7" />
+                                    <TextBlock x:Name="PacketLossStatusText" Text="Ready. Refresh the local link to detect the default gateway." Style="{StaticResource ShortcutHelpStyle}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Network quality" FontWeight="SemiBold" FontSize="14" />
+                                        <TextBlock Grid.Column="1" x:Name="PacketQualityText" Text="Not tested" FontSize="17" FontWeight="SemiBold" />
+                                    </Grid>
+                                    <UniformGrid Columns="2" Margin="0,0,-8,6">
+                                        <Border Style="{StaticResource MetricCardStyle}">
+                                            <StackPanel><TextBlock Text="Packet loss" Style="{StaticResource InfoLabelStyle}"/><TextBlock x:Name="PacketLossPercentText" Text="--%" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource MetricCardStyle}">
+                                            <StackPanel><TextBlock Text="Received" Style="{StaticResource InfoLabelStyle}"/><TextBlock x:Name="PacketCountsText" Text="-- / --" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource MetricCardStyle}">
+                                            <StackPanel><TextBlock Text="Average latency" Style="{StaticResource InfoLabelStyle}"/><TextBlock x:Name="PacketAverageLatencyText" Text="-- ms" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource MetricCardStyle}">
+                                            <StackPanel><TextBlock Text="Jitter" Style="{StaticResource InfoLabelStyle}"/><TextBlock x:Name="PacketJitterText" Text="-- ms" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                        </Border>
+                                    </UniformGrid>
+                                    <TextBlock x:Name="PacketLatencyRangeText" Text="Latency range: --" Style="{StaticResource ShortcutHelpStyle}" Margin="0,2,0,6" />
+                                    <TextBlock x:Name="PacketInterpretationText" Text="Run a test to assess the selected path." Style="{StaticResource CardDescriptionStyle}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="&#xE774;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                            <TextBlock Text="Internet speed - FAST.com" Style="{StaticResource CardTitleStyle}" />
+                        </StackPanel>
+                        <TextBlock Text="Use this when you want to measure the public internet connection supplied by the ISP. FAST.com opens in your default browser, starts the download test automatically, and its Show more info option displays upload speed plus unloaded/loaded latency."
+                                   Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />
+                        <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,12">
+                            <TextBlock Text="Why the browser? FAST.com does not provide a supported public API for third-party application integration. Opening the official site avoids the 403/API compatibility failures caused by undocumented speed-test endpoints."
+                                       Style="{StaticResource ShortcutHelpStyle}" TextWrapping="Wrap" />
+                        </Border>
+                        <Button x:Name="OpenFastComButton" Content="Open FAST.com internet speed test" Tag="&#xE774;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenFastComButton_Click" ToolTip="Opens the official FAST.com speed test in your default web browser." />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="&#xE839;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                            <TextBlock Text="Actual LAN throughput - PC to PC" Style="{StaticResource CardTitleStyle}" />
+                        </StackPanel>
+                        <TextBlock Text="Use this to measure the real TCP transfer speed between two PCs on the same Ethernet/Wi-Fi network. Internet access is not required. Install/run Windows Utility on both PCs: start the LAN test server on one PC, then enter that PC's IP address on the other and run the test."
+                                   Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,14" />
+
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14">
+                                <StackPanel>
+                                    <TextBlock Text="PC A - LAN test server" FontWeight="SemiBold" FontSize="14" />
+                                    <TextBlock Text="Start this on the other PC. Keep this window open while PC B runs the test. The server receives/sends generated memory data only; it never reads your files."
+                                               Style="{StaticResource ShortcutHelpStyle}" Margin="0,4,0,12" />
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="This PC IP" Style="{StaticResource InfoLabelStyle}" Margin="0,4" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="LanServerAddressText" Text="Refresh link to detect" FontWeight="SemiBold" Margin="0,4" />
+                                        <TextBlock Grid.Row="1" Text="TCP port" Style="{StaticResource InfoLabelStyle}" Margin="0,4" />
+                                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="LanServerPortText" Text="5201" Width="100" HorizontalAlignment="Left" ToolTip="TCP port used by the temporary LAN throughput server." />
+                                        <TextBlock Grid.Row="2" Text="Server status" Style="{StaticResource InfoLabelStyle}" Margin="0,4" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LanServerStatusText" Text="Stopped" Margin="0,4" TextWrapping="Wrap" />
+                                    </Grid>
+
+                                    <UniformGrid Columns="2" Margin="0,12,0,0">
+                                        <Button x:Name="StartLanServerButton" Content="Start server" Tag="&#xE768;" Style="{StaticResource IconCompactPrimaryButton}" Click="StartLanServerButton_Click" Margin="0,0,6,0" ToolTip="Starts the temporary TCP throughput server on this PC." />
+                                        <Button x:Name="StopLanServerButton" Content="Stop server" Tag="&#xE71A;" Style="{StaticResource IconCompactButton}" Click="StopLanServerButton_Click" IsEnabled="False" Margin="0" ToolTip="Stops the temporary LAN throughput server." />
+                                    </UniformGrid>
+                                    <Button Content="Allow test port in Windows Firewall" Tag="&#xE72E;" Style="{StaticResource IconCompactButton}" Click="AllowLanFirewallButton_Click" Margin="0,8,0,0" ToolTip="Adds an inbound TCP firewall rule for the selected port on Private/Domain profiles." />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14">
+                                <StackPanel>
+                                    <TextBlock Text="PC B - run the throughput test" FontWeight="SemiBold" FontSize="14" />
+                                    <TextBlock Text="Enter PC A's IPv4 address. Upload sends traffic from this PC to PC A; download receives traffic from PC A. The result shows the real end-to-end TCP throughput of the LAN path."
+                                               Style="{StaticResource ShortcutHelpStyle}" Margin="0,4,0,12" />
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="Server IP" Style="{StaticResource InfoLabelStyle}" Margin="0,4" />
+                                        <TextBox Grid.Row="0" Grid.Column="1" x:Name="LanTargetText" Text="192.168.1.2" ToolTip="IPv4 address or hostname of the PC running the LAN test server." />
+                                        <TextBlock Grid.Row="1" Text="TCP port" Style="{StaticResource InfoLabelStyle}" Margin="0,4" />
+                                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="LanClientPortText" Text="5201" Width="100" HorizontalAlignment="Left" />
+                                        <TextBlock Grid.Row="2" Text="Duration" Style="{StaticResource InfoLabelStyle}" Margin="0,4" />
+                                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="LanDurationComboBox" Width="130" HorizontalAlignment="Left" SelectedIndex="1">
+                                            <ComboBoxItem Content="5 seconds" Tag="5" />
+                                            <ComboBoxItem Content="10 seconds" Tag="10" />
+                                            <ComboBoxItem Content="20 seconds" Tag="20" />
+                                            <ComboBoxItem Content="30 seconds" Tag="30" />
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="3" Text="TCP streams" Style="{StaticResource InfoLabelStyle}" Margin="0,4" />
+                                        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="LanStreamsComboBox" Width="130" HorizontalAlignment="Left" SelectedIndex="2">
+                                            <ComboBoxItem Content="1 stream" Tag="1" />
+                                            <ComboBoxItem Content="2 streams" Tag="2" />
+                                            <ComboBoxItem Content="4 streams" Tag="4" />
+                                            <ComboBoxItem Content="8 streams" Tag="8" />
+                                        </ComboBox>
+                                    </Grid>
+
+                                    <UniformGrid Columns="2" Margin="0,12,0,0">
+                                        <Button x:Name="RunLanTestButton" Content="Run LAN speed test" Tag="&#xE721;" Style="{StaticResource IconCompactPrimaryButton}" Click="RunLanTestButton_Click" Margin="0,0,6,0" ToolTip="Measures upload and download throughput to the other PC." />
+                                        <Button x:Name="CancelLanTestButton" Content="Stop / Cancel" Tag="&#xE711;" Style="{StaticResource IconCompactButton}" Click="CancelLanTestButton_Click" IsEnabled="False" Margin="0" />
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <UniformGrid Columns="3" Margin="0,0,-10,12">
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <TextBlock Text="LAN latency" Style="{StaticResource InfoLabelStyle}" />
+                                    <TextBlock x:Name="LanLatencyText" Text="-- ms" FontSize="22" FontWeight="SemiBold" Margin="0,7,0,0" />
+                                    <TextBlock Text="ICMP latency, with TCP-connect fallback if ping is blocked." Style="{StaticResource ShortcutHelpStyle}" Margin="0,5,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <TextBlock Text="Upload to other PC" Style="{StaticResource InfoLabelStyle}" />
+                                    <TextBlock x:Name="LanUploadText" Text="-- Mbps" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" Margin="0,7,0,0" />
+                                    <TextBlock Text="Actual generated TCP traffic sent from this PC to the server PC." Style="{StaticResource ShortcutHelpStyle}" Margin="0,5,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <TextBlock Text="Download from other PC" Style="{StaticResource InfoLabelStyle}" />
+                                    <TextBlock x:Name="LanDownloadText" Text="-- Mbps" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" Margin="0,7,0,0" />
+                                    <TextBlock Text="Actual generated TCP traffic received from the server PC." Style="{StaticResource ShortcutHelpStyle}" Margin="0,5,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,0,0,12">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Live LAN speed meters" FontWeight="SemiBold" FontSize="14" />
+                                    <TextBlock Grid.Column="1" x:Name="LanMeterScaleText" Text="Scale: 0-1 Gbps" Style="{StaticResource InfoLabelStyle}" />
+                                </Grid>
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition Width="*"/><ColumnDefinition Width="86"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Upload" Style="{StaticResource InfoLabelStyle}" />
+                                    <ProgressBar Grid.Column="1" x:Name="LanUploadMeter" Minimum="0" Maximum="1000" Value="0" Height="17" Foreground="{DynamicResource PrimaryBrush}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" />
+                                    <TextBlock Grid.Column="2" x:Name="LanUploadMeterText" Text="0 Mbps" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition Width="*"/><ColumnDefinition Width="86"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Download" Style="{StaticResource InfoLabelStyle}" />
+                                    <ProgressBar Grid.Column="1" x:Name="LanDownloadMeter" Minimum="0" Maximum="1000" Value="0" Height="17" Foreground="{DynamicResource SuccessBrush}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" />
+                                    <TextBlock Grid.Column="2" x:Name="LanDownloadMeterText" Text="0 Mbps" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition Width="*"/><ColumnDefinition Width="86"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="1" Text="0" Style="{StaticResource ShortcutHelpStyle}" HorizontalAlignment="Left" />
+                                    <TextBlock Grid.Column="2" x:Name="LanMeterMaximumText" Text="1 Gbps" Style="{StaticResource ShortcutHelpStyle}" HorizontalAlignment="Right" />
+                                </Grid>
+                                <TextBlock x:Name="LanMeterLiveText" Text="The scale follows the active adapter and expands automatically if measured speed is higher." Style="{StaticResource ShortcutHelpStyle}" Margin="0,7,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <ProgressBar x:Name="LanTestProgressBar" Height="6" IsIndeterminate="False" Margin="0,0,0,8" />
+                        <TextBlock x:Name="LanTestPhaseText" Text="Ready for a two-PC LAN throughput test." FontWeight="SemiBold" />
+                        <TextBlock x:Name="LanTestDetailText" Text="Start the server on one PC, then run the test from the other PC. Four TCP streams and 10 seconds is a good default for testing Gigabit Ethernet or modern Wi-Fi."
+                                   Style="{StaticResource CardDescriptionStyle}" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,4">
+                    <StackPanel>
+                        <TextBlock Text="How to read the results" FontWeight="SemiBold" Margin="0,0,0,4" />
+                        <TextBlock Text="Packet loss = stability of the tested path. Negotiated link rate = what the adapter says it can link at. FAST.com = public ISP/internet performance. LAN throughput = the actual TCP transfer rate between two PCs and is the best speed test for Ethernet switches, cabling, Wi-Fi access points and local bandwidth. The LAN result will be limited by the slowest device/link in the path."
+                                   Style="{StaticResource CardDescriptionStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusText" Text="Ready." Style="{StaticResource CardDescriptionStyle}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            <Button Grid.Column="1" Content="Close" Tag="&#xE711;" Style="{StaticResource IconPrimaryButton}" Width="100" Click="CloseButton_Click" Margin="12,0,0,0" />
+        </Grid>
+    </Grid>
+</Window>

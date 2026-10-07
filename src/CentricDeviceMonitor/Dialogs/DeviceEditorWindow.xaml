@@ -1,0 +1,85 @@
+<Window x:Class="CentricDeviceMonitor.Dialogs.DeviceEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Managed device"
+        Width="470"
+        Height="365"
+        MinWidth="430"
+        MinHeight="330"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Keep the editor content scrollable so the action buttons remain visible even
+             when Windows display/text scaling leaves less vertical work area. -->
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,0,10">
+                <TextBlock x:Name="HeadingText"
+                           Text="Add managed device"
+                           FontSize="20"
+                           FontWeight="SemiBold" />
+
+                <TextBlock Text="Edit the friendly device name and IPv4 address. Hostname and MAC address are refreshed automatically when available."
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,3,0,16" />
+
+                <TextBlock Text="Device name"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,6" />
+                <TextBox x:Name="NameTextBox"
+                         Height="40"
+                         Padding="10,4"
+                         FontSize="13"
+                         VerticalContentAlignment="Center"
+                         MaxLength="80"
+                         ToolTip="Enter a friendly name for this managed device." />
+
+                <TextBlock Text="IPv4 address"
+                           FontWeight="SemiBold"
+                           Margin="0,14,0,6" />
+                <TextBox x:Name="IpTextBox"
+                         Height="40"
+                         Padding="10,4"
+                         FontSize="13"
+                         VerticalContentAlignment="Center"
+                         MaxLength="15"
+                         ToolTip="Example: 192.168.1.50" />
+
+                <TextBlock x:Name="ValidationText"
+                           Foreground="{DynamicResource DangerBrush}"
+                           TextWrapping="Wrap"
+                           MinHeight="20"
+                           Margin="0,10,0,0" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Dedicated non-scrolling action row: Save/Cancel can no longer be clipped by
+             the field content or by a smaller effective work area. -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0">
+            <Button Content="Cancel"
+                    Tag="&#xE711;"
+                    Style="{StaticResource IconButton}"
+                    Width="100"
+                    MinHeight="36"
+                    Click="CancelButton_Click" />
+            <Button Content="Save changes"
+                    Tag="&#xE74E;"
+                    Style="{StaticResource IconPrimaryButton}"
+                    Width="130"
+                    MinHeight="36"
+                    Margin="8,0,0,0"
+                    IsDefault="True"
+                    Click="SaveButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,164 @@
+<Window x:Class="CentricDeviceMonitor.Dialogs.IpScannerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Network scanner &amp; managed devices"
+        Width="980"
+        Height="620"
+        MinWidth="760"
+        MinHeight="480"
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Network scanner &amp; managed devices" FontSize="21" FontWeight="SemiBold" />
+                <TextBlock Text="Discover devices on the active local subnet and maintain the IP addresses monitored by the background service."
+                           Foreground="{DynamicResource MutedTextBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+            <TextBlock Grid.Column="1" x:Name="ManagedCountText" Text="0 managed" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+        </Grid>
+
+        <TabControl Grid.Row="1" x:Name="MainTabs">
+            <TabItem Header="Local IP scanner">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Local IP Scanner" FontSize="17" FontWeight="SemiBold" />
+                            <TextBlock x:Name="SubnetText" Foreground="{DynamicResource MutedTextBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="ScanButton" Content="Scan local network" Tag="&#xE721;" Style="{StaticResource IconPrimaryButton}" Click="ScanButton_Click" />
+                            <Button x:Name="CancelScanButton" Content="Cancel" Tag="&#xE711;" Style="{StaticResource IconButton}" Click="CancelScanButton_Click" IsEnabled="False" Margin="0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="1" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressBar x:Name="ScanProgressBar" Height="7" Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" x:Name="ProgressText" Text="Ready" Margin="10,0,0,0" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Border Grid.Row="2" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12">
+                        <DataGrid x:Name="ResultsGrid"
+                                  ItemsSource="{Binding Results}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  SelectionMode="Extended"
+                                  SelectionUnit="FullRow"
+                                  SelectionChanged="ResultsGrid_SelectionChanged"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  BorderThickness="0"
+                                  RowHeaderWidth="0"
+                                  AlternatingRowBackground="{DynamicResource SecondarySurfaceBrush}"
+                                  ColumnHeaderHeight="32"
+                                  RowHeight="32">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="IP address" Binding="{Binding IpAddress}" Width="1.05*" />
+                                <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.7*" />
+                                <DataGridTextColumn Header="MAC address" Binding="{Binding MacAddress}" Width="1.35*" />
+                                <DataGridTextColumn Header="Response" Binding="{Binding ResponseDisplay}" Width="0.7*" />
+                                <DataGridTextColumn Header="Open TCP ports" Binding="{Binding OpenPortsDisplay}" Width="1.8*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <Grid Grid.Row="3" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="StatusText" Text="Scans only the local subnet of the active Ethernet or Wi-Fi adapter." Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="ScanPortsButton" Content="Check open ports" Tag="&#xE774;" Style="{StaticResource IconButton}" Click="ScanPortsButton_Click" IsEnabled="False" />
+                            <Button x:Name="AddSelectedButton" Content="Add selected to managed devices" Tag="&#xE710;" Style="{StaticResource IconButton}" Click="AddSelectedButton_Click" IsEnabled="False" />
+                            <Button Content="Open managed devices" Tag="&#xE8FD;" Style="{StaticResource IconButton}" Click="OpenManagedTabButton_Click" Margin="0" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Managed devices">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <WrapPanel Grid.Row="0" Margin="0,0,0,8">
+                        <Button Content="Add IP" Tag="&#xE710;" Style="{StaticResource IconPrimaryButton}" Click="AddManagedDeviceButton_Click" />
+                        <Button Content="Edit" Tag="&#xE70F;" Style="{StaticResource IconButton}" Click="EditManagedDeviceButton_Click" />
+                        <Button Content="Remove" Tag="&#xE74D;" Style="{StaticResource IconButton}" Click="RemoveManagedDeviceButton_Click" />
+                        <Button Content="Connection log" Tag="&#xE81C;" Style="{StaticResource IconButton}" Click="ViewManagedDeviceLogButton_Click" />
+                        <Button Content="Refresh selected" Tag="&#xE72C;" Style="{StaticResource IconButton}" Click="RefreshManagedSelectedButton_Click" />
+                        <Button Content="Refresh all" Tag="&#xE72C;" Style="{StaticResource IconButton}" Click="RefreshManagedAllButton_Click" Margin="0" />
+                    </WrapPanel>
+
+                    <Border Grid.Row="1" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12">
+                        <DataGrid x:Name="ManagedGrid"
+                                  ItemsSource="{Binding ManagedDevices}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  MouseDoubleClick="ManagedGrid_MouseDoubleClick"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  BorderThickness="0"
+                                  RowHeaderWidth="0"
+                                  AlternatingRowBackground="{DynamicResource SecondarySurfaceBrush}"
+                                  ColumnHeaderHeight="32"
+                                  RowHeight="32">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="1.25*" />
+                                <DataGridTextColumn Header="IP address" Binding="{Binding IpAddress}" Width="1.05*" />
+                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="0.85*" />
+                                <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.45*" />
+                                <DataGridTextColumn Header="MAC address" Binding="{Binding MacAddress}" Width="1.25*" />
+                                <DataGridTextColumn Header="Response" Binding="{Binding ResponseDisplay}" Width="0.8*" />
+                                <DataGridTextColumn Header="Last checked" Binding="{Binding LastCheckedDisplay}" Width="1.25*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <TextBlock Grid.Row="2" x:Name="ManagedStatusText" Text="Managed devices are monitored by the LocalSystem background service." Foreground="{DynamicResource MutedTextBrush}" Margin="0,8,0,0" />
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <TextBlock Text="Changes to managed devices are saved immediately and picked up by the monitoring service on its next ping cycle."
+                       Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+            <Button Content="Close" Tag="&#xE711;" Style="{StaticResource IconButton}" HorizontalAlignment="Right" Click="CloseButton_Click" Margin="0" />
+        </Grid>
+    </Grid>
+</Window>
