@@ -76,8 +76,17 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Fil
 [Code]
 
 function IsRelaunchRequested(): Boolean;
+var
+  I: Integer;
 begin
-  Result := CmdLineParamExists('/RELAUNCH');
+  { Checked by hand because CmdLineParamExists is not available in every Inno Setup 6 release. }
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/RELAUNCH') = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
 end;
 
 var
