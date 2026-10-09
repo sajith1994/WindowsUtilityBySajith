@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
@@ -70,6 +71,25 @@ public static class UpdateService
         return version is null ? new Version(0, 0, 0) : new Version(version.Major, version.Minor, Math.Max(version.Build, 0));
     }
 
+    /// <summary>Date the running build was produced (stamped by Directory.Build.props), if known.</summary>
+    public static DateTime? GetCurrentReleaseDate()
+    {
+        string? value = Assembly.GetExecutingAssembly()
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => attribute.Key == "ReleaseDate")?.Value;
+        return ParseReleaseDate(value);
+    }
+
+    /// <summary>Parses the yyyy-MM-dd dates used by the build stamp and update.json.</summary>
+    public static DateTime? ParseReleaseDate(string? value)
+    {
+        return DateTime.TryParseExact(value?.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date)
+            ? date
+            : null;
+    }
+
+    public static string FormatReleaseDate(DateTime date) => date.ToString("d MMMM yyyy", CultureInfo.CurrentCulture);
+
     public static async Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)
     {
         Version current = GetCurrentVersion();
@@ -81,8 +101,9 @@ public static class UpdateService
             using HttpResponseMessage response = await Http.GetAsync(ManifestUrl, HttpCompletionOption.ResponseContentRead, timeout.Token);
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                return new UpdateCheckResult(UpdateCheckStatus.Failed, current, null, null,
-                    "No published release was found. Nothing has been published yet, or the update source is unavailable.");
+                // No release has been published yet, so nothing can be newer than this build.
+                return new UpdateCheckResult(UpdateCheckStatus.UpToDate, current, null, null,
+                    $"You are on the latest version ({current}).");
             }
 
             response.EnsureSuccessStatusCode();
@@ -118,6 +139,12 @@ public static class UpdateService
         catch (OperationCanceledException)
         {
             return new UpdateCheckResult(UpdateCheckStatus.Failed, current, null, null, "The update check timed out. Check the internet connection and try again.");
+        }
+        catch (HttpRequestException exception)
+        {
+            ApplicationLogService.WriteException("Update check", exception);
+            return new UpdateCheckResult(UpdateCheckStatus.Failed, current, null, null,
+                "The update server could not be reached. Check the internet connection and try again.");
         }
         catch (Exception exception)
         {

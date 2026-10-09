@@ -1,10 +1,15 @@
 <Project>
   <PropertyGroup>
     <!-- Single source of truth for the application, service and tray companion release version. -->
-    <AppVersion>2.0.46</AppVersion>
+    <AppVersion>2.0.47</AppVersion>
     <Version>$(AppVersion)</Version>
     <AssemblyVersion>$(AppVersion).0</AssemblyVersion>
     <FileVersion>$(AppVersion).0</FileVersion>
     <InformationalVersion>$(AppVersion)</InformationalVersion>
+    <!-- Date this build was produced; shown next to the version as the published date. -->
+    <AppReleaseDate Condition="'$(AppReleaseDate)' == ''">$([System.DateTime]::Now.ToString('yyyy-MM-dd'))</AppReleaseDate>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="ReleaseDate" Value="$(AppReleaseDate)" />
+  </ItemGroup>
 </Project>

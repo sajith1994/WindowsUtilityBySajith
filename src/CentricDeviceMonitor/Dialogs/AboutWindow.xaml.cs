@@ -16,9 +16,11 @@ public partial class AboutWindow : Window
         _settingsService = settingsService;
         InitializeComponent();
         Version? version = Assembly.GetExecutingAssembly().GetName().Version;
+        DateTime? published = UpdateService.GetCurrentReleaseDate();
         VersionText.Text = version is null
             ? "Version unavailable"
-            : $"Version {version.Major}.{version.Minor}.{version.Build}";
+            : $"Version {version.Major}.{version.Minor}.{version.Build}"
+              + (published is null ? string.Empty : $"  •  Published {UpdateService.FormatReleaseDate(published.Value)}");
     }
 
     private void TermsButton_Click(object sender, RoutedEventArgs e)

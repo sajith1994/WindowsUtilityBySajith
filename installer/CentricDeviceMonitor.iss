@@ -1,6 +1,6 @@
 #define MyAppName "Windows Utility by Sajith"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.46"
+#define MyAppVersion "2.0.47"
 #endif
 #define MyAppExeName "WindowsUtilityBySajith.exe"
 #define MyLegacyAppExeName "CentricDeviceMonitor.exe"

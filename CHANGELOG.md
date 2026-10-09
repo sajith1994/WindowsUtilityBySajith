@@ -260,6 +260,18 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.47] - 2026-10-09
+
+### Changed
+- **Redesigned update window.** A coloured status badge with a clear headline (checking, up to date, update
+  available, downloading, failed), a details panel with installed version, published date, latest available
+  version and last-checked time, and a separate "What's new" section for release notes.
+- **"You're up to date" when nothing has been published.** A missing release (HTTP 404) is now reported as up to
+  date instead of an error. Network failures show a short, plain message; details still go to the application log.
+- **Published date next to the version** in the update window and About window. The build stamps the date via
+  `AppReleaseDate` in `Directory.Build.props` (override with `-p:AppReleaseDate=yyyy-MM-dd`); when the installed
+  build is the published release, the date from `update.json` is shown instead.
+
 ## [2.0.46] - 2026-10-07
 
 ### Changed
