@@ -16,8 +16,11 @@ public sealed class AppSettings
     /// <summary>Checks for a newer release shortly after the dashboard starts.</summary>
     public bool AutoCheckForUpdates { get; set; } = true;
 
-    /// <summary>Newest update version the user has already been prompted about, so each release prompts once.</summary>
-    public string LastPromptedUpdateVersion { get; set; } = string.Empty;
+    /// <summary>Update version whose dashboard alert was snoozed. A newer release shows the alert again.</summary>
+    public string UpdateSnoozedVersion { get; set; } = string.Empty;
+
+    /// <summary>The snoozed update alert stays hidden until this time (UTC).</summary>
+    public DateTime? UpdateSnoozedUntilUtc { get; set; }
 
     public int PingIntervalSeconds { get; set; } = 60;
 

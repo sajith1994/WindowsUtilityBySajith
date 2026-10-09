@@ -198,6 +198,13 @@
 
                 <StackPanel Grid.Row="3">
                     <Separator Margin="8,8,8,10" Background="{DynamicResource BorderBrush}" />
+                    <Button x:Name="SidebarUpdateButton"
+                            Content="Check for updates"
+                            Tag="&#xE777;"
+                            Style="{StaticResource IconButton}"
+                            HorizontalContentAlignment="Left"
+                            Click="CheckForUpdatesButton_Click"
+                            Margin="0,0,0,6" />
                     <Button Content="About Windows Utility"
                             Tag="&#xEA1F;"
                             Style="{StaticResource IconButton}"
@@ -212,6 +219,7 @@
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="68" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="32" />
             </Grid.RowDefinitions>
@@ -284,7 +292,44 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1">
+            <!-- Update alert: shown on every start while an update is available, unless snoozed. -->
+            <Border x:Name="UpdateBanner"
+                    Grid.Row="1"
+                    Visibility="Collapsed"
+                    Background="{DynamicResource SelectedBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="22,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="34" Height="34" CornerRadius="17" Background="{DynamicResource PrimaryBrush}" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE896;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Foreground="White"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="12,0,12,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="UpdateBannerTitle" Text="An update is available" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="UpdateBannerDetail" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="Update now" Tag="&#xE896;" Style="{StaticResource IconCompactPrimaryButton}" Click="UpdateBannerUpdateButton_Click" Margin="0,0,8,0" />
+                        <Button x:Name="UpdateSnoozeButton" Content="Remind me later" Tag="&#xE823;" Style="{StaticResource IconCompactButton}" Click="UpdateSnoozeButton_Click" Margin="0">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Remind me tomorrow" Tag="1" Click="UpdateSnoozeMenuItem_Click" />
+                                    <MenuItem Header="Remind me in 3 days" Tag="3" Click="UpdateSnoozeMenuItem_Click" />
+                                    <MenuItem Header="Remind me in a week" Tag="7" Click="UpdateSnoozeMenuItem_Click" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2">
                 <!-- SYSTEM STATS -->
                 <ScrollViewer x:Name="SystemStatsPage"
                               VerticalScrollBarVisibility="Auto"
@@ -417,6 +462,44 @@
                                         <Button Content="Stop" Style="{StaticResource HeaderMiniButton}" Click="StopSpoolerButton_Click" />
                                         <Button Content="Restart" Style="{StaticResource HeaderMiniButton}" Click="RestartSpoolerButton_Click" Margin="0" />
                                     </UniformGrid>
+
+                                    <Grid Margin="0,14,0,4">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="InstalledPrintersHeaderText" Text="Installed printers" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="Devices &amp; Printers" Style="{StaticResource HeaderMiniButton}" Click="OpenDevicesAndPrintersButton_Click" Margin="0" />
+                                    </Grid>
+                                    <ScrollViewer MaxHeight="118" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl x:Name="InstalledPrintersList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,2,0,3">
+                                                        <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                    <TextBlock x:Name="InstalledPrintersEmptyText" Text="Reading installed printers..." Style="{StaticResource CardDescriptionStyle}" />
+
+                                    <Grid Margin="0,12,0,4">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="NetworkPrintersHeaderText" Text="Printers on the network" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <Button x:Name="ScanNetworkPrintersButton" Grid.Column="1" Content="Scan network" Style="{StaticResource HeaderMiniButton}" Click="ScanNetworkPrintersButton_Click" Margin="0" />
+                                    </Grid>
+                                    <ScrollViewer MaxHeight="118" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl x:Name="NetworkPrintersList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,2,0,3">
+                                                        <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                    <TextBlock x:Name="NetworkPrintersEmptyText" Text="Not scanned yet." Style="{StaticResource CardDescriptionStyle}" />
                                 </StackPanel>
                             </Border>
                         </UniformGrid>
@@ -1102,7 +1185,7 @@
                 </ScrollViewer>
             </Grid>
 
-            <Border Grid.Row="2"
+            <Border Grid.Row="3"
                     Background="{DynamicResource ToolbarBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="0,1,0,0"

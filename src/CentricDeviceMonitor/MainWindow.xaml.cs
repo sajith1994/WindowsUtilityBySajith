@@ -62,6 +62,14 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _hardwareTimer;
     private readonly DispatcherTimer _serviceTimer;
     private readonly DispatcherTimer _deviceMonitorTimer;
+    private readonly DispatcherTimer _updateCheckTimer;
+    private readonly PrinterService _printerService = new();
+    private IReadOnlyList<InstalledPrinterInfo> _installedPrinters = Array.Empty<InstalledPrinterInfo>();
+    private DateTime _installedPrintersReadAtUtc = DateTime.MinValue;
+    private string _lastSpoolerStatus = string.Empty;
+    private bool _refreshingPrinters;
+    private bool _scanningNetworkPrinters;
+    private UpdateCheckResult? _availableUpdate;
     private readonly DispatcherTimer _pingCountdownTimer;
     private readonly List<CpuTemperatureLogEntry> _cpuTemperatureLogs = new();
 
@@ -135,6 +143,10 @@ public partial class MainWindow : Window
             RefreshSystemThemeIfNeeded();
         };
 
+        // The dashboard usually stays running in the tray, so re-check for releases periodically.
+        _updateCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(6) };
+        _updateCheckTimer.Tick += async (_, _) => await CheckForUpdateInBackgroundAsync(TimeSpan.Zero);
+
         _deviceMonitorTimer = new DispatcherTimer();
         _deviceMonitorTimer.Tick += DeviceMonitorTimer_Tick;
 
@@ -191,7 +203,8 @@ public partial class MainWindow : Window
         UpdatePowerScheduleStatusDisplay();
         _loadingSettings = false;
 
-        _ = CheckForUpdateOnStartupAsync();
+        _ = CheckForUpdateInBackgroundAsync(TimeSpan.FromSeconds(4));
+        _updateCheckTimer.Start();
 
         IReadOnlyList<DeviceEntry> savedDevices = await _storageService.LoadAsync();
         foreach (DeviceEntry device in savedDevices.OrderBy(device => device.Name))
@@ -223,6 +236,7 @@ public partial class MainWindow : Window
 
         // External utility metadata is refreshed on every dashboard start without delaying the main UI.
         _ = RefreshExternalWindowsToolsAsync();
+        _ = ScanNetworkPrintersAfterStartupAsync();
         _ = RefreshWindowsActivationStatusAsync();
     }
 
@@ -303,6 +317,7 @@ public partial class MainWindow : Window
                 RefreshSystemResourceUsage();
                 await RefreshSystemHardwareInventoryAsync();
                 await RefreshSpoolerStatusAsync();
+                await RefreshInstalledPrintersAsync();
                 await RefreshBackgroundMonitoringServiceAsync();
                 await RefreshSystemHealthDetailsAsync(forcePublicRefresh: true);
                 await RefreshWindowsActivationStatusAsync();
@@ -1898,8 +1913,11 @@ public partial class MainWindow : Window
         aboutWindow.ShowDialog();
     }
 
-    /// <summary>Quiet startup check: prompts at most once per new release and never blocks startup.</summary>
-    private async Task CheckForUpdateOnStartupAsync()
+    /// <summary>
+    /// Background check used at startup and every few hours while the dashboard runs. Never blocks the UI;
+    /// an available update shows the dashboard banner unless the user snoozed that version.
+    /// </summary>
+    private async Task CheckForUpdateInBackgroundAsync(TimeSpan delay)
     {
         try
         {
@@ -1908,35 +1926,102 @@ public partial class MainWindow : Window
                 return;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(8));
+            await Task.Delay(delay);
             UpdateCheckResult result = await UpdateService.CheckAsync();
-            if (result.Status != UpdateCheckStatus.Available
-                || result.LatestVersion is null
-                || !IsLoaded
-                || string.Equals(_appSettings.LastPromptedUpdateVersion, result.LatestVersion.ToString(), StringComparison.Ordinal))
+            if (result.Status == UpdateCheckStatus.Failed || !IsLoaded)
             {
                 return;
             }
 
-            _appSettings.LastPromptedUpdateVersion = result.LatestVersion.ToString();
-            await _settingsService.SaveAsync(_appSettings);
-
-            MessageBoxResult answer = WpfMessageBox.Show(
-                this,
-                $"Version {result.LatestVersion} is available (you have {result.CurrentVersion}).\n\nOpen the update window now?",
-                "Update available",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-
-            if (answer == MessageBoxResult.Yes)
-            {
-                UpdateWindow updateWindow = new(_appSettings, _settingsService) { Owner = this };
-                updateWindow.ShowDialog();
-            }
+            ApplyUpdateCheckResult(result);
         }
         catch (Exception exception)
         {
-            ApplicationLogService.WriteException("Startup update check", exception);
+            ApplicationLogService.WriteException("Background update check", exception);
+        }
+    }
+
+    private void ApplyUpdateCheckResult(UpdateCheckResult result)
+    {
+        if (result.Status == UpdateCheckStatus.Failed)
+        {
+            return;
+        }
+
+        if (result.Status != UpdateCheckStatus.Available || result.LatestVersion is null)
+        {
+            _availableUpdate = null;
+            SidebarUpdateButton.Content = "Check for updates";
+            SidebarUpdateButton.Tag = "";
+            UpdateBanner.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        _availableUpdate = result;
+        SidebarUpdateButton.Content = $"Update to {result.LatestVersion}";
+        SidebarUpdateButton.Tag = "";
+
+        DateTime? released = UpdateService.ParseReleaseDate(result.Manifest?.Released);
+        UpdateBannerTitle.Text = $"Windows Utility {result.LatestVersion} is available";
+        UpdateBannerDetail.Text = released is null
+            ? $"You have {result.CurrentVersion}. Install it now or snooze this reminder."
+            : $"Published {UpdateService.FormatReleaseDate(released.Value)}. You have {result.CurrentVersion}.";
+        UpdateBanner.Visibility = IsUpdateAlertSnoozed(result.LatestVersion) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private bool IsUpdateAlertSnoozed(Version latest)
+    {
+        return string.Equals(_appSettings.UpdateSnoozedVersion, latest.ToString(), StringComparison.Ordinal)
+            && _appSettings.UpdateSnoozedUntilUtc is DateTime until
+            && until > DateTime.UtcNow;
+    }
+
+    private void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e) => OpenUpdateWindow();
+
+    private void UpdateBannerUpdateButton_Click(object sender, RoutedEventArgs e) => OpenUpdateWindow();
+
+    private void OpenUpdateWindow()
+    {
+        UpdateWindow updateWindow = new(_appSettings, _settingsService) { Owner = this };
+        updateWindow.ShowDialog();
+        if (updateWindow.LastResult is UpdateCheckResult result)
+        {
+            ApplyUpdateCheckResult(result);
+        }
+    }
+
+    private void UpdateSnoozeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (UpdateSnoozeButton.ContextMenu is { } menu)
+        {
+            menu.PlacementTarget = UpdateSnoozeButton;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+    }
+
+    private async void UpdateSnoozeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_availableUpdate?.LatestVersion is not Version latest
+            || sender is not System.Windows.Controls.MenuItem { Tag: string tag }
+            || !int.TryParse(tag, out int days))
+        {
+            return;
+        }
+
+        DateTime until = DateTime.Now.AddDays(days);
+        _appSettings.UpdateSnoozedVersion = latest.ToString();
+        _appSettings.UpdateSnoozedUntilUtc = until.ToUniversalTime();
+        UpdateBanner.Visibility = Visibility.Collapsed;
+        StatusText.Text = $"Update reminder for {latest} snoozed until {until:dddd d MMMM, t}. Use \"Update to {latest}\" in the sidebar any time.";
+
+        try
+        {
+            await _settingsService.SaveAsync(_appSettings);
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Save update snooze", exception);
         }
     }
 
@@ -2240,6 +2325,7 @@ public partial class MainWindow : Window
             await action();
             await Task.Delay(500);
             await RefreshSpoolerStatusAsync();
+            await RefreshInstalledPrintersAsync();
             StatusText.Text = successMessage;
         }
         catch (TimeoutException exception)
@@ -3149,11 +3235,152 @@ public partial class MainWindow : Window
         _refreshingSpoolerStatus = true;
         try
         {
-            SpoolerStatusHeaderText.Text = await _windowsUtilityService.GetPrintSpoolerStatusAsync();
+            string status = await _windowsUtilityService.GetPrintSpoolerStatusAsync();
+            SpoolerStatusHeaderText.Text = status;
+
+            // Printer lists change rarely; re-read them on a spooler state change or every 30 seconds.
+            bool statusChanged = !string.Equals(status, _lastSpoolerStatus, StringComparison.Ordinal);
+            _lastSpoolerStatus = status;
+            if (statusChanged || DateTime.UtcNow - _installedPrintersReadAtUtc > TimeSpan.FromSeconds(30))
+            {
+                _ = RefreshInstalledPrintersAsync();
+            }
         }
         finally
         {
             _refreshingSpoolerStatus = false;
+        }
+    }
+
+    private async Task RefreshInstalledPrintersAsync()
+    {
+        if (_refreshingPrinters)
+        {
+            return;
+        }
+
+        _refreshingPrinters = true;
+        _installedPrintersReadAtUtc = DateTime.UtcNow;
+        try
+        {
+            if (!string.Equals(_lastSpoolerStatus, "Running", StringComparison.Ordinal))
+            {
+                _installedPrinters = Array.Empty<InstalledPrinterInfo>();
+                InstalledPrintersList.ItemsSource = null;
+                InstalledPrintersHeaderText.Text = "Installed printers";
+                InstalledPrintersEmptyText.Text = "Start the Print Spooler to list installed printers.";
+                InstalledPrintersEmptyText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            _installedPrinters = await _printerService.GetInstalledPrintersAsync();
+            InstalledPrintersHeaderText.Text = $"Installed printers ({_installedPrinters.Count})";
+            InstalledPrintersList.ItemsSource = _installedPrinters
+                .Select(printer => new PrinterListItem(
+                    printer.IsDefault ? $"★ {printer.Name}" : printer.Name,
+                    DescribeInstalledPrinter(printer)))
+                .ToList();
+            InstalledPrintersEmptyText.Text = "No printers are installed.";
+            InstalledPrintersEmptyText.Visibility = _installedPrinters.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Installed printers", exception);
+            InstalledPrintersEmptyText.Text = "Windows did not return the printer list.";
+            InstalledPrintersEmptyText.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            _refreshingPrinters = false;
+        }
+    }
+
+    private static string DescribeInstalledPrinter(InstalledPrinterInfo printer)
+    {
+        List<string> parts = new() { printer.Status };
+        if (printer.IsDefault)
+        {
+            parts.Add("Default");
+        }
+
+        parts.Add(printer.IsVirtual ? "Virtual" : printer.IsNetwork ? "Network" : "Local");
+        if (!string.IsNullOrWhiteSpace(printer.Address))
+        {
+            parts.Add(printer.Address);
+        }
+        else if (!string.IsNullOrWhiteSpace(printer.DeviceName))
+        {
+            parts.Add($"WSD {printer.DeviceName}");
+        }
+        else if (!printer.IsVirtual && !string.IsNullOrWhiteSpace(printer.PortName))
+        {
+            parts.Add(printer.PortName);
+        }
+
+        return string.Join(" • ", parts);
+    }
+
+    private async void ScanNetworkPrintersButton_Click(object sender, RoutedEventArgs e) => await ScanNetworkPrintersAsync();
+
+    private async Task ScanNetworkPrintersAfterStartupAsync()
+    {
+        // Let the dashboard finish loading before probing the subnet.
+        await Task.Delay(TimeSpan.FromSeconds(10));
+        if (IsLoaded)
+        {
+            await ScanNetworkPrintersAsync();
+        }
+    }
+
+    private async Task ScanNetworkPrintersAsync()
+    {
+        if (_scanningNetworkPrinters)
+        {
+            return;
+        }
+
+        _scanningNetworkPrinters = true;
+        ScanNetworkPrintersButton.IsEnabled = false;
+        ScanNetworkPrintersButton.Content = "Scanning...";
+        NetworkPrintersEmptyText.Text = "Looking for printers on the local network (RAW 9100, IPP 631, LPD 515)...";
+        NetworkPrintersEmptyText.Visibility = Visibility.Visible;
+        try
+        {
+            if (_installedPrintersReadAtUtc == DateTime.MinValue)
+            {
+                await RefreshInstalledPrintersAsync();
+            }
+
+            IReadOnlyList<NetworkPrinterInfo> printers = await _printerService.ScanNetworkPrintersAsync(_installedPrinters);
+            int notInstalled = printers.Count(printer => !printer.IsInstalled);
+            NetworkPrintersHeaderText.Text = printers.Count == 0
+                ? "Printers on the network"
+                : $"Printers on the network ({printers.Count}, {notInstalled} not installed)";
+            NetworkPrintersList.ItemsSource = printers
+                .Select(printer => new PrinterListItem(
+                    string.IsNullOrEmpty(printer.HostName) ? printer.Address : $"{printer.HostName}",
+                    string.Join(" • ", new[]
+                    {
+                        printer.IsInstalled ? "Installed" : "Not installed",
+                        string.IsNullOrEmpty(printer.HostName) ? null : printer.Address,
+                        string.Join(", ", printer.Services)
+                    }.Where(part => !string.IsNullOrEmpty(part)))))
+                .ToList();
+            NetworkPrintersEmptyText.Text = $"No printers answered on the local network. Last scan {DateTime.Now:t}.";
+            NetworkPrintersEmptyText.Visibility = printers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            StatusText.Text = $"Network printer scan finished: {printers.Count} found.";
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Network printer scan", exception);
+            NetworkPrintersEmptyText.Text = $"Network scan failed: {exception.Message}";
+            NetworkPrintersEmptyText.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            ScanNetworkPrintersButton.Content = "Scan network";
+            ScanNetworkPrintersButton.IsEnabled = true;
+            _scanningNetworkPrinters = false;
         }
     }
 

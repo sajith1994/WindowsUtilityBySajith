@@ -21,6 +21,9 @@ public partial class UpdateWindow : Window
     private bool _busy;
     private bool _loadingSettings = true;
 
+    /// <summary>Most recent successful or failed check, so the dashboard can refresh its update alert.</summary>
+    public UpdateCheckResult? LastResult { get; private set; }
+
     public UpdateWindow(AppSettings settings, AppSettingsService settingsService)
     {
         InitializeComponent();
@@ -52,6 +55,7 @@ public partial class UpdateWindow : Window
         try
         {
             UpdateCheckResult result = await UpdateService.CheckAsync(_lifetime.Token);
+            LastResult = result;
             LastCheckedText.Text = $"Today at {DateTime.Now:t}";
 
             switch (result.Status)

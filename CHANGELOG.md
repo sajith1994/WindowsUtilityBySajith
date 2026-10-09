@@ -260,6 +260,20 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.48] - 2026-10-09
+
+### Added
+- **Check for updates from the dashboard.** A sidebar button above About opens the update window. When an update is
+  available it changes to "Update to x.y.z".
+- **Update alert banner** across the top of the dashboard. It appears every time the app opens while an update is
+  available, with **Update now** and **Remind me later** (tomorrow, in 3 days, in a week). A snooze applies to that
+  version only, so a newer release shows the alert again. The dashboard re-checks every 6 hours while it runs in
+  the tray. Replaces the one-time startup message box.
+- **Printers in the Print Spooler tile.** Installed printers with status, default marker, local/network/virtual
+  type and address (refreshed every 30 seconds and after spooler actions), and printers found on the local subnet
+  that accept RAW 9100, IPP 631 or LPD 515 connections, marked installed or not installed. The network scan runs
+  once shortly after startup and on **Scan network**; it only opens and closes TCP connections.
+
 ## [2.0.47] - 2026-10-09
 
 ### Changed
