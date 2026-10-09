@@ -50,5 +50,32 @@ public sealed class AppSettings
 
     // When enabled, Windows closes applications with unsaved work during the power action.
     public bool ForcePowerAction { get; set; }
+
+    /// <summary>System Stats tile order and sizes. Empty means the built-in layout.</summary>
+    public List<DashboardTileLayout> DashboardLayout { get; set; } = new();
+
+    /// <summary>Tiles pinned to the desktop as widgets, restored when the dashboard starts.</summary>
+    public List<DesktopWidgetLayout> DesktopWidgets { get; set; } = new();
+}
+
+public sealed class DashboardTileLayout
+{
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>Width in quarters of the dashboard (1 to 4).</summary>
+    public int Span { get; set; } = 2;
+
+    /// <summary>Fixed height in pixels, or null to fit the content.</summary>
+    public double? Height { get; set; }
+}
+
+public sealed class DesktopWidgetLayout
+{
+    public string Id { get; set; } = string.Empty;
+    public double Left { get; set; }
+    public double Top { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+    public bool Topmost { get; set; }
 }
 

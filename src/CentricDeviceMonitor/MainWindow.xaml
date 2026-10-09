@@ -1,11 +1,12 @@
 <Window x:Class="CentricDeviceMonitor.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:CentricDeviceMonitor.Controls"
         Title="Windows Utility by Sajith"
         Width="1220"
         Height="780"
-        MinWidth="820"
-        MinHeight="560"
+        MinWidth="760"
+        MinHeight="460"
         WindowStartupLocation="CenterScreen"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
@@ -338,9 +339,30 @@
                         <TextBlock Text="OVERVIEW" Style="{StaticResource SectionEyebrowStyle}" />
                         <TextBlock Text="System at a glance" Style="{StaticResource SectionTitleStyle}" />
                         <TextBlock Text="Live resource health, hardware inventory, sensors and background monitoring in one clean view."
-                                   Style="{StaticResource SectionDescriptionStyle}" />
+                                   Style="{StaticResource SectionDescriptionStyle}" Margin="0,0,0,10" />
+
+                        <!-- Layout toolbar: Customize turns on move/resize handles on every tile. -->
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="DashboardLayoutHintText"
+                                       Text="Right-click a tile to pin it to the desktop."
+                                       Style="{StaticResource CardDescriptionStyle}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,12,0" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button x:Name="ResetDashboardLayoutButton" Content="Reset layout" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="ResetDashboardLayoutButton_Click" Margin="0,0,8,0" Visibility="Collapsed" />
+                                <Button x:Name="CustomizeDashboardButton" Content="Customize" Tag="&#xE70F;" Style="{StaticResource IconCompactButton}" Click="CustomizeDashboardButton_Click" Margin="0" />
+                                <Button x:Name="DoneCustomizingDashboardButton" Content="Done" Tag="&#xE73E;" Style="{StaticResource IconCompactPrimaryButton}" Click="CustomizeDashboardButton_Click" MinWidth="90" Margin="0" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Grid>
+
+                        <controls:DashboardPanel x:Name="DashboardTilesPanel">
 
                         <!-- Verdict-first summary. Everything below it is the supporting detail. -->
+                        <controls:DashboardTile TileId="health" Title="Health summary" Span="4">
                         <Border Style="{StaticResource MetricCardStyle}" Margin="0,4,0,12">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
@@ -374,9 +396,10 @@
                                 </ItemsControl>
                             </StackPanel>
                         </Border>
+                        </controls:DashboardTile>
 
-                        <UniformGrid Columns="2" Margin="0,0,-12,0">
                             <!-- One card per physical component. Click to open live graphs. -->
+                            <controls:DashboardTile TileId="cpu" Title="Processor" Span="2">
                             <Border Style="{StaticResource MetricCardStyle}" Cursor="Hand"
                                     MouseLeftButtonUp="CpuCard_Click" ToolTip="Open live CPU graphs">
                                 <StackPanel>
@@ -406,7 +429,9 @@
                                     <TextBlock x:Name="CaseFanSpeedText" Text="Case fans: Checking..." Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
                                 </StackPanel>
                             </Border>
+                            </controls:DashboardTile>
 
+                            <controls:DashboardTile TileId="gpu" Title="Graphics" Span="2">
                             <Border Style="{StaticResource MetricCardStyle}" Cursor="Hand"
                                     MouseLeftButtonUp="GpuCard_Click" ToolTip="Open live GPU graphs">
                                 <StackPanel>
@@ -434,7 +459,9 @@
                                     <TextBlock x:Name="GpuPowerSensorText" Text="Detecting GPU power sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
                                 </StackPanel>
                             </Border>
+                            </controls:DashboardTile>
 
+                            <controls:DashboardTile TileId="memory" Title="Memory" Span="2">
                             <Border Style="{StaticResource MetricCardStyle}" Cursor="Hand"
                                     MouseLeftButtonUp="MemoryCard_Click" ToolTip="Open live memory graph">
                                 <StackPanel>
@@ -449,7 +476,9 @@
                                     <TextBlock x:Name="RamModuleCountText" Text="Modules: checking..." Style="{StaticResource CardDescriptionStyle}" />
                                 </StackPanel>
                             </Border>
+                            </controls:DashboardTile>
 
+                            <controls:DashboardTile TileId="spooler" Title="Print Spooler &amp; printers" Span="2">
                             <Border Style="{StaticResource MetricCardStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
@@ -502,15 +531,9 @@
                                     <TextBlock x:Name="NetworkPrintersEmptyText" Text="Not scanned yet." Style="{StaticResource CardDescriptionStyle}" />
                                 </StackPanel>
                             </Border>
-                        </UniformGrid>
+                            </controls:DashboardTile>
 
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="18" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
+                            <controls:DashboardTile TileId="background" Title="Background Monitoring" Span="2">
                             <Border Grid.Column="0" Style="{StaticResource CardStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -568,7 +591,9 @@
                                     <Button Content="View service log" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewBackgroundServiceLogButton_Click" Margin="0,8,0,0"/>
                                 </StackPanel>
                             </Border>
+                            </controls:DashboardTile>
 
+                            <controls:DashboardTile TileId="cpusensor" Title="CPU Sensor &amp; Alerts" Span="2">
                             <Border Grid.Column="2" Style="{StaticResource CardStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -604,11 +629,9 @@
                                     <Button x:Name="RestartAsAdministratorButton" Visibility="Collapsed" Content="Restart elevated" Click="RestartAsAdministratorButton_Click" />
                                 </StackPanel>
                             </Border>
-                        </Grid>
+                            </controls:DashboardTile>
 
-                        <Grid Margin="0,18,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-
+                            <controls:DashboardTile TileId="identity" Title="PC Identity" Span="2">
                             <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -626,7 +649,9 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
+                            </controls:DashboardTile>
 
+                            <controls:DashboardTile TileId="ram" Title="Installed Memory" Span="2">
                             <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -643,11 +668,9 @@
                                     </ItemsControl>
                                 </StackPanel>
                             </Border>
-                        </Grid>
+                            </controls:DashboardTile>
 
-                        <Grid Margin="0,18,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-
+                            <controls:DashboardTile TileId="displays" Title="Displays" Span="2">
                             <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -664,7 +687,9 @@
                                     </ItemsControl>
                                 </StackPanel>
                             </Border>
+                            </controls:DashboardTile>
 
+                            <controls:DashboardTile TileId="gpuinventory" Title="Graphics Adapters" Span="2">
                             <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -681,8 +706,9 @@
                                     </ItemsControl>
                                 </StackPanel>
                             </Border>
-                        </Grid>
+                            </controls:DashboardTile>
 
+                        <controls:DashboardTile TileId="storage" Title="Storage Inventory &amp; Usage" Span="4">
                         <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -701,7 +727,9 @@
                                 <TextBlock x:Name="HardwareInventoryUpdatedText" Text="Hardware inventory refreshes when System Stats is refreshed." Style="{StaticResource CardDescriptionStyle}" Margin="0,10,0,0"/>
                             </StackPanel>
                         </Border>
+                        </controls:DashboardTile>
 
+                        <controls:DashboardTile TileId="windows" Title="Windows Overview" Span="4">
                         <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
@@ -722,6 +750,9 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
+                        </controls:DashboardTile>
+
+                        </controls:DashboardPanel>
                     </StackPanel>
                 </ScrollViewer>
 

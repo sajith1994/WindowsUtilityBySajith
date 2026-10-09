@@ -103,6 +103,7 @@ public partial class App : WpfApplication
             InputLanguageManager.Current.RegisterInputLanguageSource(_safeInputLanguageSource);
 
             ThemeManager.Apply(ThemeManager.SystemPreference);
+            WindowFitter.Register();
             MainWindow mainWindow = new();
             MainWindow = mainWindow;
             ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose;

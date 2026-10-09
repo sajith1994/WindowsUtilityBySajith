@@ -203,6 +203,9 @@ public partial class MainWindow : Window
         UpdatePowerScheduleStatusDisplay();
         _loadingSettings = false;
 
+        InitializeDashboardLayout();
+        RestoreDesktopWidgets();
+
         _ = CheckForUpdateInBackgroundAsync(TimeSpan.FromSeconds(4));
         _updateCheckTimer.Start();
 
@@ -254,7 +257,8 @@ public partial class MainWindow : Window
     {
         int index = selectedIndex < 0 ? 0 : selectedIndex;
 
-        SystemStatsPage.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+        // Hidden rather than Collapsed: the tiles stay laid out so desktop widgets keep updating.
+        SystemStatsPage.Visibility = index == 0 ? Visibility.Visible : Visibility.Hidden;
         NetworkDiagnosticsPage.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
         UtilityToolsPage.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
         PowerBatteryPage.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;

@@ -260,6 +260,25 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.49] - 2026-10-09
+
+### Added
+- **Customizable System Stats dashboard.** Every card is now a tile. **Customize** shows a handle on each tile:
+  drag a tile onto another to move it before/after it, drag the blue corner to resize (width snaps to a quarter,
+  half, three-quarters or full width; height is free, double-click the corner to fit the content), or use the
+  tile's size menu. **Reset layout** restores the default. The layout is saved automatically. Tiles flow into
+  4, 2 or 1 columns depending on the window width.
+- **Desktop widgets.** Right-click any tile (or use its pin button in Customize) to pin it to the desktop as a
+  borderless widget showing the live tile, including while the dashboard is in the notification area. Drag to
+  move, resize from the corner, right-click for Keep on top / Open dashboard / Remove widget, double-click to open
+  the dashboard. Widgets and their positions come back when the dashboard starts. A widget is a live picture of
+  the tile, so its buttons are not clickable.
+
+### Changed
+- **Small screens (1024x600, 1366x600).** Every window is kept inside the Windows work area. When a dialog's
+  designed minimum size is larger than the screen, the window is shrunk to fit and its content scrolls instead of
+  being cut off. The dashboard's minimum size is now 760x460.
+
 ## [2.0.48] - 2026-10-09
 
 ### Added
