@@ -214,9 +214,40 @@ public static class UpdateService
         return destination;
     }
 
+    private static string RelaunchMarkerPath => Path.Combine(SharedDataPaths.RootDirectory, "update-relaunch.flag");
+
+    /// <summary>Removes the self-update marker once the updated dashboard is running.</summary>
+    public static void ClearRelaunchMarker()
+    {
+        try
+        {
+            if (File.Exists(RelaunchMarkerPath))
+            {
+                File.Delete(RelaunchMarkerPath);
+            }
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Clear update relaunch marker", exception);
+        }
+    }
+
     /// <summary>Starts the verified installer silently. The caller should shut the app down right after.</summary>
     public static void LaunchInstaller(string installerPath)
     {
+        // The installer reopens the dashboard when it sees /RELAUNCH or this marker.
+        try
+        {
+            SharedDataPaths.EnsureDirectories();
+            File.WriteAllText(RelaunchMarkerPath, DateTime.Now.ToString("O"));
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Write update relaunch marker", exception);
+        }
+
+        ApplicationLogService.WriteMessage("Update", $"Starting installer {Path.GetFileName(installerPath)}; the dashboard will reopen when it finishes.");
+
         ProcessStartInfo startInfo = new(installerPath, "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELAUNCH")
         {
             UseShellExecute = true,

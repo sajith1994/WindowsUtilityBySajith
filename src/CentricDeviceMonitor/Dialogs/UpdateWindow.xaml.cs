@@ -31,6 +31,7 @@ public partial class UpdateWindow : Window
         _settingsService = settingsService;
         ShowInstalledVersion(UpdateService.GetCurrentReleaseDate());
         AutoCheckBox.IsChecked = settings.AutoCheckForUpdates;
+        AutoInstallCheckBox.IsChecked = settings.AutoInstallUpdates;
         _loadingSettings = false;
         Loaded += async (_, _) => await RunCheckAsync();
         Closed += (_, _) => _lifetime.Cancel();
@@ -172,6 +173,7 @@ public partial class UpdateWindow : Window
         }
 
         _settings.AutoCheckForUpdates = AutoCheckBox.IsChecked == true;
+        _settings.AutoInstallUpdates = AutoInstallCheckBox.IsChecked == true;
         try
         {
             await _settingsService.SaveAsync(_settings);

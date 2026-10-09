@@ -104,6 +104,7 @@ public partial class App : WpfApplication
 
             ThemeManager.Apply(ThemeManager.SystemPreference);
             WindowFitter.Register();
+            UpdateService.ClearRelaunchMarker();
             MainWindow mainWindow = new();
             MainWindow = mainWindow;
             ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose;

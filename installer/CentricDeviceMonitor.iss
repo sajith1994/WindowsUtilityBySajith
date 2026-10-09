@@ -1,6 +1,6 @@
 ﻿#define MyAppName "Windows Utility by Sajith"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.49"
+#define MyAppVersion "2.0.50"
 #endif
 #define MyAppExeName "WindowsUtilityBySajith.exe"
 #define MyLegacyAppExeName "CentricDeviceMonitor.exe"
@@ -65,8 +65,10 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Fil
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricDashboardStartup.ps1"" -Action Install -ApplicationExe ""{app}\{#MyAppExeName}"""; StatusMsg: "Configuring elevated dashboard startup..."; Flags: runhidden waituntilterminated
 Filename: "{app}\{#MyTrayExeName}"; Description: "Start background service status icon"; Flags: nowait postinstall skipifsilent
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricDashboardStartup.ps1"" -Action Run"; Description: "Launch {#MyAppName}"; Flags: runhidden nowait postinstall skipifsilent
-; Self-update: the app starts Setup with /SILENT /RELAUNCH, so reopen the dashboard when the update finishes.
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricDashboardStartup.ps1"" -Action Run"; Check: IsRelaunchRequested; Flags: runhidden nowait
+; Self-update: the app starts Setup with /SILENT /RELAUNCH (and leaves a marker file), so reopen the dashboard
+; when the update finishes. Setup already runs elevated as the same user, so start the dashboard directly rather
+; than through the startup task, which may not exist if dashboard startup was turned off.
+Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Check: IsRelaunchRequested; Flags: nowait
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/c taskkill /IM {#MyTrayExeName} /F >nul 2>&1"; Flags: runhidden waituntilterminated
@@ -79,8 +81,12 @@ function IsRelaunchRequested(): Boolean;
 var
   I: Integer;
 begin
+  { The app also writes this marker before starting a self-update, in case the switch is lost. }
+  Result := FileExists(ExpandConstant('{commonappdata}\CentricDeviceMonitor\update-relaunch.flag'));
+  if Result then
+    Exit;
+
   { Checked by hand because CmdLineParamExists is not available in every Inno Setup 6 release. }
-  Result := False;
   for I := 1 to ParamCount do
     if CompareText(ParamStr(I), '/RELAUNCH') = 0 then
     begin

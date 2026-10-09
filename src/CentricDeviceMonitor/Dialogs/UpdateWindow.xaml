@@ -89,12 +89,17 @@
             </Grid>
         </Border>
 
-        <CheckBox x:Name="AutoCheckBox"
-                  Grid.Row="2"
-                  Content="Check for updates when the app starts"
-                  Margin="0,12,0,0"
-                  Checked="AutoCheckBox_Changed"
-                  Unchecked="AutoCheckBox_Changed" />
+        <StackPanel Grid.Row="2" Margin="0,12,0,0">
+            <CheckBox x:Name="AutoCheckBox"
+                      Content="Check for updates when the app starts and every 6 hours"
+                      Checked="AutoCheckBox_Changed"
+                      Unchecked="AutoCheckBox_Changed" />
+            <CheckBox x:Name="AutoInstallCheckBox"
+                      Content="Install updates automatically (the dashboard reopens afterwards)"
+                      Margin="0,6,0,0"
+                      Checked="AutoCheckBox_Changed"
+                      Unchecked="AutoCheckBox_Changed" />
+        </StackPanel>
 
         <Grid Grid.Row="3" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>

@@ -260,6 +260,21 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.50] - 2026-10-09
+
+### Added
+- **Automatic updates** (on by default; "Install updates automatically" in the update window). When a check finds
+  a new release, the dashboard banner counts down 60 seconds, then downloads the installer, verifies its SHA-256,
+  installs it silently and reopens the dashboard. **Remind me later** during the countdown postpones it. Checks run
+  at every start and every 6 hours while the dashboard runs.
+
+### Fixed
+- **Dashboard did not reopen after an in-app update.** The installer reopened it through the "Windows Utility by
+  Sajith Dashboard" startup task, which does not exist when dashboard startup is turned off, so nothing started.
+  Setup now starts the dashboard directly (it already runs elevated as the same user). The app also leaves an
+  `update-relaunch.flag` marker before starting the installer as a second signal, and removes it on start.
+  Takes effect from the update to 2.0.50 onwards, because the installer being run decides how to reopen.
+
 ## [2.0.49] - 2026-10-09
 
 ### Added

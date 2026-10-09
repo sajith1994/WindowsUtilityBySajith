@@ -70,6 +70,9 @@ public partial class MainWindow : Window
     private bool _refreshingPrinters;
     private bool _scanningNetworkPrinters;
     private UpdateCheckResult? _availableUpdate;
+    private DispatcherTimer? _autoInstallTimer;
+    private int _autoInstallSecondsLeft;
+    private bool _installingUpdate;
     private readonly DispatcherTimer _pingCountdownTimer;
     private readonly List<CpuTemperatureLogEntry> _cpuTemperatureLogs = new();
 
@@ -1925,7 +1928,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (!_appSettings.AutoCheckForUpdates)
+            if (!_appSettings.AutoCheckForUpdates && !_appSettings.AutoInstallUpdates)
             {
                 return;
             }
@@ -1954,6 +1957,7 @@ public partial class MainWindow : Window
 
         if (result.Status != UpdateCheckStatus.Available || result.LatestVersion is null)
         {
+            CancelAutoInstallCountdown();
             _availableUpdate = null;
             SidebarUpdateButton.Content = "Check for updates";
             SidebarUpdateButton.Tag = "";
@@ -1970,7 +1974,87 @@ public partial class MainWindow : Window
         UpdateBannerDetail.Text = released is null
             ? $"You have {result.CurrentVersion}. Install it now or snooze this reminder."
             : $"Published {UpdateService.FormatReleaseDate(released.Value)}. You have {result.CurrentVersion}.";
-        UpdateBanner.Visibility = IsUpdateAlertSnoozed(result.LatestVersion) ? Visibility.Collapsed : Visibility.Visible;
+        bool snoozed = IsUpdateAlertSnoozed(result.LatestVersion);
+        UpdateBanner.Visibility = snoozed ? Visibility.Collapsed : Visibility.Visible;
+
+        if (_appSettings.AutoInstallUpdates && !snoozed && !_installingUpdate && _autoInstallTimer?.IsEnabled != true)
+        {
+            StartAutoInstallCountdown();
+        }
+    }
+
+    /// <summary>
+    /// Automatic updates: count down on the banner so the user can postpone, then download, verify and install.
+    /// The installer closes the dashboard and reopens it when it finishes.
+    /// </summary>
+    private void StartAutoInstallCountdown()
+    {
+        _autoInstallSecondsLeft = 60;
+        _autoInstallTimer ??= CreateAutoInstallTimer();
+        UpdateAutoInstallCountdownText();
+        _autoInstallTimer.Start();
+        ApplicationLogService.WriteMessage("Update", $"Automatic install of {_availableUpdate?.LatestVersion} scheduled in {_autoInstallSecondsLeft} seconds.");
+    }
+
+    private DispatcherTimer CreateAutoInstallTimer()
+    {
+        DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += async (_, _) =>
+        {
+            _autoInstallSecondsLeft--;
+            if (_autoInstallSecondsLeft > 0)
+            {
+                UpdateAutoInstallCountdownText();
+                return;
+            }
+
+            timer.Stop();
+            await InstallAvailableUpdateAsync();
+        };
+        return timer;
+    }
+
+    private void UpdateAutoInstallCountdownText()
+    {
+        UpdateBannerTitle.Text = $"Installing Windows Utility {_availableUpdate?.LatestVersion} automatically in {_autoInstallSecondsLeft} s";
+        UpdateBannerDetail.Text = "The dashboard closes during the install and reopens when it is done. Choose Remind me later to postpone.";
+    }
+
+    private void CancelAutoInstallCountdown()
+    {
+        _autoInstallTimer?.Stop();
+    }
+
+    private async Task InstallAvailableUpdateAsync()
+    {
+        if (_installingUpdate || _availableUpdate?.Manifest is not UpdateManifest manifest)
+        {
+            return;
+        }
+
+        _installingUpdate = true;
+        UpdateBanner.Visibility = Visibility.Visible;
+        UpdateBannerTitle.Text = $"Downloading Windows Utility {_availableUpdate.LatestVersion}...";
+        UpdateBannerDetail.Text = "Starting the download.";
+        try
+        {
+            Progress<double> progress = new(value =>
+                UpdateBannerDetail.Text = $"{value:P0} downloaded. The installer is checked against its published SHA-256 before it runs.");
+            string installerPath = await UpdateService.DownloadAsync(manifest, progress, CancellationToken.None);
+
+            UpdateBannerTitle.Text = "Installing the update...";
+            UpdateBannerDetail.Text = "The dashboard will reopen when the install finishes.";
+            UpdateService.LaunchInstaller(installerPath);
+            _allowApplicationExit = true;
+            WpfApplication.Current.Shutdown();
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Automatic update install", exception);
+            _installingUpdate = false;
+            UpdateBannerTitle.Text = $"Windows Utility {_availableUpdate?.LatestVersion} could not be installed automatically";
+            UpdateBannerDetail.Text = $"{exception.Message} It will be tried again at the next check, or use Update now.";
+        }
     }
 
     private bool IsUpdateAlertSnoozed(Version latest)
@@ -1986,6 +2070,8 @@ public partial class MainWindow : Window
 
     private void OpenUpdateWindow()
     {
+        // The window handles the install itself; resume the automatic countdown afterwards if still relevant.
+        CancelAutoInstallCountdown();
         UpdateWindow updateWindow = new(_appSettings, _settingsService) { Owner = this };
         updateWindow.ShowDialog();
         if (updateWindow.LastResult is UpdateCheckResult result)
@@ -2013,6 +2099,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        CancelAutoInstallCountdown();
         DateTime until = DateTime.Now.AddDays(days);
         _appSettings.UpdateSnoozedVersion = latest.ToString();
         _appSettings.UpdateSnoozedUntilUtc = until.ToUniversalTime();

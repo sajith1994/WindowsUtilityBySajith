@@ -16,6 +16,9 @@ public sealed class AppSettings
     /// <summary>Checks for a newer release shortly after the dashboard starts.</summary>
     public bool AutoCheckForUpdates { get; set; } = true;
 
+    /// <summary>Downloads and installs a new release automatically (after a short countdown) when one is found.</summary>
+    public bool AutoInstallUpdates { get; set; } = true;
+
     /// <summary>Update version whose dashboard alert was snoozed. A newer release shows the alert again.</summary>
     public string UpdateSnoozedVersion { get; set; } = string.Empty;
 
