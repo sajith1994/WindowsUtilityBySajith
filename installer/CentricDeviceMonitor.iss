@@ -1,6 +1,6 @@
-﻿#define MyAppName "Windows Utility by Sajith"
+﻿#define MyAppName "Windows Utility"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.50"
+#define MyAppVersion "2.0.51"
 #endif
 #define MyAppExeName "WindowsUtilityBySajith.exe"
 #define MyLegacyAppExeName "CentricDeviceMonitor.exe"
@@ -11,7 +11,7 @@
 AppId={{BDE939BA-32D8-45E4-A080-6BD62E4D24B5}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-DefaultDirName={autopf}\Windows Utility by Sajith
+DefaultDirName={autopf}\Windows Utility
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=..\dist\installer
@@ -42,6 +42,12 @@ DisableDirPage=auto
 Name: "{commonappdata}\CentricDeviceMonitor"; Permissions: users-modify
 Name: "{commonappdata}\CentricDeviceMonitor\logs"; Permissions: users-modify
 Name: "{commonappdata}\CentricDeviceMonitor\service"; Permissions: users-modify
+
+[InstallDelete]
+; Shortcuts from releases before the product was renamed from "Windows Utility by Sajith".
+Type: files; Name: "{autoprograms}\Windows Utility by Sajith.lnk"
+Type: files; Name: "{autoprograms}\Uninstall Windows Utility by Sajith.lnk"
+Type: files; Name: "{autodesktop}\Windows Utility by Sajith.lnk"
 
 [Files]
 Source: "..\dist\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -108,7 +114,7 @@ begin
   InstallModePage := CreateInputOptionPage(
     wpSelectDir,
     'Installation mode',
-    'Choose how Windows Utility by Sajith should be installed',
+    'Choose how Windows Utility should be installed',
     'Upgrade preserves devices, settings and logs. Clean installation removes all previous Windows Utility program files and legacy compatibility data, service data, settings, logs and per-user cache before installing a fresh copy.',
     True,
     False);

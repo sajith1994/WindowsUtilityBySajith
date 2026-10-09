@@ -260,7 +260,7 @@ public sealed class WindowsUtilityService
         const uint ShutdownReasonFlagPlanned = 0x80000000;
         uint reason = ShutdownReasonMajorApplication | ShutdownReasonFlagPlanned;
         string actionName = restart ? "restart" : "shutdown";
-        string message = $"Windows Utility by Sajith scheduled this Windows {actionName}.";
+        string message = $"Windows Utility scheduled this Windows {actionName}.";
 
         if (!InitiateSystemShutdownExW(
                 null,

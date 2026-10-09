@@ -84,7 +84,7 @@ public sealed class PrivilegedCommandClient
         }
 
         throw new TimeoutException(
-            "The background monitoring service did not respond to the Print Spooler command. Make sure Windows Utility by Sajith Service is running.");
+            "The background monitoring service did not respond to the Print Spooler command. Make sure Windows Utility Service is running.");
     }
 
     private static async Task<PrivilegedServiceCommandResponse?> ReadResponseAsync(

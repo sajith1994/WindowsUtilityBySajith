@@ -37,7 +37,7 @@ public partial class App : WpfApplication
                 "Startup",
                 "Dashboard startup was blocked because the process did not have administrator privileges.");
             WpfMessageBox.Show(
-                "Windows Utility by Sajith must run with Administrator privileges. " +
+                "Windows Utility must run with Administrator privileges. " +
                 "Use the installed shortcut or the elevated startup task.",
                 "Administrator privileges required",
                 MessageBoxButton.OK,
@@ -77,9 +77,9 @@ public partial class App : WpfApplication
                 if (!signalled)
                 {
                     WpfMessageBox.Show(
-                        "Windows Utility by Sajith is already running but did not respond. " +
+                        "Windows Utility is already running but did not respond. " +
                         "Check Task Manager for WindowsUtilityBySajith.",
-                        "Windows Utility by Sajith",
+                        "Windows Utility",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
                 }
@@ -114,8 +114,8 @@ public partial class App : WpfApplication
         {
             ApplicationLogService.WriteException("Startup", exception);
             WpfMessageBox.Show(
-                $"Windows Utility by Sajith could not start.\n\n{exception.Message}\n\nDiagnostic log: {ApplicationLogService.LogFilePath}",
-                "Windows Utility by Sajith",
+                $"Windows Utility could not start.\n\n{exception.Message}\n\nDiagnostic log: {ApplicationLogService.LogFilePath}",
+                "Windows Utility",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             Shutdown();
@@ -127,7 +127,7 @@ public partial class App : WpfApplication
         ApplicationLogService.WriteException("UI thread", e.Exception);
         WpfMessageBox.Show(
             $"An unexpected application error occurred.\n\n{e.Exception.Message}\n\nThe error was recorded in:\n{ApplicationLogService.LogFilePath}",
-            "Windows Utility by Sajith",
+            "Windows Utility",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
         e.Handled = true;

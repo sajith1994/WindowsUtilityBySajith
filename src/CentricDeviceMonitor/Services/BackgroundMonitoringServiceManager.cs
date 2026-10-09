@@ -17,7 +17,7 @@ public sealed record BackgroundMonitoringServiceInfo(
 public sealed class BackgroundMonitoringServiceManager
 {
     public const string ServiceName = "CentricDeviceMonitorService";
-    public const string DisplayName = "Windows Utility by Sajith Background Service";
+    public const string DisplayName = "Windows Utility Background Service";
 
     public async Task<BackgroundMonitoringServiceInfo> GetInfoAsync()
     {

@@ -8,8 +8,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $serviceName = "CentricDeviceMonitorService"
-$displayName = "Windows Utility by Sajith Background Service"
-$description = "Provides unattended device connectivity, CPU temperature, CPU/RAM, network health, and scheduled power monitoring for Windows Utility by Sajith."
+$displayName = "Windows Utility Background Service"
+$description = "Provides unattended device connectivity, CPU temperature, CPU/RAM, network health, and scheduled power monitoring for Windows Utility."
 
 function Wait-ServiceState {
     param(

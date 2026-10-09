@@ -9,7 +9,7 @@
     <AssemblyName>CentricDeviceMonitorService</AssemblyName>
     <RootNamespace>CentricDeviceMonitor.ServiceHost</RootNamespace>
     <Authors>Sajith Varghese</Authors>
-    <Product>Windows Utility by Sajith Background Service</Product>
+    <Product>Windows Utility Background Service</Product>
     <Description>LocalSystem background service for device, temperature, CPU, RAM, and network monitoring.</Description>
   </PropertyGroup>
 

@@ -1,4 +1,4 @@
-# AI Development Context — Windows Utility by Sajith
+# AI Development Context — Windows Utility
 
 **Base release:** 2.0.23
 **Framework:** .NET 10 / WPF / Windows  
@@ -41,7 +41,7 @@ Before returning a changed source package:
 
 ## 2. Product overview
 
-**Windows Utility by Sajith** is a Windows technician/support utility intended for IT technicians and administrators. It is a `.NET 10` WPF desktop application supported by a LocalSystem monitoring service and a separate interactive tray companion.
+**Windows Utility** is a Windows technician/support utility intended for IT technicians and administrators. It is a `.NET 10` WPF desktop application supported by a LocalSystem monitoring service and a separate interactive tray companion.
 
 The current UI is an Apple/macOS-inspired Windows interface using a navigation sidebar and four main sections:
 
@@ -52,7 +52,7 @@ The current UI is an Apple/macOS-inspired Windows interface using a navigation s
 
 The application is intentionally technician-oriented and contains elevated/system-level capabilities. It is not a consumer-only dashboard.
 
-The visible branding should remain **Windows Utility by Sajith**. Company name and website branding were intentionally removed from the visible application. The About text includes:
+The visible branding should remain **Windows Utility**. Company name and website branding were intentionally removed from the visible application. The About text includes:
 
 > **Made for IT technicians by an IT technician.**
 
@@ -934,7 +934,7 @@ Use this as the minimum release checklist:
 
 Copy/paste the following together with this file and the latest source ZIP:
 
-> This is the latest complete source of **Windows Utility by Sajith**. Read `AI_CONTEXT.md` first, then inspect `README.md`, `CHANGELOG.md`, `VALIDATION.md`, `Directory.Build.props`, `MainWindow.xaml` and the relevant service/dialog files before changing anything. Continue from the existing architecture; do not rebuild working features from scratch. Preserve all disk/network/thermal safety protections, LocalSystem service behavior, user data compatibility, Terms & Conditions, Apple-inspired System/Light/Dark UI, and internal compatibility identifiers. The project uses both WPF and Windows Forms, so explicitly qualify ambiguous control/framework types. Every code revision must increment the application version; the next revision after this base is 2.0.24. Make the requested changes, update the documentation/versioning, run as much validation as possible, and return a complete updated source ZIP plus a concise list of changes and any build limitations.
+> This is the latest complete source of **Windows Utility**. Read `AI_CONTEXT.md` first, then inspect `README.md`, `CHANGELOG.md`, `VALIDATION.md`, `Directory.Build.props`, `MainWindow.xaml` and the relevant service/dialog files before changing anything. Continue from the existing architecture; do not rebuild working features from scratch. Preserve all disk/network/thermal safety protections, LocalSystem service behavior, user data compatibility, Terms & Conditions, Apple-inspired System/Light/Dark UI, and internal compatibility identifiers. The project uses both WPF and Windows Forms, so explicitly qualify ambiguous control/framework types. Every code revision must increment the application version; the next revision after this base is 2.0.24. Make the requested changes, update the documentation/versioning, run as much validation as possible, and return a complete updated source ZIP plus a concise list of changes and any build limitations.
 
 ---
 

@@ -718,7 +718,7 @@ public sealed class HardwareMonitorService : IDisposable
         lock (_syncRoot)
         {
             StringBuilder report = new();
-            report.AppendLine("Windows Utility by Sajith - Fan diagnostics");
+            report.AppendLine("Windows Utility - Fan diagnostics");
             report.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             report.AppendLine($"PawnIO: {GetPawnIoDiagnostic()}");
             report.AppendLine();
@@ -2037,7 +2037,7 @@ public sealed class HardwareMonitorService : IDisposable
         string pawnIoDiagnostic = GetPawnIoDiagnostic();
         string baseMessage =
             "No CPU-specific temperature sensor was exposed by the built-in LibreHardwareMonitor engine. " +
-            "Windows Utility by Sajith does not require HWiNFO. The installer includes the signed PawnIO low-level hardware driver used by current LibreHardwareMonitor builds. " +
+            "Windows Utility does not require HWiNFO. The installer includes the signed PawnIO low-level hardware driver used by current LibreHardwareMonitor builds. " +
             "Generic Windows ACPI thermal zones are diagnostic-only because they may not represent CPU package temperature. Use Rescan sensors after installing/upgrading PawnIO or after a Windows restart.";
 
         string diagnostic = $"{pawnIoDiagnostic} {baseMessage} Optional HWiNFO fallback status: {_hwiNfoDiagnostic}";
@@ -2056,7 +2056,7 @@ public sealed class HardwareMonitorService : IDisposable
     {
         return TryGetPawnIoVersion(out string version)
             ? $"PawnIO {version} is installed for low-level hardware access."
-            : "PawnIO is not detected. Re-run the Windows Utility by Sajith installer as administrator so it can install the hardware sensor driver.";
+            : "PawnIO is not detected. Re-run the Windows Utility installer as administrator so it can install the hardware sensor driver.";
     }
 
     private static bool TryGetPawnIoVersion(out string version)

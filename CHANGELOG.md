@@ -260,6 +260,19 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.51] - 2026-10-09
+
+### Changed
+- **Renamed to "Windows Utility"** (was "Windows Utility by Sajith") everywhere the name is shown: window titles,
+  sidebar and About header, messages, installer, Start menu and desktop shortcuts, Apps & features entry, the
+  background service display name, release titles, Terms & Conditions, README and notices. The developer credit in
+  About is unchanged.
+- The installer removes the old "Windows Utility by Sajith" Start menu and desktop shortcuts. Existing installs
+  stay in their current folder; new installs default to `Program Files\Windows Utility`.
+- Unchanged on purpose, because installed copies and updates depend on them: the `WindowsUtilityBySajith.exe`
+  file name, the GitHub repository and update address, the installer file name and the
+  "Windows Utility by Sajith Dashboard" startup task name.
+
 ## [2.0.50] - 2026-10-09
 
 ### Added

@@ -12,7 +12,7 @@
     <RootNamespace>CentricDeviceMonitor</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Authors>Sajith Varghese</Authors>
-    <Product>Windows Utility by Sajith</Product>
+    <Product>Windows Utility</Product>
     <Description>Windows monitoring, network device management, CPU/RAM/temperature health alerts, controlled CPU/GPU thermal load testing, extended Windows/network health, packet-loss diagnostics, local-link and FAST.com internet testing, visual two-PC LAN throughput testing, storage and battery diagnostics, guarded disk/partition management, command runners, activation status, technician shortcuts, cleanup reporting, user-application shutdown, and external administration tools.</Description>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>

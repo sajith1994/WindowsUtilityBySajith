@@ -1,9 +1,9 @@
-WINDOWS UTILITY BY SAJITH
+WINDOWS UTILITY
 END USER LICENCE AGREEMENT, TERMS OF USE AND DISCLAIMER
 
 Last Updated: 30 August 2026
 
-Please read these Terms and Conditions carefully before installing or using Windows Utility by Sajith (the "Software").
+Please read these Terms and Conditions carefully before installing or using Windows Utility (the "Software").
 
 By selecting "I accept the agreement", installing, accessing, or using the Software, you confirm that you have read, understood, and agreed to these Terms.
 
@@ -11,7 +11,7 @@ If you do not agree with these Terms, do not install or use the Software.
 
 1. PURPOSE OF THE SOFTWARE
 
-Windows Utility by Sajith is an IT administration, monitoring, diagnostic and troubleshooting utility intended primarily for IT technicians, system administrators and other authorised users.
+Windows Utility is an IT administration, monitoring, diagnostic and troubleshooting utility intended primarily for IT technicians, system administrators and other authorised users.
 
 The Software may provide capabilities including, but not limited to:
 
@@ -133,7 +133,7 @@ The Network Speed & Bandwidth feature can report negotiated Ethernet/Wi-Fi link 
 
 8. PRIVACY AND DATA HANDLING
 
-Windows Utility by Sajith is not designed to collect personal information for advertising, profiling, resale or marketing purposes.
+Windows Utility is not designed to collect personal information for advertising, profiling, resale or marketing purposes.
 
 The Software does not intentionally transmit personal information, diagnostic information or monitored-device information to the developer as part of its normal operation.
 
@@ -163,7 +163,7 @@ Information will only be shared with the developer if the user or administrator 
 
 9. MALWARE AND SECURITY STATEMENT
 
-Windows Utility by Sajith is developed as a legitimate system administration and diagnostic utility and is not designed to operate as malware, spyware, ransomware, a computer virus or other malicious software.
+Windows Utility is developed as a legitimate system administration and diagnostic utility and is not designed to operate as malware, spyware, ransomware, a computer virus or other malicious software.
 
 Because the Software performs administrative activities such as network scanning, service management, hardware access, disk operations and system configuration, some antivirus, endpoint-protection or application-control products may classify or flag certain functions as potentially sensitive.
 
@@ -177,7 +177,7 @@ The Software may use or provide access to third-party libraries, drivers, utilit
 
 Third-party software remains subject to the licence terms and conditions of its respective developer or publisher.
 
-The developer of Windows Utility by Sajith does not control and cannot guarantee the continued availability, behaviour, compatibility or security of third-party components.
+The developer of Windows Utility does not control and cannot guarantee the continued availability, behaviour, compatibility or security of third-party components.
 
 11. NO GUARANTEE OF AVAILABILITY OR ACCURACY
 
@@ -197,7 +197,7 @@ Hardware manufacturers, Windows updates, drivers, security policies and network 
 
 12. LIMITATION OF LIABILITY
 
-To the maximum extent permitted by applicable law, the developer and distributor of Windows Utility by Sajith shall not be liable for indirect, incidental, consequential or special loss arising from the installation or use of the Software.
+To the maximum extent permitted by applicable law, the developer and distributor of Windows Utility shall not be liable for indirect, incidental, consequential or special loss arising from the installation or use of the Software.
 
 This may include, without limitation:
 

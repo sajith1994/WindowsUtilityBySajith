@@ -1,7 +1,7 @@
 <Window x:Class="CentricDeviceMonitor.Dialogs.TermsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Terms &amp; Conditions - Windows Utility by Sajith"
+        Title="Terms &amp; Conditions - Windows Utility"
         Width="820"
         Height="760"
         MinWidth="620"

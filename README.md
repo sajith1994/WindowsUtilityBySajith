@@ -1,6 +1,6 @@
-# Windows Utility by Sajith 2.0.23
+# Windows Utility 2.0.23
 
-Windows Utility by Sajith is a .NET 10 WPF technician dashboard with a LocalSystem background monitoring service plus an interactive service-status tray companion. It combines network-device monitoring, hardware/system health, Windows administration, storage and battery diagnostics, cleanup tools, disk management and common technician shortcuts.
+Windows Utility is a .NET 10 WPF technician dashboard with a LocalSystem background monitoring service plus an interactive service-status tray companion. It combines network-device monitoring, hardware/system health, Windows administration, storage and battery diagnostics, cleanup tools, disk management and common technician shortcuts.
 
 ## Current release
 

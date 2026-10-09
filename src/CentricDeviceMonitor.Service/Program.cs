@@ -10,7 +10,7 @@ internal static class Program
         {
             using MonitoringWindowsService service = new();
             service.StartInteractive();
-            Console.WriteLine("Windows Utility by Sajith Service is running in console mode. Press Enter to stop.");
+            Console.WriteLine("Windows Utility Service is running in console mode. Press Enter to stop.");
             Console.ReadLine();
             service.StopInteractive();
             return;

@@ -20,7 +20,7 @@ public partial class TermsWindow : Window
             string path = Path.Combine(AppContext.BaseDirectory, TermsFileName);
             return File.Exists(path)
                 ? File.ReadAllText(path)
-                : "The Terms & Conditions file could not be found. Please reinstall or repair Windows Utility by Sajith.";
+                : "The Terms & Conditions file could not be found. Please reinstall or repair Windows Utility.";
         }
         catch (Exception exception)
         {

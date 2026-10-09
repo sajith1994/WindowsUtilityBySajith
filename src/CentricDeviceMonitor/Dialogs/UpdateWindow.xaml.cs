@@ -86,7 +86,7 @@ public partial class UpdateWindow : Window
     private void ShowUpToDate(UpdateCheckResult result)
     {
         ShowStatus(UpToDateIcon, "SuccessBrush", "You're up to date",
-            $"Windows Utility by Sajith {_currentVersion} is the latest version. There is nothing to install.");
+            $"Windows Utility {_currentVersion} is the latest version. There is nothing to install.");
 
         if (result.Manifest is not null && result.LatestVersion == _currentVersion)
         {
@@ -192,8 +192,8 @@ public partial class UpdateWindow : Window
         InstalledVersionText.Text = _currentVersion.ToString();
         InstalledDateText.Text = date;
         CurrentVersionText.Text = published is null
-            ? $"Windows Utility by Sajith {_currentVersion}"
-            : $"Windows Utility by Sajith {_currentVersion}  •  Published {date}";
+            ? $"Windows Utility {_currentVersion}"
+            : $"Windows Utility {_currentVersion}  •  Published {date}";
     }
 
     private void ShowStatus(string icon, string brushKey, string title, string detail)

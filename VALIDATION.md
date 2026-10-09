@@ -1,4 +1,4 @@
-# Windows Utility by Sajith 2.0.23 validation
+# Windows Utility 2.0.23 validation
 
 - Utility Tools now opens a dedicated CPU/GPU thermal-load window with CPU-only, GPU-render-only and combined modes.
 - The acknowledgement and Start/Stop/Close controls use a fixed footer, and both temperature controls fit side by side in the compact settings card.

@@ -104,7 +104,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Notification-area companion package restore failed."
 }
 
-Write-Host "Publishing Windows Utility by Sajith for $Runtime..."
+Write-Host "Publishing Windows Utility for $Runtime..."
 & dotnet publish $appProject `
     --configuration Release `
     --runtime $Runtime `

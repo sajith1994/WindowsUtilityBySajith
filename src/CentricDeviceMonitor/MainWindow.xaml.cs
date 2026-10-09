@@ -425,7 +425,7 @@ public partial class MainWindow : Window
                 _trayHintShown = true;
                 _trayIcon.ShowBalloonTip(
                     5000,
-                    "Windows Utility by Sajith",
+                    "Windows Utility",
                     "The dashboard is still running in the notification area. Background monitoring continues in the Windows service even if the dashboard exits.",
                     System.Windows.Forms.ToolTipIcon.Info);
             }
@@ -1607,7 +1607,7 @@ public partial class MainWindow : Window
         string command = _externalWindowsToolService.ChrisTitusLaunchCommand;
         MessageBoxResult answer = WpfMessageBox.Show(
             "Chris Titus Tech WinUtil performs system-wide changes and will be launched in an elevated PowerShell window. " +
-            "Windows Utility by Sajith refreshes the stable launch endpoint from the official ChrisTitusTech GitHub README at dashboard startup.\n\n" +
+            "Windows Utility refreshes the stable launch endpoint from the official ChrisTitusTech GitHub README at dashboard startup.\n\n" +
             $"Command:\n{command}\n\nContinue?",
             "Run Chris Titus Tech WinUtil",
             MessageBoxButton.YesNo,
@@ -1667,7 +1667,7 @@ public partial class MainWindow : Window
     {
         MessageBoxResult answer = WpfMessageBox.Show(
             $"{displayName} can make system-wide changes and will run in an elevated PowerShell window. " +
-            $"Windows Utility by Sajith refreshes its launch endpoint from {metadataSource} every time the dashboard starts.\n\n" +
+            $"Windows Utility refreshes its launch endpoint from {metadataSource} every time the dashboard starts.\n\n" +
             $"Command:\n{command}\n\nContinue?",
             $"Run {displayName}",
             MessageBoxButton.YesNo,
@@ -2263,7 +2263,7 @@ public partial class MainWindow : Window
     private async void ClearTemporaryFilesButton_Click(object sender, RoutedEventArgs e)
     {
         MessageBoxResult answer = WpfMessageBox.Show(
-            "Clear files from the current user's Temp folder and Windows Temp? Files currently in use are skipped.\n\nAfter cleanup, Windows Utility by Sajith will show every deleted/skipped item and the reclaimed space.",
+            "Clear files from the current user's Temp folder and Windows Temp? Files currently in use are skipped.\n\nAfter cleanup, Windows Utility will show every deleted/skipped item and the reclaimed space.",
             "Clear temporary files",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question,
@@ -2298,7 +2298,7 @@ public partial class MainWindow : Window
     private async void TerminateUserApplicationsButton_Click(object sender, RoutedEventArgs e)
     {
         MessageBoxResult answer = WpfMessageBox.Show(
-            "Close all visible non-Windows applications in the current sign-in session?\n\nWindows Utility by Sajith and Windows system executables are excluded. Applications are asked to close normally first; if they do not exit within a short timeout, they are force terminated.\n\nUNSAVED WORK IN OTHER APPLICATIONS MAY BE LOST.",
+            "Close all visible non-Windows applications in the current sign-in session?\n\nWindows Utility and Windows system executables are excluded. Applications are asked to close normally first; if they do not exit within a short timeout, they are force terminated.\n\nUNSAVED WORK IN OTHER APPLICATIONS MAY BE LOST.",
             "Close user applications",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,

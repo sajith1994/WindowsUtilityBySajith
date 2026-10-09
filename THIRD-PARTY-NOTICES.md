@@ -24,7 +24,7 @@ This application references Hwinfo.SharedMemory.Net 2.1.0 to read sensor values 
 Project: https://github.com/Seraksab/Hwinfo.SharedMemory.Net
 License: MIT
 
-HWiNFO itself is optional external software and is not distributed with Windows Utility by Sajith. HWiNFO licensing terms apply separately.
+HWiNFO itself is optional external software and is not distributed with Windows Utility. HWiNFO licensing terms apply separately.
 
 ## System.ServiceProcess.ServiceController
 
@@ -42,11 +42,11 @@ Project: https://github.com/namazso/PawnIO
 Official setup releases: https://github.com/namazso/PawnIO.Setup/releases
 Website: https://pawnio.eu/
 
-PawnIO is distributed under its upstream license and special exception. Review the upstream license before commercial redistribution. Windows Utility by Sajith does not uninstall PawnIO automatically because other installed applications may also depend on it.
+PawnIO is distributed under its upstream license and special exception. Review the upstream license before commercial redistribution. Windows Utility does not uninstall PawnIO automatically because other installed applications may also depend on it.
 
 ## Optional external technician tools
 
-Windows Utility by Sajith can open the official installer/launcher commands for Chris Titus Tech WinUtil, Raphire Win11Debloat and Winhance. These tools are not bundled with, copied into, or redistributed by Windows Utility by Sajith. Their upstream project pages, licenses and terms apply separately.
+Windows Utility can open the official installer/launcher commands for Chris Titus Tech WinUtil, Raphire Win11Debloat and Winhance. These tools are not bundled with, copied into, or redistributed by Windows Utility. Their upstream project pages, licenses and terms apply separately.
 
 - Chris Titus Tech WinUtil: https://github.com/ChrisTitusTech/winutil
 - Raphire Win11Debloat: https://github.com/Raphire/Win11Debloat

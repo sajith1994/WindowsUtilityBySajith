@@ -56,7 +56,7 @@ if ($Action -eq "Uninstall") {
 if ($Action -eq "Run") {
     & schtasks.exe /Run /TN $taskName | Out-Null
     if ($LASTEXITCODE -ne 0) {
-        throw "Windows could not start the Windows Utility by Sajith dashboard task."
+        throw "Windows could not start the Windows Utility dashboard task."
     }
     exit 0
 }
@@ -81,5 +81,5 @@ Remove-LegacyRunEntry
     /F | Out-Null
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Windows could not create the elevated Windows Utility by Sajith dashboard startup task for $user."
+    throw "Windows could not create the elevated Windows Utility dashboard startup task for $user."
 }

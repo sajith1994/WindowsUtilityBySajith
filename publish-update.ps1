@@ -76,9 +76,9 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
 }
 
 $notesFile = Join-Path $env:TEMP "wus-release-notes.txt"
-[System.IO.File]::WriteAllText($notesFile, $(if ($Notes) { $Notes } else { "Windows Utility by Sajith $version" }), (New-Object System.Text.UTF8Encoding($false)))
+[System.IO.File]::WriteAllText($notesFile, $(if ($Notes) { $Notes } else { "Windows Utility $version" }), (New-Object System.Text.UTF8Encoding($false)))
 
-& gh release create "v$version" $installerPath $manifestPath --repo $Repo --title "Windows Utility by Sajith $version" --notes-file $notesFile
+& gh release create "v$version" $installerPath $manifestPath --repo $Repo --title "Windows Utility $version" --notes-file $notesFile
 if ($LASTEXITCODE -ne 0) { throw "gh release create failed." }
 
 Write-Host ""

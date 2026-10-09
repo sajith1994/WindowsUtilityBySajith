@@ -1,7 +1,7 @@
 <Window x:Class="CentricDeviceMonitor.Dialogs.TemporaryFileCleanupReportWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Temporary File Cleanup Report - Windows Utility by Sajith"
+        Title="Temporary File Cleanup Report - Windows Utility"
         Width="1080"
         Height="680"
         MinWidth="760"

@@ -1,7 +1,7 @@
 <Window x:Class="CentricDeviceMonitor.Dialogs.UserApplicationTerminationReportWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Closed Applications Report - Windows Utility by Sajith"
+        Title="Closed Applications Report - Windows Utility"
         Width="1080"
         Height="650"
         MinWidth="760"
@@ -22,7 +22,7 @@
                     <TextBlock Text="&#xE7C4;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,8,0" />
                     <TextBlock Text="Closed user applications" FontSize="22" FontWeight="SemiBold" />
                 </StackPanel>
-                <TextBlock Text="Only visible non-Windows applications in the current sign-in session are targeted. Windows Utility by Sajith and Windows system executables are excluded."
+                <TextBlock Text="Only visible non-Windows applications in the current sign-in session are targeted. Windows Utility and Windows system executables are excluded."
                            Foreground="{DynamicResource MutedTextBrush}"
                            TextWrapping="Wrap"
                            Margin="0,3,0,0" />
