@@ -16,7 +16,13 @@ public sealed record NetworkAdapterInfo(
     string SubnetMask,
     string Gateway,
     IReadOnlyList<string> DnsServers,
-    bool DnsFromDhcp)
+    bool DnsFromDhcp,
+    string Id = "",
+    string MacAddress = "",
+    long LinkSpeedBitsPerSecond = 0,
+    string AdapterType = "",
+    string DhcpServer = "",
+    IReadOnlyList<string>? IPv6Addresses = null)
 {
     public string DisplayName => $"{Name}  -  {Description}  ({Status})";
 
@@ -85,6 +91,13 @@ public sealed class NetworkAdapterConfigService
                     .Where(address => address.AddressFamily == AddressFamily.InterNetwork)
                     .Select(address => address.ToString())
                     .ToList();
+                string mac = string.Join("-", networkInterface.GetPhysicalAddress().GetAddressBytes().Select(value => value.ToString("X2")));
+                List<string> ipv6 = properties.UnicastAddresses
+                    .Where(address => address.Address.AddressFamily == AddressFamily.InterNetworkV6)
+                    .Select(address => address.Address.ToString())
+                    .ToList();
+                string dhcpServer = properties.DhcpServerAddresses
+                    .FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork)?.ToString() ?? string.Empty;
 
                 adapters.Add(new NetworkAdapterInfo(
                     networkInterface.Name,
@@ -95,7 +108,13 @@ public sealed class NetworkAdapterConfigService
                     unicast?.IPv4Mask?.ToString() ?? string.Empty,
                     gateway,
                     dns,
-                    IsDnsFromDhcp(networkInterface.Id)));
+                    IsDnsFromDhcp(networkInterface.Id),
+                    networkInterface.Id,
+                    mac,
+                    networkInterface.OperationalStatus == OperationalStatus.Up ? networkInterface.Speed : 0,
+                    DescribeType(networkInterface.NetworkInterfaceType),
+                    dhcpServer,
+                    ipv6));
             }
             catch
             {
@@ -109,6 +128,98 @@ public sealed class NetworkAdapterConfigService
             .ThenBy(adapter => adapter.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
     }
+
+    private static string DescribeType(NetworkInterfaceType type) => type switch
+    {
+        NetworkInterfaceType.Wireless80211 => "Wi-Fi",
+        NetworkInterfaceType.Ethernet or NetworkInterfaceType.GigabitEthernet or NetworkInterfaceType.FastEthernetT or NetworkInterfaceType.FastEthernetFx => "Ethernet",
+        NetworkInterfaceType.Ppp => "PPP / dial-up",
+        NetworkInterfaceType.Wwanpp or NetworkInterfaceType.Wwanpp2 => "Mobile broadband",
+        _ => type.ToString()
+    };
+
+    public static string FormatLinkSpeed(long bitsPerSecond) => bitsPerSecond switch
+    {
+        <= 0 => "Not connected",
+        >= 1_000_000_000 => $"{bitsPerSecond / 1_000_000_000.0:0.#} Gbps",
+        _ => $"{bitsPerSecond / 1_000_000.0:0.#} Mbps"
+    };
+
+    /// <summary>DHCP lease times for an adapter (WMI), or empty strings when not on DHCP.</summary>
+    public (string Obtained, string Expires) GetDhcpLease(string interfaceId)
+    {
+        try
+        {
+            using System.Management.ManagementObjectSearcher searcher = new(
+                $"SELECT DHCPLeaseObtained, DHCPLeaseExpires FROM Win32_NetworkAdapterConfiguration WHERE SettingID = '{interfaceId.Replace("'", string.Empty)}'");
+            foreach (System.Management.ManagementBaseObject item in searcher.Get())
+            {
+                using (item)
+                {
+                    return (FormatWmiDate(item["DHCPLeaseObtained"] as string), FormatWmiDate(item["DHCPLeaseExpires"] as string));
+                }
+            }
+        }
+        catch
+        {
+            // Lease times are informational only.
+        }
+
+        return (string.Empty, string.Empty);
+    }
+
+    private static string FormatWmiDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return System.Management.ManagementDateTimeConverter.ToDateTime(value).ToString("g");
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    /// <summary>Average round-trip time of a few pings in milliseconds, or null when the host does not answer.</summary>
+    public static async Task<double?> PingAsync(string address, int attempts = 3, int timeoutMilliseconds = 1000)
+    {
+        if (!IPAddress.TryParse(address?.Trim(), out IPAddress? ip))
+        {
+            return null;
+        }
+
+        List<long> times = new();
+        using Ping ping = new();
+        for (int attempt = 0; attempt < attempts; attempt++)
+        {
+            try
+            {
+                PingReply reply = await ping.SendPingAsync(ip, timeoutMilliseconds);
+                if (reply.Status == IPStatus.Success)
+                {
+                    times.Add(reply.RoundtripTime);
+                }
+            }
+            catch (PingException)
+            {
+                // Counted as no reply.
+            }
+        }
+
+        return times.Count == 0 ? null : times.Average();
+    }
+
+    public static string FormatPing(double? milliseconds) => milliseconds switch
+    {
+        null => "no reply",
+        < 1 => "<1 ms",
+        _ => $"{milliseconds:0} ms"
+    };
 
     /// <summary>Manually set DNS servers are stored in the interface's NameServer value; empty means DHCP-provided.</summary>
     private static bool IsDnsFromDhcp(string interfaceId)

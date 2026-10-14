@@ -280,6 +280,8 @@ public partial class MainWindow : Window
                 {
                     RefreshNetworkAdapters();
                 }
+
+                _ = RefreshLocalSharesAsync();
                 break;
             case 2:
                 HeaderTitleText.Text = "Utility Tools";

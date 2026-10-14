@@ -866,11 +866,31 @@
                                     <TextBlock Text="Adapter" Style="{StaticResource InfoLabelStyle}" />
                                     <ComboBox Grid.Column="1" x:Name="NetworkAdapterComboBox" DisplayMemberPath="DisplayName" FontSize="11" SelectionChanged="NetworkAdapterComboBox_SelectionChanged" />
                                 </Grid>
-                                <Grid Margin="0,0,0,14">
+                                <Grid Margin="0,0,0,6">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="Current" Style="{StaticResource InfoLabelStyle}" VerticalAlignment="Top" />
                                     <TextBlock Grid.Column="1" x:Name="NetworkAdapterCurrentText" Text="Select an adapter." Style="{StaticResource CardDescriptionStyle}" />
                                 </Grid>
+                                <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,8" Margin="0,4,0,14">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Type / speed" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="AdapterTypeSpeedText" Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="MAC address" Style="{StaticResource InfoLabelStyle}" Margin="12,3,0,3"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="3" x:Name="AdapterMacText" Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="DHCP server" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="AdapterDhcpServerText" Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="2" Text="Lease" Style="{StaticResource InfoLabelStyle}" Margin="12,3,0,3"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="3" x:Name="AdapterLeaseText" Style="{StaticResource InfoValueStyle}" Margin="0,3" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Gateway ping" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="AdapterGatewayPingText" Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="2" Text="Internet ping" Style="{StaticResource InfoLabelStyle}" Margin="12,3,0,3"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="3" x:Name="AdapterInternetPingText" Style="{StaticResource InfoValueStyle}" Margin="0,3" ToolTip="Ping to 1.1.1.1"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="IPv6" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" x:Name="AdapterIpv6Text" Style="{StaticResource InfoValueStyle}" Margin="0,3" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                    </Grid>
+                                </Border>
 
                                 <Grid>
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -898,20 +918,100 @@
                                         <ComboBox x:Name="DnsPresetComboBox" FontSize="11" SelectionChanged="DnsPresetComboBox_SelectionChanged" Margin="0,0,0,4" />
                                         <TextBlock x:Name="DnsPresetNoteText" Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,8" />
                                         <Grid x:Name="DnsServerFields">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/><ColumnDefinition Width="72"/></Grid.ColumnDefinitions>
                                             <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
                                             <TextBlock Grid.Row="0" Text="Preferred DNS" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
-                                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="PrimaryDnsTextBox" FontSize="11" Margin="0,3" ToolTip="Example: 8.8.8.8"/>
+                                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="PrimaryDnsTextBox" FontSize="11" Margin="0,3" TextChanged="DnsTextBox_TextChanged" ToolTip="Pick a service above, or type any DNS server, for example 8.8.8.8"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="2" x:Name="PrimaryDnsPingText" Style="{StaticResource InfoValueStyle}" HorizontalAlignment="Right" Margin="8,3,0,3"/>
                                             <TextBlock Grid.Row="1" Text="Alternate DNS" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
-                                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="SecondaryDnsTextBox" FontSize="11" Margin="0,3" ToolTip="Example: 8.8.4.4 (optional)"/>
+                                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="SecondaryDnsTextBox" FontSize="11" Margin="0,3" TextChanged="DnsTextBox_TextChanged" ToolTip="Optional. Keep the service's alternate or type your own, for example 1.1.1.1"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="2" x:Name="SecondaryDnsPingText" Style="{StaticResource InfoValueStyle}" HorizontalAlignment="Right" Margin="8,3,0,3"/>
                                         </Grid>
                                     </StackPanel>
                                 </Grid>
+
+                                <!-- DNS response times: every preset plus the DNS servers currently in use. -->
+                                <Grid Margin="0,16,0,6">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="DNS response times" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="DnsLatencyHintText" Text="Average of 3 pings to each server. Lower is faster." Style="{StaticResource CardDescriptionStyle}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" x:Name="TestDnsSpeedButton" Content="Test again" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="TestDnsSpeedButton_Click" Margin="0" VerticalAlignment="Center" />
+                                </Grid>
+                                <ItemsControl x:Name="DnsLatencyList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/><ColumnDefinition Width="70"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Servers}" Style="{StaticResource CardDescriptionStyle}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                <TextBlock Grid.Column="2" Text="{Binding LatencyText}" FontSize="11" FontWeight="SemiBold" Foreground="{Binding LatencyBrush}" VerticalAlignment="Center" />
+                                                <Button Grid.Column="3" Content="Use" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Visibility="{Binding UseVisibility}" Click="UseDnsLatencyRow_Click" Margin="0" ToolTip="Fill the DNS fields with these servers" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
 
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
                                     <Button Content="Reset to automatic" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="ResetAdapterToAutomaticButton_Click" Margin="0,0,8,0" ToolTip="Set this adapter back to DHCP with automatic DNS." />
                                     <Button x:Name="ApplyAdapterSettingsButton" Content="Apply settings" Tag="&#xE73E;" Style="{StaticResource IconCompactPrimaryButton}" Click="ApplyAdapterSettingsButton_Click" Margin="0" />
                                 </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Shared folders: from this PC and on the local network. -->
+                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="&#xE8F7;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                    <TextBlock Text="Shared Folders" Style="{StaticResource CardTitleStyle}" />
+                                </StackPanel>
+                                <TextBlock Text="Folders this PC shares, and shared folders on other PCs of the local network. Add to File Explorer puts a share under This PC > Network locations."
+                                           Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />
+
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="LocalSharesHeaderText" Text="Shared from this PC" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="Refresh" Style="{StaticResource HeaderMiniButton}" Click="RefreshLocalSharesButton_Click" Margin="0" />
+                                </Grid>
+                                <ItemsControl x:Name="LocalSharesList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2,0,3">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding UncPath}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Open folder" Style="{StaticResource HeaderMiniButton}" Tag="{Binding Path}" Click="OpenShareButton_Click" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="LocalSharesEmptyText" Text="Reading shared folders..." Style="{StaticResource CardDescriptionStyle}" />
+
+                                <Grid Margin="0,14,0,4">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="NetworkSharesHeaderText" Text="Shared on the network" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" x:Name="ScanNetworkSharesButton" Content="Scan network" Style="{StaticResource HeaderMiniButton}" Click="ScanNetworkSharesButton_Click" Margin="0" />
+                                </Grid>
+                                <ItemsControl x:Name="NetworkSharesList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2,0,3">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Open" Style="{StaticResource HeaderMiniButton}" Tag="{Binding UncPath}" Click="OpenShareButton_Click" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                <Button Grid.Column="2" Content="Add to File Explorer" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="AddShareToExplorerButton_Click" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="NetworkSharesEmptyText" Text="Not scanned yet. Scan network looks for PCs with file sharing (SMB) on this subnet." Style="{StaticResource CardDescriptionStyle}" />
                             </StackPanel>
                         </Border>
 

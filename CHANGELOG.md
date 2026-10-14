@@ -260,6 +260,25 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.54] - 2026-10-14
+
+### Added
+- **DNS response times.** Network Adapter Settings pings every DNS service and the DNS servers currently in use
+  (average of 3 pings each), lists them fastest first with a ★ on the fastest, colour-codes the times and offers
+  **Use** to fill the DNS fields. The Current line shows the ping of the DNS in use, and the Preferred/Alternate
+  fields show the ping of whatever is typed in them. **Test again** re-measures.
+- **More adapter detail:** type and link speed, MAC address, DHCP server, DHCP lease obtained/expires, IPv6
+  addresses, and ping to the gateway and to the internet (1.1.1.1).
+- **Shared Folders** card on Network Diagnostics: folders shared from this PC (hidden `$` shares excluded) with
+  Open folder, and **Scan network** for PCs with file sharing (SMB) on the subnet and their shares. Each share or PC
+  has **Open** and **Add to File Explorer**, which adds it under This PC > Network locations (the same structure as
+  Windows' "Add a network location"; nothing is mapped and no password is stored). PCs that only list their shares
+  after sign-in are shown so they can be opened with a user name and password.
+
+### Changed
+- The Preferred and Alternate DNS fields are editable for every DNS service, so one server can be changed while
+  keeping the other. When DNS is set manually, the fields show the servers actually in use.
+
 ## [2.0.53] - 2026-10-14
 
 ### Added
