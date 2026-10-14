@@ -34,6 +34,9 @@ public sealed class LiveChartSeries
 
     public List<double?> Values { get; } = new();
     public bool IsVisible { get; set; } = true;
+
+    /// <summary>Optional limit drawn as a dashed red line across the lane (e.g. a thermal stop temperature).</summary>
+    public double? Threshold { get; set; }
     public bool HasData => Values.Any(value => value.HasValue);
 
     public string Format(double? value) => value.HasValue ? $"{LiveChart.FormatNumber(value.Value)} {Unit}" : "no reading";
@@ -74,6 +77,15 @@ public sealed class LiveChart : FrameworkElement
         _times = times;
         _series = series;
         _range = range;
+        InvalidateVisual();
+    }
+
+    private IReadOnlyList<(DateTime Time, string Label)> _markers = Array.Empty<(DateTime, string)>();
+
+    /// <summary>Labelled vertical markers across every lane, e.g. "Test started" / "Safety stop".</summary>
+    public void SetMarkers(IReadOnlyList<(DateTime Time, string Label)> markers)
+    {
+        _markers = markers;
         InvalidateVisual();
     }
 
@@ -263,7 +275,9 @@ public sealed class LiveChart : FrameworkElement
                 }
             }
 
-            (double min, double max, double valueStep) = NiceAxis(series, windowValues);
+            // Keep the limit on screen so the gap between reading and limit is visible.
+            (double min, double max, double valueStep) = NiceAxis(series,
+                series.Threshold is double limit ? windowValues.Append(limit) : windowValues);
             double span = Math.Max(max - min, 1e-9);
             double YFor(double value) => valueRect.Bottom - (value - min) / span * valueRect.Height;
 
@@ -285,6 +299,15 @@ public sealed class LiveChart : FrameworkElement
 
             DrawText(context, series.Unit, new WpfPoint(4, valueRect.Top - 2), stroke, 10, dpi, TextAlignment.Left, bold: true);
             context.DrawLine(axis, new WpfPoint(valueRect.Left, valueRect.Top), new WpfPoint(valueRect.Left, valueRect.Bottom));
+
+            if (series.Threshold is double threshold)
+            {
+                WpfBrush danger = Resource("DangerBrush", Brushes.Red);
+                double y = Math.Clamp(YFor(threshold), valueRect.Top, valueRect.Bottom);
+                context.DrawLine(new WpfPen(danger, 1.5) { DashStyle = new DashStyle(new double[] { 6, 4 }, 0) },
+                    new WpfPoint(valueRect.Left, y), new WpfPoint(valueRect.Right, y));
+                DrawText(context, $"limit {FormatNumber(threshold)} {series.Unit}", new WpfPoint(valueRect.Right - 4, y - 15), danger, 10, dpi, TextAlignment.Right, bold: true);
+            }
 
             // Line + soft area fill, broken where a sensor gave no reading.
             List<List<WpfPoint>> segments = new();
@@ -344,6 +367,22 @@ public sealed class LiveChart : FrameworkElement
 
             DrawMarker(context, pinnedIndex, series, plot, start, end, valueRect, YFor, stroke, card, pinned: true);
             DrawMarker(context, hoverIndex, series, plot, start, end, valueRect, YFor, stroke, card, pinned: false);
+        }
+
+        foreach ((DateTime time, string label) in _markers)
+        {
+            if (time < start || time > end)
+            {
+                continue;
+            }
+
+            double x = XFor(time, plot, start, end);
+            WpfBrush markerBrush = Resource("WarningBrush", Brushes.Orange);
+            context.DrawLine(new WpfPen(markerBrush, 1.5), new WpfPoint(x, plot.Top), new WpfPoint(x, plot.Bottom));
+            FormattedText markerText = Text(label, Brushes.White, 10, dpi, bold: true);
+            Rect tag = new(Math.Min(x + 3, plot.Right - markerText.Width - 10), plot.Bottom - markerText.Height - 6, markerText.Width + 8, markerText.Height + 2);
+            context.DrawRoundedRectangle(markerBrush, null, tag, 4, 4);
+            context.DrawText(markerText, new WpfPoint(tag.Left + 4, tag.Top + 1));
         }
 
         DrawCursorLine(context, pinnedIndex, plot, start, end, pinned: true);

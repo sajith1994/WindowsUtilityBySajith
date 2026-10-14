@@ -260,6 +260,26 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.58] - 2026-10-14
+
+### Changed
+- **Rebuilt CPU & GPU thermal load test window** with a modern layout and better control:
+  - Set-up column: chip choices for load target (CPU / GPU / CPU + GPU), load level and duration, GPU adapter,
+    stop-limit sliders with value badges, and the GPU render preview.
+  - Live tiles for CPU and GPU temperature with a bar showing how close each is to its stop limit (green, amber,
+    red), plus peak; CPU power and clock; GPU load, power and VRAM; fans.
+  - State badge (Ready / Running / Completed / Stopped / Safety stop) and a progress card with elapsed, remaining
+    and load.
+  - **Live thermal graph** (new): CPU and GPU temperature with the stop limits as red dashed lines, CPU load, package
+    power, clock, GPU load and CPU fan, recorded from when the window opens so the idle baseline is visible.
+    Start and stop are marked on the time axis; reading chips show or hide lanes; hover and click-to-pin as in the
+    other graphs.
+  - **Result summary** after each test (duration, peak and rise from start, margin to the limit, average and
+    maximum package power, fan response, stop reason) and **Save report** (CSV of every sample plus the summary).
+  - All safety behaviour is unchanged: acknowledgement and confirmation before start, finite durations, fixed
+    footer with Start/Stop, real-sensor preflight, stops on limit, missing telemetry, read failure, time and close.
+- Progress bars app-wide use a rounded, theme-aware style (the default track was bright white in dark mode).
+
 ## [2.0.57] - 2026-10-14
 
 ### Fixed

@@ -164,7 +164,28 @@ public sealed class LiveGraphPanel : Grid, IDisposable
     }
 
     /// <summary>Pill-shaped toggle: filled when the reading is plotted, outlined when hidden.</summary>
-    private static readonly ControlTemplate ChipTemplate = CreateChipTemplate();
+    internal static readonly ControlTemplate ChipTemplate = CreateChipTemplate();
+
+    /// <summary>A reading toggle chip (colour dot + name) for any LiveChart host.</summary>
+    internal static ToggleButton CreateSeriesChip(LiveChartSeries series, Action changed)
+    {
+        StackPanel content = new() { Orientation = WpfOrientation.Horizontal };
+        content.Children.Add(new Border { Width = 9, Height = 9, CornerRadius = new CornerRadius(3), Background = new SolidColorBrush(series.Color), Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center });
+        content.Children.Add(new TextBlock { Text = series.Name, FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
+        ToggleButton chip = new()
+        {
+            Content = content,
+            IsChecked = series.IsVisible,
+            Margin = new Thickness(0, 0, 5, 4),
+            Padding = new Thickness(8, 3, 8, 3),
+            Template = ChipTemplate,
+            Cursor = System.Windows.Input.Cursors.Hand,
+            ToolTip = $"Show or hide {series.Name}"
+        };
+        chip.Checked += (_, _) => { series.IsVisible = true; changed(); };
+        chip.Unchecked += (_, _) => { series.IsVisible = false; changed(); };
+        return chip;
+    }
 
     private static ControlTemplate CreateChipTemplate()
     {
