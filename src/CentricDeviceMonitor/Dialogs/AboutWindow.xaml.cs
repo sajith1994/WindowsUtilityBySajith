@@ -17,10 +17,10 @@ public partial class AboutWindow : Window
         InitializeComponent();
         Version? version = Assembly.GetExecutingAssembly().GetName().Version;
         DateTime? published = UpdateService.GetCurrentReleaseDate();
-        VersionText.Text = version is null
-            ? "Version unavailable"
-            : $"Version {version.Major}.{version.Minor}.{version.Build}"
-              + (published is null ? string.Empty : $"  •  Published {UpdateService.FormatReleaseDate(published.Value)}");
+        string versionNumber = version is null ? "unavailable" : $"{version.Major}.{version.Minor}.{version.Build}";
+        string publishedText = published is null ? string.Empty : $"  •  Published {UpdateService.FormatReleaseDate(published.Value)}";
+        VersionText.Text = $"Version {versionNumber}{publishedText}  •  Developed by {UpdateService.DeveloperName}";
+        VersionValueText.Text = published is null ? versionNumber : $"{versionNumber} (published {UpdateService.FormatReleaseDate(published.Value)})";
     }
 
     private void TermsButton_Click(object sender, RoutedEventArgs e)

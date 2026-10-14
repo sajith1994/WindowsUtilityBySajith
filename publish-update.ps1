@@ -55,6 +55,7 @@ $manifest = [ordered]@{
     sha256   = $hash
     notes    = $Notes
     released = (Get-Date).ToString("yyyy-MM-dd")
+    size     = (Get-Item $installerPath).Length
 }
 
 $manifestPath = Join-Path $root "dist\installer\update.json"

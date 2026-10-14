@@ -26,6 +26,36 @@ public sealed class UpdateManifest
 
     [JsonPropertyName("released")]
     public string Released { get; set; } = string.Empty;
+
+    /// <summary>Installer size in bytes (written by publish-update.ps1 from 2.0.53; 0 when absent).</summary>
+    [JsonPropertyName("size")]
+    public long Size { get; set; }
+}
+
+/// <summary>Download progress with size and speed for the update window and dashboard banner.</summary>
+public sealed record DownloadProgress(long Received, long? Total, double BytesPerSecond)
+{
+    public double Fraction => Total is > 0 ? Math.Clamp(Received / (double)Total.Value, 0, 1) : 0;
+
+    public string Describe()
+    {
+        string amount = Total is > 0
+            ? $"{UpdateService.FormatBytes(Received)} of {UpdateService.FormatBytes(Total.Value)} ({Fraction:P0})"
+            : $"{UpdateService.FormatBytes(Received)} downloaded";
+        if (BytesPerSecond <= 0)
+        {
+            return amount;
+        }
+
+        string text = $"{amount}  •  {UpdateService.FormatBytes(BytesPerSecond)}/s";
+        if (Total is > 0 && Received < Total)
+        {
+            double secondsLeft = (Total.Value - Received) / BytesPerSecond;
+            text += secondsLeft < 60 ? $"  •  about {Math.Max(1, secondsLeft):0} s left" : $"  •  about {secondsLeft / 60:0} min left";
+        }
+
+        return text;
+    }
 }
 
 public enum UpdateCheckStatus
@@ -153,8 +183,43 @@ public static class UpdateService
         }
     }
 
+    public const string DeveloperName = "Sajith Varghese";
+
+    /// <summary>Installer size in bytes: from update.json when published with it, otherwise asked from the server.</summary>
+    public static async Task<long?> GetDownloadSizeAsync(UpdateManifest manifest, CancellationToken cancellationToken)
+    {
+        if (manifest.Size > 0)
+        {
+            return manifest.Size;
+        }
+
+        if (!IsTrustedUrl(manifest.Url))
+        {
+            return null;
+        }
+
+        try
+        {
+            using HttpRequestMessage request = new(HttpMethod.Head, manifest.Url);
+            using HttpResponseMessage response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            return response.IsSuccessStatusCode ? response.Content.Headers.ContentLength : null;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    public static string FormatBytes(double bytes) => bytes switch
+    {
+        >= 1024 * 1024 * 1024 => $"{bytes / (1024 * 1024 * 1024):0.0} GB",
+        >= 1024 * 1024 => $"{bytes / (1024 * 1024):0.0} MB",
+        >= 1024 => $"{bytes / 1024:0} KB",
+        _ => $"{bytes:0} bytes"
+    };
+
     /// <summary>Downloads the installer to a temporary folder and returns its verified path.</summary>
-    public static async Task<string> DownloadAsync(UpdateManifest manifest, IProgress<double>? progress, CancellationToken cancellationToken)
+    public static async Task<string> DownloadAsync(UpdateManifest manifest, IProgress<DownloadProgress>? progress, CancellationToken cancellationToken)
     {
         if (!IsTrustedUrl(manifest.Url))
         {
@@ -187,15 +252,34 @@ public static class UpdateService
             byte[] buffer = new byte[81920];
             long received = 0;
             int read;
+            Stopwatch clock = Stopwatch.StartNew();
+            TimeSpan lastReport = TimeSpan.Zero;
+            Queue<(TimeSpan Time, long Bytes)> window = new();
+            window.Enqueue((TimeSpan.Zero, 0));
             while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
             {
                 await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                 received += read;
-                if (total is > 0)
+
+                // Report about four times a second; speed is measured over the last two seconds.
+                TimeSpan now = clock.Elapsed;
+                if (now - lastReport >= TimeSpan.FromMilliseconds(250))
                 {
-                    progress?.Report(received / (double)total.Value);
+                    lastReport = now;
+                    window.Enqueue((now, received));
+                    while (window.Count > 2 && now - window.Peek().Time > TimeSpan.FromSeconds(2))
+                    {
+                        window.Dequeue();
+                    }
+
+                    (TimeSpan startTime, long startBytes) = window.Peek();
+                    double seconds = (now - startTime).TotalSeconds;
+                    double speed = seconds > 0 ? (received - startBytes) / seconds : 0;
+                    progress?.Report(new DownloadProgress(received, total, speed));
                 }
             }
+
+            progress?.Report(new DownloadProgress(received, total, clock.Elapsed.TotalSeconds > 0 ? received / clock.Elapsed.TotalSeconds : 0));
         }
 
         string actual;
@@ -210,7 +294,6 @@ public static class UpdateService
             throw new InvalidDataException("The downloaded installer did not match its published checksum, so it was discarded.");
         }
 
-        progress?.Report(1.0);
         return destination;
     }
 

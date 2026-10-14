@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Management;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
@@ -39,7 +41,8 @@ public sealed record InstalledPrinterInfo(
 /// <summary>A WSD printer as Windows recorded it when the device was discovered.</summary>
 internal sealed record WsdDeviceInfo(string DeviceName, string FriendlyName, string? IPv4Address, string? MacAddress);
 
-public sealed record NetworkPrinterInfo(string Address, string HostName, IReadOnlyList<string> Services, bool IsInstalled);
+/// <summary>A printer found on the network. Model is read over IPP (e.g. "EPSON L3270 Series") when the printer answers.</summary>
+public sealed record NetworkPrinterInfo(string Address, string HostName, IReadOnlyList<string> Services, bool IsInstalled, string Model = "");
 
 /// <summary>
 /// Lists printers installed on this PC (WMI Win32_Printer) and finds printers on the local subnet by
@@ -184,7 +187,8 @@ public sealed class PrinterService
                 }
 
                 string hostName = await TryGetHostNameAsync(address, token);
-                found.Add(new NetworkPrinterInfo(address, hostName, services, false));
+                string model = services.Contains("IPP") ? await TryGetIppModelAsync(address, token) : string.Empty;
+                found.Add(new NetworkPrinterInfo(address, hostName, services, false, model));
             });
 
         // The connection attempts above put every responding printer into the ARP cache.
@@ -197,12 +201,143 @@ public sealed class PrinterService
                 bool isInstalled = installedAddresses.Contains(printer.Address)
                     || (printer.HostName.Length > 0 && installedAddresses.Contains(printer.HostName))
                     || (macByAddress.TryGetValue(printer.Address, out string? mac) && installedMacs.Contains(mac))
-                    || (shortName.Length >= 4 && installedNames.Any(name => name.Contains(shortName, StringComparison.OrdinalIgnoreCase)));
+                    || (shortName.Length >= 4 && installedNames.Any(name => name.Contains(shortName, StringComparison.OrdinalIgnoreCase)))
+                    || ModelMatchesInstalled(printer.Model, installedNames);
                 return printer with { IsInstalled = isInstalled };
             })
             .OrderBy(printer => printer.IsInstalled)
             .ThenBy(printer => IPAddress.Parse(printer.Address).GetAddressBytes()[3])
             .ToList();
+    }
+
+    /// <summary>
+    /// WSD printers are installed under their model name with no address on record, so a printer whose IPP model
+    /// ("EPSON L3270 Series") or model number ("L3270") appears in an installed printer's name counts as installed.
+    /// </summary>
+    private static bool ModelMatchesInstalled(string model, IReadOnlyCollection<string> installedNames)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return false;
+        }
+
+        string core = Regex.Replace(model, @"^(EPSON|HP|Brother|Canon|Xerox|RICOH|Kyocera|KONICA MINOLTA|Lexmark|Samsung|SHARP|OKI)\s+", string.Empty, RegexOptions.IgnoreCase);
+        core = Regex.Replace(core, @"\s+Series$", string.Empty, RegexOptions.IgnoreCase).Trim();
+        return installedNames.Any(name =>
+            name.Contains(model, StringComparison.OrdinalIgnoreCase)
+            || (core.Length >= 4 && Regex.IsMatch(name, $@"(^|[\s(\[]){Regex.Escape(core)}($|[\s)\]])", RegexOptions.IgnoreCase)));
+    }
+
+    private static readonly HttpClient IppClient = new(new HttpClientHandler
+    {
+        // Printers use self-signed certificates for IPPS. Only the printer's model name is read here.
+        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    })
+    { Timeout = TimeSpan.FromSeconds(4) };
+
+    /// <summary>Asks the printer for printer-make-and-model with an IPP Get-Printer-Attributes request (IPPS first, as many printers refuse plain IPP).</summary>
+    private static async Task<string> TryGetIppModelAsync(string address, CancellationToken cancellationToken)
+    {
+        foreach ((string scheme, string uriScheme) in new[] { ("https", "ipps"), ("http", "ipp") })
+        {
+            try
+            {
+                byte[] body = BuildGetPrinterAttributesRequest($"{uriScheme}://{address}:631/ipp/print");
+                using ByteArrayContent content = new(body);
+                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/ipp");
+                using HttpResponseMessage response = await IppClient.PostAsync($"{scheme}://{address}:631/ipp/print", content, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    continue;
+                }
+
+                string? model = ReadIppTextAttribute(await response.Content.ReadAsByteArrayAsync(cancellationToken), "printer-make-and-model");
+                if (!string.IsNullOrWhiteSpace(model))
+                {
+                    return model.Trim();
+                }
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Try the other scheme; a printer that answers neither simply has no model shown.
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static byte[] BuildGetPrinterAttributesRequest(string printerUri)
+    {
+        using MemoryStream stream = new();
+        stream.Write(new byte[] { 0x02, 0x00, 0x00, 0x0B, 0x00, 0x00, 0x00, 0x01, 0x01 }); // IPP/2.0 Get-Printer-Attributes, operation group
+        WriteIppAttribute(stream, 0x47, "attributes-charset", "utf-8");
+        WriteIppAttribute(stream, 0x48, "attributes-natural-language", "en");
+        WriteIppAttribute(stream, 0x45, "printer-uri", printerUri);
+        WriteIppAttribute(stream, 0x44, "requested-attributes", "printer-make-and-model");
+        stream.WriteByte(0x03);
+        return stream.ToArray();
+    }
+
+    private static void WriteIppAttribute(Stream stream, byte tag, string name, string value)
+    {
+        byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(name);
+        byte[] valueBytes = System.Text.Encoding.UTF8.GetBytes(value);
+        stream.WriteByte(tag);
+        stream.WriteByte((byte)(nameBytes.Length >> 8));
+        stream.WriteByte((byte)nameBytes.Length);
+        stream.Write(nameBytes);
+        stream.WriteByte((byte)(valueBytes.Length >> 8));
+        stream.WriteByte((byte)valueBytes.Length);
+        stream.Write(valueBytes);
+    }
+
+    /// <summary>Walks an IPP response and returns the first value of the named attribute.</summary>
+    private static string? ReadIppTextAttribute(byte[] data, string attribute)
+    {
+        int position = 8; // version, status code, request id
+        while (position < data.Length)
+        {
+            byte tag = data[position++];
+            if (tag == 0x03)
+            {
+                break;
+            }
+
+            if (tag < 0x10)
+            {
+                continue; // group delimiter
+            }
+
+            if (position + 2 > data.Length)
+            {
+                break;
+            }
+
+            int nameLength = (data[position] << 8) | data[position + 1];
+            position += 2;
+            if (position + nameLength + 2 > data.Length)
+            {
+                break;
+            }
+
+            string name = System.Text.Encoding.ASCII.GetString(data, position, nameLength);
+            position += nameLength;
+            int valueLength = (data[position] << 8) | data[position + 1];
+            position += 2;
+            if (position + valueLength > data.Length)
+            {
+                break;
+            }
+
+            if (name == attribute)
+            {
+                return System.Text.Encoding.UTF8.GetString(data, position, valueLength);
+            }
+
+            position += valueLength;
+        }
+
+        return null;
     }
 
     /// <summary>Host-name prefixes printers commonly advertise, mapped to the text their Windows drivers contain.</summary>
@@ -228,7 +363,8 @@ public sealed class PrinterService
 
         string address = ip.ToString();
         string shortName = printer.HostName.Split('.')[0];
-        string baseName = string.IsNullOrWhiteSpace(shortName) ? "Network printer" : shortName;
+        string baseName = !string.IsNullOrWhiteSpace(printer.Model) ? printer.Model
+            : string.IsNullOrWhiteSpace(shortName) ? "Network printer" : shortName;
         string name = Regex.Replace($"{baseName} ({address})", @"[^A-Za-z0-9 ._()\-]", string.Empty);
 
         string script;
@@ -238,7 +374,7 @@ public sealed class PrinterService
                 $ErrorActionPreference = 'Stop'
                 if (Get-Printer -Name '{{name}}' -ErrorAction SilentlyContinue) { 'RESULT:EXISTS'; exit 0 }
                 $lastError = ''
-                foreach ($url in @('http://{{address}}:631/ipp/print', 'http://{{address}}:631/ipp')) {
+                foreach ($url in @('https://{{address}}:631/ipp/print', 'http://{{address}}:631/ipp/print', 'https://{{address}}:631/ipp', 'http://{{address}}:631/ipp')) {
                     try { Add-Printer -Name '{{name}}' -IppURL $url; 'RESULT:OK'; exit 0 } catch { $lastError = $_.Exception.Message }
                 }
                 'RESULT:FAIL ' + $lastError

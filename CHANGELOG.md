@@ -260,6 +260,27 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.53] - 2026-10-14
+
+### Added
+- **Network adapter settings** on Network Diagnostics. Pick an adapter, see its current IP/gateway/DNS, switch
+  between automatic (DHCP) and a static IP (address, subnet mask, gateway, with examples), and choose DNS:
+  Automatic, Google, Cloudflare, Cloudflare for Families, Quad9, OpenDNS, AdGuard or Custom. Input is validated
+  (real IPv4 addresses, valid mask, gateway in the same subnet). Applying asks for confirmation, warns when running
+  in a remote session, uses netsh and flushes the DNS cache. **Reset to automatic** restores DHCP and automatic DNS.
+- **Update download size and speed.** The update window shows the download size before you update, and the live
+  amount, speed and time left while downloading (also on the dashboard banner during automatic installs).
+  `update.json` now includes the installer size.
+- **Developer name** on the update window, and version, published date and developer in the About header.
+
+### Fixed
+- **Installing a network printer failed** with "The specified WSD or IPP print device was not found". Many
+  printers (including Epson) refuse plain IPP and only accept IPPS; installs now try `https://…:631/ipp/print`
+  first.
+- **Installed WSD printers showed as "Not installed"**. The scan now reads each printer's model over IPP
+  (e.g. "EPSON L3270 Series"), shows it in the list and matches it against installed printers.
+- **Release notes** in the update window are shown as plain text instead of raw markdown.
+
 ## [2.0.52] - 2026-10-14
 
 ### Added

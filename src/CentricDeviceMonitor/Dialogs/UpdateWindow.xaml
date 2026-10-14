@@ -61,7 +61,13 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="4" Grid.Column="0" x:Name="DownloadSizeLabel" Text="Download size" Foreground="{DynamicResource MutedTextBrush}" Margin="0,4" Visibility="Collapsed" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="DownloadSizeText" FontWeight="SemiBold" Margin="0,4" Visibility="Collapsed" />
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Developer" Foreground="{DynamicResource MutedTextBrush}" Margin="0,4" />
+                        <TextBlock Grid.Row="5" Grid.Column="1" x:Name="DeveloperText" FontWeight="SemiBold" Margin="0,4" />
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Installed version" Foreground="{DynamicResource MutedTextBrush}" Margin="0,4" />
                         <TextBlock Grid.Row="0" Grid.Column="1" x:Name="InstalledVersionText" FontWeight="SemiBold" Margin="0,4" />
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Published" Foreground="{DynamicResource MutedTextBrush}" Margin="0,4" />

@@ -276,6 +276,10 @@ public partial class MainWindow : Window
                 HeaderPrimaryActionButton.Tag = "\uE721";
                 NetworkDiagnosticsPage.ScrollToTop();
                 _ = RefreshManagedDevicesForNetworkPageAsync();
+                if (!_applyingAdapterSettings)
+                {
+                    RefreshNetworkAdapters();
+                }
                 break;
             case 2:
                 HeaderTitleText.Text = "Utility Tools";
@@ -2039,8 +2043,7 @@ public partial class MainWindow : Window
         UpdateBannerDetail.Text = "Starting the download.";
         try
         {
-            Progress<double> progress = new(value =>
-                UpdateBannerDetail.Text = $"{value:P0} downloaded. The installer is checked against its published SHA-256 before it runs.");
+            Progress<DownloadProgress> progress = new(value => UpdateBannerDetail.Text = value.Describe());
             string installerPath = await UpdateService.DownloadAsync(manifest, progress, CancellationToken.None);
 
             UpdateBannerTitle.Text = "Installing the update...";
@@ -3502,11 +3505,13 @@ public partial class MainWindow : Window
                 : $"Printers on the network ({printers.Count}, {notInstalled} not installed)";
             NetworkPrintersList.ItemsSource = printers
                 .Select(printer => new PrinterListItem(
-                    string.IsNullOrEmpty(printer.HostName) ? printer.Address : $"{printer.HostName}",
+                    !string.IsNullOrEmpty(printer.Model) ? printer.Model
+                        : string.IsNullOrEmpty(printer.HostName) ? printer.Address : printer.HostName,
                     string.Join(" • ", new[]
                     {
                         printer.IsInstalled ? "Installed" : "Not installed",
-                        string.IsNullOrEmpty(printer.HostName) ? null : printer.Address,
+                        string.IsNullOrEmpty(printer.Model) ? null : printer.HostName.Split('.')[0],
+                        string.IsNullOrEmpty(printer.HostName) && string.IsNullOrEmpty(printer.Model) ? null : printer.Address,
                         string.Join(", ", printer.Services)
                     }.Where(part => !string.IsNullOrEmpty(part))),
                     printer.IsInstalled ? null : printer))

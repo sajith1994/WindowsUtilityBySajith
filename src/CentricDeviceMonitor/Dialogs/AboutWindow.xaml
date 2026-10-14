@@ -60,7 +60,8 @@
                     <Separator Margin="0,0,0,12" />
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="115"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Version" Foreground="{DynamicResource MutedTextBrush}" Margin="0,9,0,0"/><TextBlock Grid.Row="2" Grid.Column="1" x:Name="VersionValueText" FontWeight="SemiBold" Margin="0,9,0,0"/>
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Developer" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,9"/><TextBlock Grid.Row="0" Grid.Column="1" Text="Sajith Varghese" FontWeight="SemiBold" Margin="0,0,0,9"/>
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Platform" Foreground="{DynamicResource MutedTextBrush}"/><TextBlock Grid.Row="1" Grid.Column="1" Text="Windows • .NET 10 • WPF • LocalSystem background service" FontWeight="SemiBold" TextWrapping="Wrap"/>
                     </Grid>

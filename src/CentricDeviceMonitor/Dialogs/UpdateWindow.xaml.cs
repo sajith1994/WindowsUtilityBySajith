@@ -29,6 +29,7 @@ public partial class UpdateWindow : Window
         InitializeComponent();
         _settings = settings;
         _settingsService = settingsService;
+        DeveloperText.Text = UpdateService.DeveloperName;
         ShowInstalledVersion(UpdateService.GetCurrentReleaseDate());
         AutoCheckBox.IsChecked = settings.AutoCheckForUpdates;
         AutoInstallCheckBox.IsChecked = settings.AutoInstallUpdates;
@@ -49,6 +50,7 @@ public partial class UpdateWindow : Window
         _availableVersion = null;
         UpdateButton.Visibility = Visibility.Collapsed;
         SetLatest(null);
+        SetDownloadSize(null);
         SetNotes(null, null);
         LastCheckedText.Text = "Checking now...";
         ShowStatus(CheckingIcon, "PrimaryBrush", "Checking for updates...", "Contacting the release server.");
@@ -121,6 +123,59 @@ public partial class UpdateWindow : Window
             string.IsNullOrWhiteSpace(manifest.Notes) ? "No release notes were provided." : manifest.Notes);
         UpdateButton.Content = $"Update to {latest}";
         UpdateButton.Visibility = Visibility.Visible;
+        _ = ShowDownloadSizeAsync(manifest);
+    }
+
+    private async Task ShowDownloadSizeAsync(UpdateManifest manifest)
+    {
+        SetDownloadSize("Checking...");
+        long? size = await UpdateService.GetDownloadSizeAsync(manifest, _lifetime.Token);
+        if (ReferenceEquals(manifest, _available))
+        {
+            SetDownloadSize(size is > 0 ? UpdateService.FormatBytes(size.Value) : "Not reported by the server");
+        }
+    }
+
+    private void SetDownloadSize(string? text)
+    {
+        Visibility visibility = string.IsNullOrWhiteSpace(text) ? Visibility.Collapsed : Visibility.Visible;
+        DownloadSizeLabel.Visibility = visibility;
+        DownloadSizeText.Visibility = visibility;
+        DownloadSizeText.Text = text ?? string.Empty;
+    }
+
+    /// <summary>Turns the CHANGELOG markdown in update.json into readable plain text.</summary>
+    private static string FormatReleaseNotes(string notes)
+    {
+        List<string> lines = new();
+        foreach (string raw in notes.Replace("\r", string.Empty).Split('\n'))
+        {
+            string line = raw.Replace("**", string.Empty).Replace("`", string.Empty);
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith('#'))
+            {
+                if (lines.Count > 0)
+                {
+                    lines.Add(string.Empty);
+                }
+
+                lines.Add(trimmed.TrimStart('#').Trim());
+            }
+            else if (trimmed.StartsWith("- ", StringComparison.Ordinal))
+            {
+                lines.Add("•  " + trimmed[2..]);
+            }
+            else if (trimmed.Length > 0 && lines.Count > 0 && lines[^1].Length > 0 && line.StartsWith("  ", StringComparison.Ordinal))
+            {
+                lines[^1] += " " + trimmed; // wrapped continuation of the previous bullet
+            }
+            else
+            {
+                lines.Add(trimmed);
+            }
+        }
+
+        return string.Join(Environment.NewLine, lines).Trim();
     }
 
     private async void UpdateButton_Click(object sender, RoutedEventArgs e)
@@ -137,10 +192,14 @@ public partial class UpdateWindow : Window
 
         try
         {
-            Progress<double> progress = new(value =>
+            Progress<Services.DownloadProgress> progress = new(value =>
             {
-                DownloadProgress.Value = value;
-                StatusDetail.Text = $"{value:P0} downloaded. The installer is checked against its published SHA-256 before it runs.";
+                DownloadProgress.Value = value.Fraction;
+                StatusDetail.Text = value.Describe();
+                if (value.Total is > 0)
+                {
+                    SetDownloadSize(UpdateService.FormatBytes(value.Total.Value));
+                }
             });
 
             string installerPath = await UpdateService.DownloadAsync(_available, progress, _lifetime.Token);
@@ -192,8 +251,8 @@ public partial class UpdateWindow : Window
         InstalledVersionText.Text = _currentVersion.ToString();
         InstalledDateText.Text = date;
         CurrentVersionText.Text = published is null
-            ? $"Windows Utility {_currentVersion}"
-            : $"Windows Utility {_currentVersion}  •  Published {date}";
+            ? $"Windows Utility {_currentVersion}  •  Developed by {UpdateService.DeveloperName}"
+            : $"Windows Utility {_currentVersion}  •  Published {date}  •  Developed by {UpdateService.DeveloperName}";
     }
 
     private void ShowStatus(string icon, string brushKey, string title, string detail)
@@ -217,7 +276,7 @@ public partial class UpdateWindow : Window
         bool show = !string.IsNullOrWhiteSpace(notes);
         NotesPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         NotesHeader.Text = header ?? string.Empty;
-        NotesText.Text = show ? notes!.Trim() : string.Empty;
+        NotesText.Text = show ? FormatReleaseNotes(notes!) : string.Empty;
     }
 
     private static string ReleasedSuffix(UpdateManifest? manifest)

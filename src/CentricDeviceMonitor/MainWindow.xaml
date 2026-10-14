@@ -847,6 +847,74 @@
                             </Border>
                         </Grid>
 
+                        <!-- Adapter IPv4 / DNS configuration -->
+                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE839;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Network Adapter Settings (Administrator)" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Refresh" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshNetworkAdaptersButton_Click" Margin="0" ToolTip="Reload adapters and their current settings." />
+                                </Grid>
+                                <TextBlock Text="Choose an adapter, then switch between automatic (DHCP) and a static IP, and pick a DNS service. Changing these can briefly drop the connection, including RDP and VPN sessions."
+                                           Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Adapter" Style="{StaticResource InfoLabelStyle}" />
+                                    <ComboBox Grid.Column="1" x:Name="NetworkAdapterComboBox" DisplayMemberPath="DisplayName" FontSize="11" SelectionChanged="NetworkAdapterComboBox_SelectionChanged" />
+                                </Grid>
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Current" Style="{StaticResource InfoLabelStyle}" VerticalAlignment="Top" />
+                                    <TextBlock Grid.Column="1" x:Name="NetworkAdapterCurrentText" Text="Select an adapter." Style="{StaticResource CardDescriptionStyle}" />
+                                </Grid>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="IP address" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                        <RadioButton x:Name="AdapterDhcpRadio" GroupName="AdapterIpMode" Content="Obtain an IP address automatically (DHCP)" FontSize="11" IsChecked="True" Checked="AdapterIpMode_Changed" Margin="0,0,0,4" />
+                                        <RadioButton x:Name="AdapterStaticRadio" GroupName="AdapterIpMode" Content="Use a static IP address" FontSize="11" Checked="AdapterIpMode_Changed" Margin="0,0,0,8" />
+                                        <Grid x:Name="AdapterStaticFields" IsEnabled="False">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                            <TextBlock Grid.Row="0" Text="IP address" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
+                                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="AdapterIpTextBox" FontSize="11" Margin="0,3" ToolTip="Example: 192.168.1.50"/>
+                                            <TextBlock Grid.Row="1" Text="Subnet mask" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
+                                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="AdapterMaskTextBox" FontSize="11" Margin="0,3" Text="255.255.255.0" ToolTip="Usually 255.255.255.0 on home and small office networks"/>
+                                            <TextBlock Grid.Row="2" Text="Default gateway" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
+                                            <TextBox Grid.Row="2" Grid.Column="1" x:Name="AdapterGatewayTextBox" FontSize="11" Margin="0,3" ToolTip="Your router, for example 192.168.1.1. Leave empty for no gateway."/>
+                                            <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="Example: 192.168.1.50  •  255.255.255.0  •  192.168.1.1. Use an address outside the router's DHCP range."
+                                                       Style="{StaticResource CardDescriptionStyle}" Margin="0,4,0,0"/>
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="DNS servers" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                        <ComboBox x:Name="DnsPresetComboBox" FontSize="11" SelectionChanged="DnsPresetComboBox_SelectionChanged" Margin="0,0,0,4" />
+                                        <TextBlock x:Name="DnsPresetNoteText" Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,8" />
+                                        <Grid x:Name="DnsServerFields">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                            <TextBlock Grid.Row="0" Text="Preferred DNS" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
+                                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="PrimaryDnsTextBox" FontSize="11" Margin="0,3" ToolTip="Example: 8.8.8.8"/>
+                                            <TextBlock Grid.Row="1" Text="Alternate DNS" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/>
+                                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="SecondaryDnsTextBox" FontSize="11" Margin="0,3" ToolTip="Example: 8.8.4.4 (optional)"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                                    <Button Content="Reset to automatic" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="ResetAdapterToAutomaticButton_Click" Margin="0,0,8,0" ToolTip="Set this adapter back to DHCP with automatic DNS." />
+                                    <Button x:Name="ApplyAdapterSettingsButton" Content="Apply settings" Tag="&#xE73E;" Style="{StaticResource IconCompactPrimaryButton}" Click="ApplyAdapterSettingsButton_Click" Margin="0" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,7">
