@@ -1325,20 +1325,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OpenDiskPreparationButton_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            DiskPreparationWindow window = new() { Owner = this };
-            window.ShowDialog();
-            StatusText.Text = "Closed DiskPart & disk initialization.";
-        }
-        catch (Exception exception)
-        {
-            ApplicationLogService.WriteException("Open disk preparation", exception);
-            WpfMessageBox.Show(exception.Message, "Disk preparation", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
+    private void OpenDiskPreparationButton_Click(object sender, RoutedEventArgs e) => OpenStorageHub("Disk tools");
 
     private void CommandModeToggle_Changed(object sender, RoutedEventArgs e)
     {
@@ -1794,11 +1781,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OpenStorageDiagnosticsButton_Click(object sender, RoutedEventArgs e)
-    {
-        StorageDiagnosticsWindow window = new() { Owner = this };
-        window.ShowDialog();
-    }
+    private void OpenStorageDiagnosticsButton_Click(object sender, RoutedEventArgs e) => OpenStorageHub("Health & speed");
 
     private void OpenThermalLoadTestButton_Click(object sender, RoutedEventArgs e)
     {
@@ -1914,12 +1897,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ViewCpuTemperatureLogButton_Click(object sender, RoutedEventArgs e)
-    {
-        CpuTemperatureLogWindow logWindow = new(_cpuTemperatureLogService) { Owner = this };
-        logWindow.ShowDialog();
-        await ReloadCpuTemperatureLogsAsync();
-    }
+    private void ViewCpuTemperatureLogButton_Click(object sender, RoutedEventArgs e) => OpenCpuHub("Temperature history");
 
     private void AboutButton_Click(object sender, RoutedEventArgs e)
     {
@@ -3139,14 +3117,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ViewSystemHealthLogButton_Click(object sender, RoutedEventArgs e)
-    {
-        SystemHealthLogWindow window = new(_systemHealthLogService)
-        {
-            Owner = this
-        };
-        window.ShowDialog();
-    }
+    private void ViewSystemHealthLogButton_Click(object sender, RoutedEventArgs e) => OpenLogsHub("System health events");
 
     private bool TryDisplayBackgroundServiceCpuReading()
     {
@@ -3309,18 +3280,7 @@ public partial class MainWindow : Window
         RestartBackgroundServiceButton.IsEnabled = exists && running;
     }
 
-    private void ViewBackgroundServiceLogButton_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            _backgroundServiceManager.OpenServiceLog();
-            StatusText.Text = "Opened the background service log.";
-        }
-        catch (Exception exception)
-        {
-            WpfMessageBox.Show(exception.Message, "Background Monitoring Service", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
+    private void ViewBackgroundServiceLogButton_Click(object sender, RoutedEventArgs e) => OpenLogsHub("Service log");
 
     private async Task RefreshSpoolerStatusAsync()
     {
@@ -4306,9 +4266,9 @@ public partial class MainWindow : Window
         public string TargetLabel => Target switch
         {
             "network" => "Open Network Diagnostics",
-            "cpu" => "Show the Processor tile",
-            "storage" => "Show the Storage tile",
-            "memory" => "Show the Memory tile",
+            "cpu" => "Open CPU & Cooling: live graph, temperature history and fans",
+            "storage" => "Open Storage & disks: health, speed, disk tools and cleanup",
+            "memory" => "Open Memory: live graph, modules and incidents",
             _ => "Show details"
         };
     }
@@ -4327,13 +4287,23 @@ public partial class MainWindow : Window
     {
         if (sender is FrameworkElement { Tag: HealthDomainRow row })
         {
-            if (row.Target == "network")
+            switch (row.Target)
             {
-                NavigationList.SelectedIndex = 1;
-            }
-            else
-            {
-                ShowDashboardTile(row.Target);
+                case "network":
+                    NavigationList.SelectedIndex = 1;
+                    break;
+                case "cpu":
+                    OpenCpuHub();
+                    break;
+                case "storage":
+                    OpenStorageHub();
+                    break;
+                case "memory":
+                    OpenMemoryHub();
+                    break;
+                default:
+                    ShowDashboardTile(row.Target);
+                    break;
             }
 
             e.Handled = true;
@@ -4391,25 +4361,11 @@ public partial class MainWindow : Window
     }
 
 
-    private void CpuCard_Click(object sender, MouseButtonEventArgs e) => OpenComponentGraph(GraphComponent.Cpu);
+    private void CpuCard_Click(object sender, MouseButtonEventArgs e) => OpenCpuHub("Live graph");
 
-    private void GpuCard_Click(object sender, MouseButtonEventArgs e) => OpenComponentGraph(GraphComponent.Gpu);
+    private void GpuCard_Click(object sender, MouseButtonEventArgs e) => OpenGpuHub("Live graph");
 
-    private void MemoryCard_Click(object sender, MouseButtonEventArgs e) => OpenComponentGraph(GraphComponent.Memory);
-
-    private void OpenComponentGraph(GraphComponent component)
-    {
-        try
-        {
-            ComponentGraphWindow window = new(component) { Owner = this };
-            window.Show();
-        }
-        catch (Exception exception)
-        {
-            ApplicationLogService.WriteException("Open component graph", exception);
-            WpfMessageBox.Show(exception.Message, "Live readings", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
+    private void MemoryCard_Click(object sender, MouseButtonEventArgs e) => OpenMemoryHub("Live graph");
 
 
     private void TrayIconToggle_Changed(object sender, RoutedEventArgs e)

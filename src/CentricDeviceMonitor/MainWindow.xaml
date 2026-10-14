@@ -196,6 +196,13 @@
 
                 <StackPanel Grid.Row="3">
                     <Separator Margin="8,8,8,10" Background="{DynamicResource BorderBrush}" />
+                    <Button Content="Logs &amp; history"
+                            Tag="&#xE81C;"
+                            Style="{StaticResource IconButton}"
+                            HorizontalContentAlignment="Left"
+                            Click="OpenLogsHubButton_Click"
+                            ToolTip="CPU temperature, system health, service and application logs in one place"
+                            Margin="0,0,0,6" />
                     <Button x:Name="SidebarUpdateButton"
                             Content="Check for updates"
                             Tag="&#xE777;"
@@ -630,7 +637,7 @@
                                         </StackPanel>
                                     </Grid>
                                     <UniformGrid Columns="3">
-                                        <Button Content="CPU log" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewCpuTemperatureLogButton_Click" Margin="0,0,6,0"/>
+                                        <Button Content="History" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewCpuTemperatureLogButton_Click" Margin="0,0,6,0"/>
                                         <Button Content="Rescan" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RescanCpuSensorsButton_Click" Margin="0,0,6,0"/>
                                         <Button Content="Fan diagnostics" Tag="&#xE9D9;" Style="{StaticResource IconCompactButton}" Click="FanDiagnosticsButton_Click" Margin="0"/>
                                     </UniformGrid>
@@ -660,7 +667,7 @@
                             </controls:DashboardTile>
 
                             <controls:DashboardTile TileId="ram" Title="Installed Memory" Span="2">
-                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0">
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0" Cursor="Hand" MouseLeftButtonUp="InstalledMemoryCard_Click" ToolTip="Open Memory: live graph, modules and incidents">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <TextBlock Text="&#xE7F1;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
@@ -698,7 +705,7 @@
                             </controls:DashboardTile>
 
                             <controls:DashboardTile TileId="gpuinventory" Title="Graphics Adapters" Span="2">
-                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0">
+                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0" Cursor="Hand" MouseLeftButtonUp="GraphicsAdaptersCard_Click" ToolTip="Open Graphics: live graph, adapters and displays">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <TextBlock Text="&#xE7F8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
@@ -717,7 +724,7 @@
                             </controls:DashboardTile>
 
                         <controls:DashboardTile TileId="storage" Title="Storage Inventory &amp; Usage" Span="4">
-                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
+                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0" Cursor="Hand" MouseLeftButtonUp="StorageCard_Click" ToolTip="Open Storage &amp; disks: health, speed, disk tools and cleanup">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                     <TextBlock Text="&#xE958;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
@@ -1142,17 +1149,13 @@
                                 </StackPanel>
                                 <TextBlock Text="Open common Windows support consoles. Admin actions still request elevated privileges."
                                            Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,14" />
-                                <UniformGrid Columns="5" Rows="3">
-                                    <StackPanel Margin="0,0,6,10"><Button Content="Devices &amp; Printers" Tag="&#xE772;" Style="{StaticResource IconCompactButton}" Click="OpenDevicesAndPrintersButton_Click" Margin="0" ToolTip="Manage installed printers, scanners and connected peripherals."/><TextBlock Text="Add/manage printers, scanners and peripherals." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
+                                <UniformGrid Columns="4">
                                     <StackPanel Margin="0,0,6,10"><Button Content="Task Manager" Tag="&#xE7C4;" Style="{StaticResource IconCompactButton}" Click="OpenTaskManagerButton_Click" Margin="0" ToolTip="Inspect apps, processes, startup items and performance."/><TextBlock Text="Processes, startup apps and performance checks." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
                                     <StackPanel Margin="0,0,6,10"><Button Content="CMD" Tag="&#xE756;" Style="{StaticResource IconCompactButton}" Click="OpenCommandPromptButton_Click" Margin="0" ToolTip="Open a standard Command Prompt for diagnostics that do not require elevation."/><TextBlock Text="Standard command-line diagnostics." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
                                     <StackPanel Margin="0,0,6,10"><Button Content="CMD (Admin)" Tag="&#xE7EF;" Style="{StaticResource IconCompactButton}" Click="OpenCommandPromptAdminButton_Click" Margin="0" ToolTip="Open an elevated Command Prompt for system-level changes."/><TextBlock Text="Elevated commands and system repair." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
                                     <StackPanel Margin="0,0,0,10"><Button Content="PowerShell" Tag="&#xE943;" Style="{StaticResource IconCompactButton}" Click="OpenPowerShellButton_Click" Margin="0" ToolTip="Open a normal PowerShell session for scripts and queries."/><TextBlock Text="Standard PowerShell scripts and queries." Style="{StaticResource ShortcutHelpStyle}" Margin="4,4,0,0"/></StackPanel>
                                     <StackPanel Margin="0,0,6,0"><Button Content="PowerShell (Admin)" Tag="&#xE7EF;" Style="{StaticResource IconCompactButton}" Click="OpenPowerShellAdminButton_Click" Margin="0" ToolTip="Open an elevated PowerShell session for administrative scripts."/><TextBlock Text="Elevated PowerShell administration." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
-                                    <StackPanel Margin="0,0,6,0"><Button Content="Disk Cleanup" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Click="OpenDiskCleanupButton_Click" Margin="0" ToolTip="Open Windows Disk Cleanup to remove system and temporary cleanup files."/><TextBlock Text="Free Windows/system cleanup space." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
-                                    <StackPanel Margin="0,0,6,0"><Button Content="DiskPart (Admin)" Tag="&#xE7EF;" Style="{StaticResource IconCompactButton}" Click="OpenDiskPartButton_Click" Margin="0" ToolTip="Open the native elevated DiskPart console for advanced disk work."/><TextBlock Text="Advanced command-line disk administration." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
-                                    <StackPanel Margin="0,0,6,0"><Button Content="Disk Tools" Tag="&#xE7C3;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenDiskPreparationButton_Click" Margin="0" ToolTip="Open the guarded GUI for clean, initialize, partition, format and delete operations."/><TextBlock Text="Guarded clean/init/partition/format workflow." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
-                                    <StackPanel Margin="0,0,0,10"><Button Content="Disk Management" Tag="&#xE958;" Style="{StaticResource IconCompactButton}" Click="OpenDiskManagementButton_Click" Margin="0" ToolTip="Open the native Windows Disk Management console."/><TextBlock Text="Native Windows volumes and disk layout." Style="{StaticResource ShortcutHelpStyle}" Margin="4,4,0,0"/></StackPanel>
+                                    <StackPanel Margin="0,0,6,0"><Button Content="Storage &amp; disks" Tag="&#xE958;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenStorageHubButton_Click" Margin="0" ToolTip="Drive health and speed, guarded disk tools, cleanup, Disk Cleanup, Storage Sense, Disk Management and DiskPart."/><TextBlock Text="Everything for drives: health, speed, disk tools, cleanup and consoles." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
                                     <StackPanel Margin="0,0,6,0"><Button Content="Smart App Control" Tag="&#xE72E;" Style="{StaticResource IconCompactButton}" Click="OpenSmartAppControlButton_Click" Margin="0" ToolTip="Open Windows Security - Smart App Control. Requires Windows 11 22H2 or later."/><TextBlock Text="Check Smart App Control state (Win11 22H2+)." Style="{StaticResource ShortcutHelpStyle}"/></StackPanel>
                                 </UniformGrid>
                             </StackPanel>
@@ -1226,11 +1229,8 @@
                             <Border Style="{StaticResource MetricCardStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE958;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="Storage Health &amp; Speed" Style="{StaticResource CardTitleStyle}"/></StackPanel>
-                                    <TextBlock Text="SSD/HDD health, NVMe/USB benchmarks, continuous speed tests, capacity verification and Windows Storage Sense." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,14"/>
-                                    <UniformGrid Columns="2">
-                                        <Button Content="Storage diagnostics" Tag="&#xE958;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenStorageDiagnosticsButton_Click" Margin="0,0,6,0" ToolTip="Check drive health, benchmark read/write speed and verify real writable capacity."/>
-                                        <Button Content="Storage Sense" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Click="OpenStorageSenseButton_Click" Margin="0" ToolTip="Open Windows Storage Sense settings for automatic cleanup rules."/>
-                                    </UniformGrid>
+                                    <TextBlock Text="SSD/HDD health, NVMe/USB benchmarks, capacity verification, guarded disk tools, cleanup and the Windows disk consoles - all in one window." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,14"/>
+                                    <Button Content="Open Storage &amp; disks" Tag="&#xE958;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenStorageHubButton_Click" Margin="0" ToolTip="Drive health, speed and capacity tests, disk tools, cleanup and consoles."/>
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource MetricCardStyle}">
@@ -1240,7 +1240,8 @@
                                     <Button x:Name="TerminateUserApplicationsButton" Content="Close user applications" Tag="&#xE8BB;" Style="{StaticResource IconCompactButton}" Click="TerminateUserApplicationsButton_Click" Margin="0" ToolTip="Close visible non-Windows user applications in the current sign-in session and review what closed/skipped."/>
                                 </StackPanel>
                             </Border>
-                            <Border Style="{StaticResource MetricCardStyle}">
+                            <!-- Shown on the System Stats "Windows Overview" tile instead; kept (hidden) because code updates its status text. -->
+                            <Border Style="{StaticResource MetricCardStyle}" Visibility="Collapsed">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE73E;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="Windows Activation" Style="{StaticResource CardTitleStyle}"/></StackPanel>
                                     <TextBlock x:Name="WindowsActivationStatusText" Text="Checking Windows activation status..." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,14"/>

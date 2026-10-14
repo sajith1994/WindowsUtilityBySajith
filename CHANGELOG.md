@@ -260,6 +260,38 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.56] - 2026-10-14
+
+### Added
+- **Subject hubs.** Related features now live together in one tabbed window per subject instead of being spread
+  over several pages and dialogs:
+  - **CPU & Cooling** (Processor tile, health "Cooling", CPU Sensor & Alerts > History): Live graph, Temperature
+    history, Sensors & tools (sensor, alert settings, fans, fan diagnostics, sensor rescan, thermal load test).
+  - **Graphics** (Graphics and Graphics Adapters tiles): Live graph, Adapters & displays, Load test.
+  - **Memory** (Memory and Installed Memory tiles, health "Memory"): Live graph, Installed modules, Incidents.
+  - **Storage & disks** (Storage tile, health "Storage", Utility Tools): Health & speed, Disk tools,
+    Cleanup & consoles (temporary files, Disk Cleanup, Storage Sense, Disk Management, DiskPart).
+  - **Logs & history** (new sidebar button; also View service log and View system health log): CPU temperature,
+    System health events, Service log, Application log.
+  Each hub opens once (clicking again brings it to the front on the right tab).
+- **Modern live graphs.** One lane per reading, each with its own Y axis in its units, a shared clock-time X axis,
+  dashed gridlines, smooth area-filled lines and now/min/max per lane. Hovering shows a crosshair with every value
+  at that moment; clicking pins the point (marker on every lane plus a value card), right-click or Esc clears.
+  Readings, time range (30 s to 10 min) and sample rate are chosen with chips.
+
+### Changed
+- Removed duplicates: the Windows Shortcuts disk buttons (Disk Cleanup, DiskPart, Disk Tools, Disk Management) and
+  Devices & Printers (already on the Print Spooler tile) are replaced by one **Storage & disks** button; the Storage
+  Health & Speed card opens the Storage hub; the Utility Tools Windows Activation card is hidden (shown on the
+  Windows Overview tile).
+- The old component graph window is replaced by the hubs' Live graph tab.
+
+### Fixed
+- **Dropdowns showed no text in dark mode** anywhere in the app (Storage, Disk tools, Network speed test, Thermal
+  test, Network Diagnostics, CPU alerts). The default Windows dropdown template ignores the theme background and
+  always draws a light box, so the dark theme's light text was invisible. Dropdowns now use a theme-aware template:
+  themed box and arrow, rounded drop-down list with hover and selected highlighting, in light and dark mode.
+
 ## [2.0.55] - 2026-10-14
 
 ### Added
