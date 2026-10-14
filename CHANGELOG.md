@@ -260,6 +260,17 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.57] - 2026-10-14
+
+### Fixed
+- **Disk tools showed no drives** in the Storage & disks hub (stuck on "Refreshing physical disks..."). The disk and
+  partition lists are bound to the Disk tools window's DataContext, which the content lost when it was moved into
+  the hub tab. Hub tabs now keep the hosted window's DataContext.
+- **Dark-mode text that was hard to read.** Text with no colour of its own (section titles, DNS service names,
+  Shared Folders headings and similar) inherited the window's default black. Every window now defaults to the
+  theme's text colour, option buttons (e.g. DHCP / static IP) follow the theme, and selected table rows use the
+  theme's highlight instead of the bright Windows selection colour.
+
 ## [2.0.56] - 2026-10-14
 
 ### Added

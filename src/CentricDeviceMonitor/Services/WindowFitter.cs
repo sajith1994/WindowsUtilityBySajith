@@ -15,6 +15,21 @@ public static class WindowFitter
     public static void Register()
     {
         EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(OnWindowLoaded));
+        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(ApplyThemeText), handledEventsToo: true);
+    }
+
+    /// <summary>
+    /// Text with no colour of its own inherits the window's Foreground, which defaults to black and was unreadable in
+    /// dark mode. Every window now defaults to the theme's text colour (and follows theme changes).
+    /// </summary>
+    private static void ApplyThemeText(object sender, RoutedEventArgs e)
+    {
+        if (sender is Window window && window is not DesktopWidgetWindow
+            && ReferenceEquals(e.OriginalSource, window)
+            && window.ReadLocalValue(System.Windows.Controls.Control.ForegroundProperty) == DependencyProperty.UnsetValue)
+        {
+            window.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextBrush");
+        }
     }
 
     private static void OnWindowLoaded(object sender, RoutedEventArgs e)

@@ -94,7 +94,15 @@ public sealed class HubWindow : Window
             return;
         }
 
+        // Bindings in the moved content (e.g. Disk tools' disk list) were resolved against the window's DataContext,
+        // which the content no longer inherits once it leaves the window.
+        object? dataContext = window.DataContext;
         window.Content = null;
+        if (dataContext is not null)
+        {
+            content.DataContext = dataContext;
+        }
+
         if (window.Resources.Count > 0 || window.Resources.MergedDictionaries.Count > 0)
         {
             content.Resources.MergedDictionaries.Add(window.Resources);

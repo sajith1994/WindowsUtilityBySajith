@@ -9,7 +9,8 @@
         MinHeight="460"
         WindowStartupLocation="CenterScreen"
         UseLayoutRounding="True"
-        SnapsToDevicePixels="True">
+        SnapsToDevicePixels="True"
+        Foreground="{DynamicResource TextBrush}">
     <Window.Resources>
         <Style x:Key="CardStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource CardBrush}" />

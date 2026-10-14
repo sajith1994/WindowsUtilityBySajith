@@ -576,6 +576,23 @@
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         </Style>
 
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        </Style>
+
+        <!-- Cells follow the row's theme colours; the default cell selection used the bright Windows highlight. -->
+        <Style TargetType="DataGridCell">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridRow}}" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
 
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="Transparent" />
