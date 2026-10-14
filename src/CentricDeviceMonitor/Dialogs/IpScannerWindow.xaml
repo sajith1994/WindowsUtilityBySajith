@@ -72,6 +72,9 @@
                                   SelectionMode="Extended"
                                   SelectionUnit="FullRow"
                                   SelectionChanged="ResultsGrid_SelectionChanged"
+                                  MouseDoubleClick="ResultsGrid_MouseDoubleClick"
+                                  PreviewMouseRightButtonDown="ResultsGrid_PreviewMouseRightButtonDown"
+                                  ContextMenuOpening="ResultsGrid_ContextMenuOpening"
                                   HeadersVisibility="Column"
                                   GridLinesVisibility="Horizontal"
                                   BorderThickness="0"
@@ -79,8 +82,21 @@
                                   AlternatingRowBackground="{DynamicResource SecondarySurfaceBrush}"
                                   ColumnHeaderHeight="32"
                                   RowHeight="32">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu />
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="IP address" Binding="{Binding IpAddress}" Width="1.05*" />
+                                <!-- Click the IP to open the device's web page over http or https. -->
+                                <DataGridTemplateColumn Header="IP address" Width="1.05*" SortMemberPath="IpAddress">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding IpAddress}" Tag="{Binding}" VerticalAlignment="Top" Margin="2,0,0,0"
+                                                       Foreground="{DynamicResource PrimaryBrush}" TextDecorations="Underline" Cursor="Hand"
+                                                       ToolTip="Open this device's web page (http or https)"
+                                                       MouseLeftButtonUp="IpAddressLink_Click" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.7*" />
                                 <DataGridTextColumn Header="MAC address" Binding="{Binding MacAddress}" Width="1.35*" />
                                 <DataGridTextColumn Header="Response" Binding="{Binding ResponseDisplay}" Width="0.7*" />
@@ -96,6 +112,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="StatusText" Text="Scans only the local subnet of the active Ethernet or Wi-Fi adapter." Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="OpenWebPageButton" Content="Open web page" Tag="&#xE774;" Style="{StaticResource IconButton}" Click="OpenWebPageButton_Click" IsEnabled="False" ToolTip="Open the selected device's web page over http or https" />
                             <Button x:Name="ScanPortsButton" Content="Check open ports" Tag="&#xE774;" Style="{StaticResource IconButton}" Click="ScanPortsButton_Click" IsEnabled="False" />
                             <Button x:Name="AddSelectedButton" Content="Add selected to managed devices" Tag="&#xE710;" Style="{StaticResource IconButton}" Click="AddSelectedButton_Click" IsEnabled="False" />
                             <Button Content="Open managed devices" Tag="&#xE8FD;" Style="{StaticResource IconButton}" Click="OpenManagedTabButton_Click" Margin="0" />

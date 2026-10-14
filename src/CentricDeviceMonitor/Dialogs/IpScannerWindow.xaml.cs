@@ -6,6 +6,8 @@ using System.Windows.Input;
 using CentricDeviceMonitor.Models;
 using CentricDeviceMonitor.Services;
 using WpfMessageBox = System.Windows.MessageBox;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+using MenuItem = System.Windows.Controls.MenuItem;
 
 namespace CentricDeviceMonitor.Dialogs;
 
@@ -173,6 +175,113 @@ public partial class IpScannerWindow : Window
         ScanPortsButton.Content = selectedCount <= 1
             ? "Check open ports"
             : $"Check ports on {selectedCount} devices";
+        OpenWebPageButton.IsEnabled = selectedCount == 1;
+    }
+
+    // ---- Open a scanned device's web page ----
+
+    private void IpAddressLink_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: IpScanResult device } element)
+        {
+            ResultsGrid.SelectedItem = device;
+            ShowWebMenu(device, element);
+            e.Handled = true;
+        }
+    }
+
+    private void OpenWebPageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ResultsGrid.SelectedItem is IpScanResult device)
+        {
+            ShowWebMenu(device, OpenWebPageButton);
+        }
+    }
+
+    /// <summary>Double-click opens the most likely web page: https when 443 is open, otherwise http.</summary>
+    private void ResultsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ResultsGrid.SelectedItem is IpScanResult device && e.OriginalSource is DependencyObject source && FindRow(source) is not null)
+        {
+            OpenUrl(device.WebAddresses[0].Url);
+        }
+    }
+
+    /// <summary>Right-click selects the row under the mouse so the menu is about that device.</summary>
+    private void ResultsGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source && FindRow(source) is DataGridRow row && !row.IsSelected)
+        {
+            ResultsGrid.SelectedItem = row.Item;
+        }
+    }
+
+    private void ResultsGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (ResultsGrid.SelectedItem is not IpScanResult device || ResultsGrid.ContextMenu is not ContextMenu menu)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        FillWebMenu(menu, device);
+    }
+
+    private void ShowWebMenu(IpScanResult device, FrameworkElement placementTarget)
+    {
+        ContextMenu menu = new() { PlacementTarget = placementTarget, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        FillWebMenu(menu, device);
+        menu.IsOpen = true;
+    }
+
+    private void FillWebMenu(ContextMenu menu, IpScanResult device)
+    {
+        menu.Items.Clear();
+        foreach ((string url, bool verified) in device.WebAddresses)
+        {
+            MenuItem item = new() { Header = verified ? $"Open {url}   (port open)" : $"Open {url}" };
+            item.Click += (_, _) => OpenUrl(url);
+            menu.Items.Add(item);
+        }
+
+        menu.Items.Add(new Separator());
+        MenuItem copy = new() { Header = $"Copy IP address ({device.IpAddress})" };
+        copy.Click += (_, _) =>
+        {
+            System.Windows.Clipboard.SetText(device.IpAddress);
+            StatusText.Text = $"Copied {device.IpAddress}.";
+        };
+        menu.Items.Add(copy);
+
+        if (device.OpenPorts.Count == 0 && device.OpenPortsDisplay == "Not scanned")
+        {
+            menu.Items.Add(new MenuItem { Header = "Tip: Check open ports to find the device's web ports", IsEnabled = false });
+        }
+    }
+
+    private void OpenUrl(string url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+            StatusText.Text = $"Opened {url} in the default browser. Devices with self-signed certificates show a browser warning for https.";
+        }
+        catch (Exception exception)
+        {
+            WpfMessageBox.Show(this, exception.Message, "Open web page", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static DataGridRow? FindRow(DependencyObject? element)
+    {
+        while (element is not null and not DataGridRow)
+        {
+            element = element is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+                ? System.Windows.Media.VisualTreeHelper.GetParent(element)
+                : LogicalTreeHelper.GetParent(element);
+        }
+
+        return element as DataGridRow;
     }
 
     private async void ScanPortsButton_Click(object sender, RoutedEventArgs e)
@@ -207,6 +316,7 @@ public partial class IpScannerWindow : Window
                     device.IpAddress,
                     _portScanCancellation.Token);
 
+                device.OpenPorts = openPorts.Select(port => port.Port).ToList();
                 device.OpenPortsDisplay = openPorts.Count == 0
                     ? "None found (common ports)"
                     : string.Join(", ", openPorts.Select(port => port.Display));

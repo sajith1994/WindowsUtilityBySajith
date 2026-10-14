@@ -260,6 +260,15 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.55] - 2026-10-14
+
+### Added
+- **Open a scanned device's web page** from the network scanner. IP addresses are links: clicking one offers
+  **Open http://IP** and **Open https://IP**, plus any other web port the port check found open (8443, 9443, 8080,
+  8000, 8008, 8888, 81), marked "(port open)". The same menu is on right-click, with **Copy IP address**.
+  Double-clicking a row opens the most likely page (https when 443 is open, otherwise http), and an
+  **Open web page** button works on the selected device. Pages open in the default browser.
+
 ## [2.0.54] - 2026-10-14
 
 ### Added
