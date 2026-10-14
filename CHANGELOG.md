@@ -260,6 +260,19 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.52] - 2026-10-14
+
+### Added
+- **Install network printers from the Print Spooler tile.** Printers found by the network scan that are not
+  installed get an **Install** button. Printers that accept IPP are added with Windows' built-in Microsoft IPP
+  Class Driver (`Add-Printer -IppURL`, trying `/ipp/print` then `/ipp`), the same way Windows' own Add device
+  works. RAW/LPD-only printers are added on a Standard TCP/IP or LPR port when a driver from the same
+  manufacturer (recognised from the host name) is already installed; otherwise the app offers to open
+  Printers & scanners. The lists refresh after a successful install.
+- **Health summary links.** Each check in the summary opens what it is about: Cooling goes to the Processor tile,
+  Storage to Storage Inventory, Memory to the Memory tile (each scrolled into view and briefly outlined), and
+  Network opens Network Diagnostics.
+
 ## [2.0.51] - 2026-10-09
 
 ### Changed

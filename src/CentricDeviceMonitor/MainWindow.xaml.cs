@@ -69,6 +69,7 @@ public partial class MainWindow : Window
     private string _lastSpoolerStatus = string.Empty;
     private bool _refreshingPrinters;
     private bool _scanningNetworkPrinters;
+    private bool _installingPrinter;
     private UpdateCheckResult? _availableUpdate;
     private DispatcherTimer? _autoInstallTimer;
     private int _autoInstallSecondsLeft;
@@ -3413,6 +3414,58 @@ public partial class MainWindow : Window
 
     private async void ScanNetworkPrintersButton_Click(object sender, RoutedEventArgs e) => await ScanNetworkPrintersAsync();
 
+    private async void InstallNetworkPrinterButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button { Tag: NetworkPrinterInfo printer } button || _installingPrinter)
+        {
+            return;
+        }
+
+        _installingPrinter = true;
+        button.IsEnabled = false;
+        button.Content = "Installing...";
+        string label = string.IsNullOrEmpty(printer.HostName) ? printer.Address : printer.HostName;
+        StatusText.Text = $"Adding {label} to Windows. This can take a minute while Windows sets up the driver...";
+        try
+        {
+            PrinterInstallResult result = await _printerService.InstallNetworkPrinterAsync(printer);
+            ApplicationLogService.WriteMessage("Printer install", $"{label} ({printer.Address}): {result.Outcome} - {result.Message}");
+            StatusText.Text = result.Message;
+
+            switch (result.Outcome)
+            {
+                case PrinterInstallOutcome.Installed:
+                case PrinterInstallOutcome.AlreadyInstalled:
+                    await RefreshInstalledPrintersAsync();
+                    await ScanNetworkPrintersAsync();
+                    break;
+                case PrinterInstallOutcome.NeedsDriver:
+                    if (WpfMessageBox.Show(this, $"{result.Message}\n\nOpen Printers & scanners now?", "Add printer",
+                            MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:printers") { UseShellExecute = true });
+                    }
+                    break;
+                default:
+                    WpfMessageBox.Show(this, $"Windows could not add {label}.\n\n{result.Message}", "Add printer",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Printer install", exception);
+            StatusText.Text = $"Could not add {label}.";
+            WpfMessageBox.Show(this, exception.Message, "Add printer", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _installingPrinter = false;
+            button.IsEnabled = true;
+            button.Content = "Install";
+        }
+    }
+
     private async Task ScanNetworkPrintersAfterStartupAsync()
     {
         // Let the dashboard finish loading before probing the subnet.
@@ -3455,7 +3508,8 @@ public partial class MainWindow : Window
                         printer.IsInstalled ? "Installed" : "Not installed",
                         string.IsNullOrEmpty(printer.HostName) ? null : printer.Address,
                         string.Join(", ", printer.Services)
-                    }.Where(part => !string.IsNullOrEmpty(part)))))
+                    }.Where(part => !string.IsNullOrEmpty(part))),
+                    printer.IsInstalled ? null : printer))
                 .ToList();
             NetworkPrintersEmptyText.Text = $"No printers answered on the local network. Last scan {DateTime.Now:t}.";
             NetworkPrintersEmptyText.Visibility = printers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -4240,7 +4294,44 @@ public partial class MainWindow : Window
     /// View-model row for the health strip. Carries its own brush so the template can bind a
     /// colour without a converter.
     /// </summary>
-    private sealed record HealthDomainRow(string Name, string Headline, string Reason, WpfBrush StatusBrush);
+    private sealed record HealthDomainRow(string Name, string Headline, string Reason, WpfBrush StatusBrush, string Target)
+    {
+        public string TargetLabel => Target switch
+        {
+            "network" => "Open Network Diagnostics",
+            "cpu" => "Show the Processor tile",
+            "storage" => "Show the Storage tile",
+            "memory" => "Show the Memory tile",
+            _ => "Show details"
+        };
+    }
+
+    /// <summary>Which tile (or page) explains each health check.</summary>
+    private static string HealthTarget(string domainName) => domainName switch
+    {
+        "Cooling" => "cpu",
+        "Storage" => "storage",
+        "Memory" => "memory",
+        "Network" => "network",
+        _ => string.Empty
+    };
+
+    private void HealthDomain_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: HealthDomainRow row })
+        {
+            if (row.Target == "network")
+            {
+                NavigationList.SelectedIndex = 1;
+            }
+            else
+            {
+                ShowDashboardTile(row.Target);
+            }
+
+            e.Handled = true;
+        }
+    }
 
     private static WpfBrush BrushForHealth(HealthStatus status) => status switch
     {
@@ -4283,7 +4374,7 @@ public partial class MainWindow : Window
 
             HealthDomainList.ItemsSource = domains
                 .Select(domain => new HealthDomainRow(
-                    domain.Name, domain.Headline, domain.Reason, BrushForHealth(domain.Status)))
+                    domain.Name, domain.Headline, domain.Reason, BrushForHealth(domain.Status), HealthTarget(domain.Name)))
                 .ToList();
         }
         catch (Exception exception)

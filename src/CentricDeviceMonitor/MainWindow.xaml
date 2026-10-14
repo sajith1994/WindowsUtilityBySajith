@@ -378,11 +378,16 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <StackPanel Margin="0,0,16,0">
+                                            <!-- Each check opens the tile (or page) behind it. -->
+                                            <StackPanel Margin="0,0,16,0" Background="Transparent" Cursor="Hand"
+                                                        Tag="{Binding}" ToolTip="{Binding TargetLabel}"
+                                                        MouseLeftButtonUp="HealthDomain_Click">
                                                 <StackPanel Orientation="Horizontal">
                                                     <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,6,0"
                                                             VerticalAlignment="Center" Background="{Binding StatusBrush}" />
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" />
+                                                    <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="9" Opacity="0.5"
+                                                               VerticalAlignment="Center" Margin="5,1,0,0" />
                                                 </StackPanel>
                                                 <TextBlock Text="{Binding Headline}" FontSize="12" Margin="14,1,0,0" TextWrapping="Wrap" />
                                                 <TextBlock Text="{Binding Reason}" Style="{StaticResource CardDescriptionStyle}"
@@ -517,10 +522,16 @@
                                         <ItemsControl x:Name="NetworkPrintersList">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <StackPanel Margin="0,2,0,3">
-                                                        <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
-                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
-                                                    </StackPanel>
+                                                    <Grid Margin="0,2,0,3">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+                                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" Content="Install" Style="{StaticResource HeaderMiniButton}" Margin="8,0,0,0"
+                                                                VerticalAlignment="Center" Tag="{Binding InstallTarget}" Visibility="{Binding InstallVisibility}"
+                                                                ToolTip="Add this printer to Windows" Click="InstallNetworkPrinterButton_Click" />
+                                                    </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>

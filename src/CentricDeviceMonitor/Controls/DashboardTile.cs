@@ -40,6 +40,13 @@ public sealed class DashboardTile : Grid
         new PropertyMetadata(false, (d, _) => ((DashboardTile)d).UpdateEditVisuals()));
 
     private readonly Border _overlay = new();
+    private readonly Border _highlight = new()
+    {
+        CornerRadius = new CornerRadius(14),
+        BorderThickness = new Thickness(3),
+        IsHitTestVisible = false,
+        Opacity = 0
+    };
     private readonly ScrollViewer _scroller = new();
     private WpfPoint? _dragStart;
     private Vector _resizeOffset;
@@ -101,11 +108,25 @@ public sealed class DashboardTile : Grid
         _scroller.PreviewMouseWheel += Scroller_PreviewMouseWheel;
         Children.Add(_scroller);
 
+        _highlight.SetResourceReference(Border.BorderBrushProperty, "PrimaryBrush");
+        Children.Add(_highlight);
+
         BuildOverlay();
         Children.Add(_overlay);
         ContextMenu = BuildContextMenu();
         AllowDrop = true;
         UpdateEditVisuals();
+    }
+
+    /// <summary>Briefly outlines the tile so the user sees where a link from elsewhere landed.</summary>
+    public void Highlight()
+    {
+        System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames pulse = new() { Duration = TimeSpan.FromSeconds(2.4) };
+        pulse.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(1, System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.2))));
+        pulse.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(0.35, System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.7))));
+        pulse.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(1, System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromSeconds(1.2))));
+        pulse.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(0, System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromSeconds(2.4))));
+        _highlight.BeginAnimation(OpacityProperty, pulse);
     }
 
     private void BuildOverlay()

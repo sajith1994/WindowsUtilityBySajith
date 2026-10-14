@@ -8,8 +8,22 @@ using Microsoft.Win32;
 
 namespace CentricDeviceMonitor.Services;
 
-/// <summary>One row in the Print Spooler tile's printer lists.</summary>
-public sealed record PrinterListItem(string Title, string Detail);
+/// <summary>One row in the Print Spooler tile's printer lists. Network rows that are not installed carry the printer to install.</summary>
+public sealed record PrinterListItem(string Title, string Detail, NetworkPrinterInfo? InstallTarget = null)
+{
+    public System.Windows.Visibility InstallVisibility =>
+        InstallTarget is null ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+}
+
+public enum PrinterInstallOutcome
+{
+    Installed,
+    AlreadyInstalled,
+    NeedsDriver,
+    Failed
+}
+
+public sealed record PrinterInstallResult(PrinterInstallOutcome Outcome, string PrinterName, string Message);
 
 public sealed record InstalledPrinterInfo(
     string Name,
@@ -189,6 +203,125 @@ public sealed class PrinterService
             .OrderBy(printer => printer.IsInstalled)
             .ThenBy(printer => IPAddress.Parse(printer.Address).GetAddressBytes()[3])
             .ToList();
+    }
+
+    /// <summary>Host-name prefixes printers commonly advertise, mapped to the text their Windows drivers contain.</summary>
+    private static readonly (string Prefix, string DriverText)[] VendorPrefixes =
+    {
+        ("EPSON", "EPSON"), ("HP", "HP"), ("NPI", "HP"), ("BRN", "Brother"), ("BRW", "Brother"),
+        ("CANON", "Canon"), ("KONICA", "KONICA"), ("KM", "KONICA"), ("XRX", "Xerox"), ("XEROX", "Xerox"),
+        ("RICOH", "RICOH"), ("RNP", "RICOH"), ("KYOCERA", "Kyocera"), ("LEXMARK", "Lexmark"),
+        ("SEC", "Samsung"), ("SAMSUNG", "Samsung"), ("SHARP", "SHARP"), ("OKI", "OKI"), ("ZEBRA", "ZDesigner")
+    };
+
+    /// <summary>
+    /// Installs a printer found by the network scan. IPP printers use Windows' built-in IPP class driver, the same
+    /// way Windows' own "Add device" does. RAW/LPD-only printers need a matching driver already on this PC.
+    /// Requires administrator rights, which the dashboard has.
+    /// </summary>
+    public async Task<PrinterInstallResult> InstallNetworkPrinterAsync(NetworkPrinterInfo printer, CancellationToken cancellationToken = default)
+    {
+        if (!IPAddress.TryParse(printer.Address, out IPAddress? ip) || ip.AddressFamily != AddressFamily.InterNetwork)
+        {
+            return new PrinterInstallResult(PrinterInstallOutcome.Failed, string.Empty, "The printer address is not a valid IPv4 address.");
+        }
+
+        string address = ip.ToString();
+        string shortName = printer.HostName.Split('.')[0];
+        string baseName = string.IsNullOrWhiteSpace(shortName) ? "Network printer" : shortName;
+        string name = Regex.Replace($"{baseName} ({address})", @"[^A-Za-z0-9 ._()\-]", string.Empty);
+
+        string script;
+        if (printer.Services.Contains("IPP"))
+        {
+            script = $$"""
+                $ErrorActionPreference = 'Stop'
+                if (Get-Printer -Name '{{name}}' -ErrorAction SilentlyContinue) { 'RESULT:EXISTS'; exit 0 }
+                $lastError = ''
+                foreach ($url in @('http://{{address}}:631/ipp/print', 'http://{{address}}:631/ipp')) {
+                    try { Add-Printer -Name '{{name}}' -IppURL $url; 'RESULT:OK'; exit 0 } catch { $lastError = $_.Exception.Message }
+                }
+                'RESULT:FAIL ' + $lastError
+                exit 1
+                """;
+        }
+        else
+        {
+            string vendor = VendorPrefixes.FirstOrDefault(entry => baseName.StartsWith(entry.Prefix, StringComparison.OrdinalIgnoreCase)).DriverText ?? string.Empty;
+            string addPort = printer.Services.Contains("RAW")
+                ? $"Add-PrinterPort -Name $port -PrinterHostAddress '{address}'"
+                : $"Add-PrinterPort -Name $port -LprHostAddress '{address}' -LprQueueName 'lp'";
+            script = $$"""
+                $ErrorActionPreference = 'Stop'
+                if (Get-Printer -Name '{{name}}' -ErrorAction SilentlyContinue) { 'RESULT:EXISTS'; exit 0 }
+                $vendor = '{{vendor}}'
+                $driver = $null
+                if ($vendor) { $driver = Get-PrinterDriver | Where-Object { $_.Name -like "*$vendor*" } | Select-Object -First 1 }
+                if (-not $driver) { 'RESULT:NODRIVER'; exit 2 }
+                $port = 'IP_{{address}}'
+                if (-not (Get-PrinterPort -Name $port -ErrorAction SilentlyContinue)) { {{addPort}} }
+                try { Add-Printer -Name '{{name}}' -DriverName $driver.Name -PortName $port; 'RESULT:OK ' + $driver.Name; exit 0 }
+                catch { 'RESULT:FAIL ' + $_.Exception.Message; exit 1 }
+                """;
+        }
+
+        string output = await RunPowerShellAsync(script, cancellationToken);
+        string result = output.Split('\n').Select(line => line.Trim()).LastOrDefault(line => line.StartsWith("RESULT:", StringComparison.Ordinal)) ?? string.Empty;
+
+        if (result.StartsWith("RESULT:OK", StringComparison.Ordinal))
+        {
+            string driver = result.Length > "RESULT:OK".Length ? result["RESULT:OK".Length..].Trim() : "Microsoft IPP Class Driver";
+            return new PrinterInstallResult(PrinterInstallOutcome.Installed, name, $"Installed \"{name}\" using {driver}.");
+        }
+
+        if (result.StartsWith("RESULT:EXISTS", StringComparison.Ordinal))
+        {
+            return new PrinterInstallResult(PrinterInstallOutcome.AlreadyInstalled, name, $"\"{name}\" is already installed.");
+        }
+
+        if (result.StartsWith("RESULT:NODRIVER", StringComparison.Ordinal))
+        {
+            return new PrinterInstallResult(PrinterInstallOutcome.NeedsDriver, name,
+                "This printer does not accept IPP, and no matching driver is installed on this PC. Add it from Windows Settings (Printers & scanners > Add device), or install the manufacturer's driver first.");
+        }
+
+        string detail = result.StartsWith("RESULT:FAIL", StringComparison.Ordinal) ? result["RESULT:FAIL".Length..].Trim() : output.Trim();
+        return new PrinterInstallResult(PrinterInstallOutcome.Failed, name,
+            string.IsNullOrWhiteSpace(detail) ? "Windows did not report why the printer could not be added." : detail);
+    }
+
+    private static async Task<string> RunPowerShellAsync(string script, CancellationToken cancellationToken)
+    {
+        ProcessStartInfo startInfo = new("powershell.exe")
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-NonInteractive");
+        startInfo.ArgumentList.Add("-ExecutionPolicy");
+        startInfo.ArgumentList.Add("Bypass");
+        startInfo.ArgumentList.Add("-Command");
+        startInfo.ArgumentList.Add(script);
+
+        using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("PowerShell could not be started.");
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(3));
+        Task<string> output = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        Task<string> error = process.StandardError.ReadToEndAsync(timeout.Token);
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            throw new TimeoutException("Adding the printer took too long and was stopped.");
+        }
+
+        return (await output) + Environment.NewLine + (await error);
     }
 
     private static async Task<HashSet<string>> ResolveInstalledAddressesAsync(

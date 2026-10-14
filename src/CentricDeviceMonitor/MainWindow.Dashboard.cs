@@ -65,6 +65,31 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>Switches to System Stats, scrolls the tile to the top of the view and highlights it.</summary>
+    private void ShowDashboardTile(string tileId)
+    {
+        DashboardTile? tile = DashboardTiles.FirstOrDefault(candidate =>
+            string.Equals(candidate.TileId, tileId, StringComparison.OrdinalIgnoreCase));
+        if (tile is null)
+        {
+            return;
+        }
+
+        NavigationList.SelectedIndex = 0;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            if (SystemStatsPage.Content is not UIElement content || !tile.IsDescendantOf(content))
+            {
+                return;
+            }
+
+            double top = tile.TransformToAncestor(content).Transform(new System.Windows.Point(0, 0)).Y;
+            SystemStatsPage.ScrollToVerticalOffset(Math.Max(0, top - 12));
+            tile.Highlight();
+            StatusText.Text = $"Showing {tile.Title}.";
+        });
+    }
+
     private void CustomizeDashboardButton_Click(object sender, RoutedEventArgs e) => SetDashboardEditing(!_dashboardEditing);
 
     private void SetDashboardEditing(bool editing)
