@@ -11,11 +11,16 @@ using Microsoft.Win32;
 namespace CentricDeviceMonitor.Services;
 
 /// <summary>One row in the Print Spooler tile's printer lists. Network rows that are not installed carry the printer to install.</summary>
-public sealed record PrinterListItem(string Title, string Detail, NetworkPrinterInfo? InstallTarget = null)
+public sealed record PrinterListItem(string Title, string Detail, NetworkPrinterInfo? InstallTarget = null, InstalledPrinterInfo? RemoveTarget = null)
 {
     public System.Windows.Visibility InstallVisibility =>
         InstallTarget is null ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+
+    public System.Windows.Visibility RemoveVisibility =>
+        RemoveTarget is null ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 }
+
+public sealed record PrinterRemoveResult(bool Removed, string Message, string PortMessage);
 
 public enum PrinterInstallOutcome
 {
@@ -424,6 +429,131 @@ public sealed class PrinterService
         string detail = result.StartsWith("RESULT:FAIL", StringComparison.Ordinal) ? result["RESULT:FAIL".Length..].Trim() : output.Trim();
         return new PrinterInstallResult(PrinterInstallOutcome.Failed, name,
             string.IsNullOrWhiteSpace(detail) ? "Windows did not report why the printer could not be added." : detail);
+    }
+
+    /// <summary>
+    /// Ports that belong to Windows itself (USB, LPT, COM, FILE:, PORTPROMPT:, nul:, the PDF/XPS/OneNote ports) are
+    /// never removed; only network TCP/IP and WSD ports are.
+    /// </summary>
+    public static bool IsRemovablePort(string portName)
+    {
+        string port = portName.Trim();
+        if (port.Length == 0 || IsVirtualPort(port))
+        {
+            return false;
+        }
+
+        string upper = port.ToUpperInvariant();
+        return !(upper.StartsWith("USB", StringComparison.Ordinal) || upper.StartsWith("LPT", StringComparison.Ordinal)
+                 || upper.StartsWith("COM", StringComparison.Ordinal) || upper.StartsWith("DOT4", StringComparison.Ordinal)
+                 || upper.StartsWith("TS", StringComparison.Ordinal) || upper.EndsWith(':'));
+    }
+
+    /// <summary>
+    /// Removes an installed printer and, when asked, its network port (only if no other printer uses it).
+    /// Normal mode cancels queued jobs and calls Remove-Printer. Force mode also restarts the Print Spooler while
+    /// clearing the spool folder, falls back to deleting the printer's registry key with the spooler stopped, removes
+    /// the printer's Plug and Play queue device (so WSD printers do not reinstall themselves) and retries the port
+    /// after the restart. Requires administrator rights, which the dashboard has.
+    /// </summary>
+    public async Task<PrinterRemoveResult> RemovePrinterAsync(InstalledPrinterInfo printer, bool removePort, bool force, CancellationToken cancellationToken = default)
+    {
+        string output = await RunPowerShellAsync(BuildRemoveScript(printer, removePort, force), cancellationToken);
+        return ParseRemoveOutput(printer, force, output);
+    }
+
+    internal static string BuildRemoveScript(InstalledPrinterInfo printer, bool removePort, bool force)
+    {
+        string name = printer.Name.Replace("'", "''");
+        string port = printer.PortName == "WSD" ? string.Empty : printer.PortName.Replace("'", "''");
+        bool registryFallbackAllowed = !printer.Name.Contains('\\') && !printer.Name.Contains('/');
+
+        string forceSteps = force
+            ? $$"""
+                Stop-Service -Name Spooler -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path "$env:windir\System32\spool\PRINTERS\*" -Force -ErrorAction SilentlyContinue
+                Start-Service -Name Spooler
+                Start-Sleep -Seconds 2
+                if (Get-Printer -Name $name -ErrorAction SilentlyContinue) { try { Remove-Printer -Name $name -ErrorAction Stop } catch { $lastError = $_.Exception.Message } }
+                if ({{(registryFallbackAllowed ? "$true" : "$false")}} -and (Get-Printer -Name $name -ErrorAction SilentlyContinue)) {
+                    Stop-Service -Name Spooler -Force -ErrorAction SilentlyContinue
+                    Remove-Item -Path ("HKLM:\SYSTEM\CurrentControlSet\Control\Print\Printers\" + $name) -Recurse -Force -ErrorAction SilentlyContinue
+                    Start-Service -Name Spooler
+                    Start-Sleep -Seconds 2
+                }
+                Get-PnpDevice -Class PrintQueue -ErrorAction SilentlyContinue | Where-Object { $_.FriendlyName -eq $name } |
+                    ForEach-Object { & pnputil.exe /remove-device $_.InstanceId | Out-Null }
+                """
+            : string.Empty;
+
+        string portSteps = removePort && IsRemovablePort(printer.PortName)
+            ? """
+                if ($port) {
+                    $users = @(Get-Printer -ErrorAction SilentlyContinue | Where-Object { $_.PortName -eq $port })
+                    if ($users.Count -gt 0) { 'PORT:INUSE ' + $port }
+                    elseif (-not (Get-PrinterPort -Name $port -ErrorAction SilentlyContinue)) { 'PORT:GONE ' + $port }
+                    else {
+                        try { Remove-PrinterPort -Name $port -ErrorAction Stop; 'PORT:REMOVED ' + $port }
+                        catch {
+                            if ($force) {
+                                Restart-Service -Name Spooler -Force; Start-Sleep -Seconds 2
+                                try { Remove-PrinterPort -Name $port -ErrorAction Stop; 'PORT:REMOVED ' + $port } catch { 'PORT:FAILED ' + $_.Exception.Message }
+                            } else { 'PORT:FAILED ' + $_.Exception.Message }
+                        }
+                    }
+                }
+                """
+            : "if ($port) { 'PORT:KEPT ' + $port }";
+
+        string script = $$"""
+            $ErrorActionPreference = 'Stop'
+            $name = '{{name}}'
+            $port = '{{port}}'
+            $force = ${{(force ? "true" : "false")}}
+            $lastError = ''
+            $wasInstalled = [bool](Get-Printer -Name $name -ErrorAction SilentlyContinue)
+            if ($wasInstalled) {
+                try { Get-PrintJob -PrinterName $name -ErrorAction SilentlyContinue | Remove-PrintJob -ErrorAction SilentlyContinue } catch { }
+                try { Remove-Printer -Name $name -ErrorAction Stop } catch { $lastError = $_.Exception.Message }
+            }
+            {{forceSteps}}
+            if (Get-Printer -Name $name -ErrorAction SilentlyContinue) { 'RESULT:FAIL ' + $lastError; exit 1 }
+            if ($wasInstalled) { 'RESULT:REMOVED' } else { 'RESULT:ALREADYGONE' }
+            {{portSteps}}
+            """;
+        return script;
+    }
+
+    private static PrinterRemoveResult ParseRemoveOutput(InstalledPrinterInfo printer, bool force, string output)
+    {
+        string[] lines = output.Split('\n').Select(line => line.Trim()).ToArray();
+        string result = lines.LastOrDefault(line => line.StartsWith("RESULT:", StringComparison.Ordinal)) ?? string.Empty;
+        string portLine = lines.LastOrDefault(line => line.StartsWith("PORT:", StringComparison.Ordinal)) ?? string.Empty;
+
+        string portMessage = portLine switch
+        {
+            _ when portLine.StartsWith("PORT:REMOVED", StringComparison.Ordinal) => $"Port {portLine["PORT:REMOVED".Length..].Trim()} removed.",
+            _ when portLine.StartsWith("PORT:INUSE", StringComparison.Ordinal) => $"Port {portLine["PORT:INUSE".Length..].Trim()} kept: another printer still uses it.",
+            _ when portLine.StartsWith("PORT:GONE", StringComparison.Ordinal) => "The port was already gone.",
+            _ when portLine.StartsWith("PORT:FAILED", StringComparison.Ordinal) => $"The port could not be removed: {portLine["PORT:FAILED".Length..].Trim()}",
+            _ when portLine.StartsWith("PORT:KEPT", StringComparison.Ordinal) => $"Port {portLine["PORT:KEPT".Length..].Trim()} kept.",
+            _ => string.Empty
+        };
+
+        if (result.StartsWith("RESULT:REMOVED", StringComparison.Ordinal))
+        {
+            return new PrinterRemoveResult(true, $"\"{printer.Name}\" was removed{(force ? " (forced)" : string.Empty)}.", portMessage);
+        }
+
+        if (result.StartsWith("RESULT:ALREADYGONE", StringComparison.Ordinal))
+        {
+            return new PrinterRemoveResult(true, $"\"{printer.Name}\" was already removed.", portMessage);
+        }
+
+        string detail = result.StartsWith("RESULT:FAIL", StringComparison.Ordinal) ? result["RESULT:FAIL".Length..].Trim() : output.Trim();
+        return new PrinterRemoveResult(false,
+            string.IsNullOrWhiteSpace(detail) ? "Windows did not say why the printer could not be removed." : detail,
+            portMessage);
     }
 
     private static async Task<string> RunPowerShellAsync(string script, CancellationToken cancellationToken)

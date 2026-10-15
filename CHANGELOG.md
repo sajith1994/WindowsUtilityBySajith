@@ -260,6 +260,19 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.59] - 2026-10-15
+
+### Added
+- **Remove installed printers** from the Print Spooler tile. Each installed printer has a **Remove** button:
+  - Choose to remove the printer and its network port, or the printer only. The port is removed only when no other
+    printer uses it; USB, LPT, COM and virtual ports (PDF, XPS, OneNote) are always kept.
+  - Queued print jobs are cancelled first.
+  - If Windows refuses, the app offers a **force removal**: it restarts the Print Spooler while clearing stuck jobs,
+    retries, falls back to deleting the printer's spooler registry entry with the spooler stopped, and removes the
+    printer's Plug and Play queue device so WSD printers do not reinstall themselves. The port is retried after the
+    spooler restart.
+  - Warnings before removing the default printer or a built-in virtual printer. The printer lists refresh afterwards
+    and the result is written to the application log.
 ## [2.0.58] - 2026-10-14
 
 ### Changed

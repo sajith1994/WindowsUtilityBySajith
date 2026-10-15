@@ -511,10 +511,16 @@
                                         <ItemsControl x:Name="InstalledPrintersList">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <StackPanel Margin="0,2,0,3">
-                                                        <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
-                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
-                                                    </StackPanel>
+                                                    <Grid Margin="0,2,0,3">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" />
+                                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" Content="Remove" Style="{StaticResource HeaderMiniButton}" Margin="8,0,4,0"
+                                                                VerticalAlignment="Center" Tag="{Binding RemoveTarget}" Visibility="{Binding RemoveVisibility}"
+                                                                ToolTip="Remove this printer (and its network port)" Click="RemovePrinterButton_Click" />
+                                                    </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>

@@ -3335,7 +3335,8 @@ public partial class MainWindow : Window
             InstalledPrintersList.ItemsSource = _installedPrinters
                 .Select(printer => new PrinterListItem(
                     printer.IsDefault ? $"★ {printer.Name}" : printer.Name,
-                    DescribeInstalledPrinter(printer)))
+                    DescribeInstalledPrinter(printer),
+                    RemoveTarget: printer))
                 .ToList();
             InstalledPrintersEmptyText.Text = "No printers are installed.";
             InstalledPrintersEmptyText.Visibility = _installedPrinters.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -3378,6 +3379,94 @@ public partial class MainWindow : Window
     }
 
     private async void ScanNetworkPrintersButton_Click(object sender, RoutedEventArgs e) => await ScanNetworkPrintersAsync();
+
+    /// <summary>
+    /// Removes an installed printer: Yes removes the printer and its network port (when no other printer uses it),
+    /// No removes only the printer. If Windows refuses, the user can force it (spooler restart, queue clear,
+    /// registry and device clean-up).
+    /// </summary>
+    private async void RemovePrinterButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button { Tag: InstalledPrinterInfo printer } button || _installingPrinter)
+        {
+            return;
+        }
+
+        bool portRemovable = PrinterService.IsRemovablePort(printer.PortName);
+        string portLine = printer.PortName == "WSD"
+            ? "It is a WSD network printer; Windows removes its WSD port together with the device."
+            : portRemovable
+                ? $"Its port \"{printer.PortName}\" can be removed too if no other printer uses it."
+                : $"Its port \"{printer.PortName}\" belongs to Windows and is always kept.";
+        string extra = (printer.IsDefault ? "\n\nThis is the default printer; Windows will pick another default." : string.Empty)
+            + (printer.IsVirtual ? "\n\nThis is a built-in virtual printer (for example Print to PDF). It can be added back from Windows Settings > Optional features or Printers & scanners." : string.Empty);
+
+        MessageBoxResult choice = WpfMessageBox.Show(this,
+            $"Remove the printer \"{printer.Name}\"?\n\n{portLine} Queued print jobs for it are cancelled.{extra}\n\n" +
+            (portRemovable ? "Yes - remove the printer and its port\nNo - remove only the printer\nCancel - keep it" : "Yes - remove the printer\nNo / Cancel - keep it"),
+            "Remove printer",
+            portRemovable ? MessageBoxButton.YesNoCancel : MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel);
+
+        bool removePort = portRemovable && choice == MessageBoxResult.Yes;
+        if (choice == MessageBoxResult.Cancel || (!portRemovable && choice != MessageBoxResult.Yes))
+        {
+            return;
+        }
+
+        _installingPrinter = true;
+        button.IsEnabled = false;
+        button.Content = "Removing...";
+        try
+        {
+            StatusText.Text = $"Removing {printer.Name}...";
+            PrinterRemoveResult result = await _printerService.RemovePrinterAsync(printer, removePort, force: false);
+
+            if (!result.Removed)
+            {
+                ApplicationLogService.WriteMessage("Printer remove", $"{printer.Name}: normal removal failed - {result.Message}");
+                MessageBoxResult forceChoice = WpfMessageBox.Show(this,
+                    $"Windows could not remove \"{printer.Name}\":\n{result.Message}\n\n" +
+                    "Force removal? This briefly stops the Print Spooler (all printing pauses for a few seconds), clears stuck " +
+                    "print jobs, and if needed deletes the printer's leftover registry entry and device entry so it cannot " +
+                    "reinstall itself.",
+                    "Force printer removal",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.No);
+                if (forceChoice != MessageBoxResult.Yes)
+                {
+                    StatusText.Text = $"{printer.Name} was not removed.";
+                    return;
+                }
+
+                StatusText.Text = $"Force-removing {printer.Name} (restarting the Print Spooler)...";
+                result = await _printerService.RemovePrinterAsync(printer, removePort, force: true);
+            }
+
+            string summary = string.Join(" ", new[] { result.Message, result.PortMessage }.Where(text => !string.IsNullOrWhiteSpace(text)));
+            ApplicationLogService.WriteMessage("Printer remove", $"{printer.Name}: {summary}");
+            StatusText.Text = summary;
+            if (!result.Removed)
+            {
+                WpfMessageBox.Show(this, $"\"{printer.Name}\" could not be removed even with force.\n\n{summary}", "Remove printer",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Printer remove", exception);
+            WpfMessageBox.Show(this, exception.Message, "Remove printer", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _installingPrinter = false;
+            await RefreshSpoolerStatusAsync();
+            await RefreshInstalledPrintersAsync();
+            _ = ScanNetworkPrintersAsync();
+        }
+    }
 
     private async void InstallNetworkPrinterButton_Click(object sender, RoutedEventArgs e)
     {
