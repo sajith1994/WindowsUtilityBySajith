@@ -981,7 +981,7 @@
                                     <TextBlock Text="&#xE8F7;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
                                     <TextBlock Text="Shared Folders" Style="{StaticResource CardTitleStyle}" />
                                 </StackPanel>
-                                <TextBlock Text="Folders this PC shares, and shared folders on other PCs of the local network. Add to File Explorer puts a share under This PC > Network locations."
+                                <TextBlock Text="Folders this PC shares, network folders and drives added to this PC (test, open or remove them), and shared folders on other PCs of the local network. Add to File Explorer puts a share under This PC > Network locations."
                                            Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />
 
                                 <Grid Margin="0,0,0,4">
@@ -1004,6 +1004,42 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 <TextBlock x:Name="LocalSharesEmptyText" Text="Reading shared folders..." Style="{StaticResource CardDescriptionStyle}" />
+
+                                <Grid Margin="0,14,0,4">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="AddedFoldersHeaderText" Text="Network folders added to this PC" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" x:Name="TestAllAddedFoldersButton" Content="Test all" Style="{StaticResource HeaderMiniButton}" Click="TestAllAddedFoldersButton_Click" Margin="0" />
+                                    <Button Grid.Column="2" Content="Refresh" Style="{StaticResource HeaderMiniButton}" Click="RefreshAddedFoldersButton_Click" Margin="6,0,0,0" />
+                                </Grid>
+                                <ItemsControl x:Name="AddedFoldersList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2,0,3">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Target}" />
+                                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
+                                                    <TextBlock Text="{Binding StatusText}" FontSize="11" TextWrapping="Wrap">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding State}" Value="Connected"><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding State}" Value="NeedsSignIn"><Setter Property="Foreground" Value="{DynamicResource WarningBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding State}" Value="Failed"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Open" Style="{StaticResource HeaderMiniButton}" Tag="{Binding OpenPath}" Click="OpenShareButton_Click" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                <Button Grid.Column="2" Content="Test connection" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="TestAddedFolderButton_Click" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                <Button Grid.Column="3" Content="Remove" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="RemoveAddedFolderButton_Click" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="AddedFoldersEmptyText" Text="Reading network folders..." Style="{StaticResource CardDescriptionStyle}" />
 
                                 <Grid Margin="0,14,0,4">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>

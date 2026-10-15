@@ -260,6 +260,17 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.61] - 2026-10-15
+
+### Added
+- **Network folders added to this PC** (Network Diagnostics > Shared Folders): lists the network locations under
+  This PC and the mapped network drives, each with Open, **Test connection** and **Remove**.
+  - Test connection checks that the computer answers on file sharing (with the response time) and that the folder
+    opens, and says clearly when it is connected, needs a sign-in, the folder no longer exists or the computer is
+    unreachable. Everything is tested when the page opens; Test all re-checks them.
+  - Remove deletes a network location's shortcut, or disconnects a mapped drive and stops it reconnecting at sign-in
+    (in your normal Explorer session too). Files on the network are never touched.
+  - Adding a share with Add to File Explorer now shows it in the list straight away.
 ## [2.0.60] - 2026-10-15
 
 ### Fixed

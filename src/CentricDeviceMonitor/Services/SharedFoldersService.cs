@@ -1,9 +1,14 @@
 using System.Collections.Concurrent;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Management;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 namespace CentricDeviceMonitor.Services;
 
@@ -29,9 +34,91 @@ public sealed record NetworkShareInfo(string Host, string Address, string ShareN
     public string LocationName => string.IsNullOrEmpty(ShareName) ? Host : $"{ShareName} ({Host})";
 }
 
+public enum AddedFolderKind
+{
+    NetworkLocation,
+    MappedDrive
+}
+
+public enum ConnectionState
+{
+    NotTested,
+    Testing,
+    Connected,
+    NeedsSignIn,
+    Failed
+}
+
+/// <summary>
+/// A network folder added to this PC: a network location under This PC, or a mapped network drive. The connection
+/// status changes as it is tested, so the list updates in place.
+/// </summary>
+public sealed class AddedNetworkFolder : INotifyPropertyChanged
+{
+    private ConnectionState _state = ConnectionState.NotTested;
+    private string _statusText = "Not tested";
+
+    public AddedNetworkFolder(AddedFolderKind kind, string name, string target, string? locationPath = null, string? driveLetter = null, bool reconnects = false)
+    {
+        Kind = kind;
+        Name = name;
+        Target = target;
+        LocationPath = locationPath;
+        DriveLetter = driveLetter;
+        Reconnects = reconnects;
+    }
+
+    public AddedFolderKind Kind { get; }
+    public string Name { get; }
+    public string Target { get; }
+
+    /// <summary>The network-location folder (or shortcut file) under Network Shortcuts.</summary>
+    public string? LocationPath { get; }
+
+    /// <summary>Drive letter with colon (Z:) for mapped drives.</summary>
+    public string? DriveLetter { get; }
+
+    /// <summary>Mapped drive saved in the user profile, reconnected at every sign-in.</summary>
+    public bool Reconnects { get; }
+
+    public string Title => Kind == AddedFolderKind.MappedDrive ? $"{DriveLetter}  {Target}" : Name;
+
+    public string Detail => Kind == AddedFolderKind.MappedDrive
+        ? Reconnects ? "Mapped network drive  •  reconnects at sign-in" : "Mapped network drive  •  this session only"
+        : $"Network location  •  {Target}";
+
+    /// <summary>What Open hands to File Explorer.</summary>
+    public string OpenPath => Kind == AddedFolderKind.MappedDrive ? Target : LocationPath ?? Target;
+
+    public ConnectionState State
+    {
+        get => _state;
+        private set { _state = value; OnPropertyChanged(); }
+    }
+
+    public string StatusText
+    {
+        get => _statusText;
+        private set { _statusText = value; OnPropertyChanged(); }
+    }
+
+    public void SetStatus(ConnectionState state, string text)
+    {
+        State = state;
+        StatusText = text;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+public sealed record FolderRemoveResult(bool Removed, string Message);
+
 /// <summary>
 /// Lists folders shared from this PC (WMI Win32_Share) and shares on other PCs of the local subnet (SMB port 445 +
-/// NetShareEnum), and adds shares to File Explorer as network locations under This PC.
+/// NetShareEnum), adds shares to File Explorer as network locations under This PC, and lists, tests and removes the
+/// network locations and mapped drives already added.
 /// </summary>
 public sealed class SharedFoldersService
 {
@@ -191,6 +278,381 @@ public sealed class SharedFoldersService
         File.SetAttributes(folder, File.GetAttributes(folder) | FileAttributes.ReadOnly);
         return folder;
     }
+
+    private static string NetworkShortcutsRoot =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Network Shortcuts");
+
+    /// <summary>
+    /// Network locations under This PC (Network Shortcuts folder) and mapped network drives. Mapped drives come from
+    /// the user profile (HKCU\Network, the ones that reconnect at sign-in) because this elevated dashboard runs in a
+    /// separate logon session that cannot see the drives mapped in the normal Explorer session; drives connected in
+    /// this session are added too.
+    /// </summary>
+    public Task<IReadOnlyList<AddedNetworkFolder>> GetAddedNetworkFoldersAsync() => Task.Run<IReadOnlyList<AddedNetworkFolder>>(() =>
+    {
+        List<AddedNetworkFolder> folders = new();
+        string root = NetworkShortcutsRoot;
+        if (Directory.Exists(root))
+        {
+            foreach (string folder in Directory.EnumerateDirectories(root).OrderBy(path => path, StringComparer.CurrentCultureIgnoreCase))
+            {
+                string link = Path.Combine(folder, "target.lnk");
+                if (File.Exists(link))
+                {
+                    folders.Add(new AddedNetworkFolder(AddedFolderKind.NetworkLocation, Path.GetFileName(folder), ReadShortcutTarget(link), folder));
+                }
+            }
+
+            foreach (string link in Directory.EnumerateFiles(root, "*.lnk").OrderBy(path => path, StringComparer.CurrentCultureIgnoreCase))
+            {
+                folders.Add(new AddedNetworkFolder(AddedFolderKind.NetworkLocation, Path.GetFileNameWithoutExtension(link), ReadShortcutTarget(link), link));
+            }
+        }
+
+        SortedDictionary<string, AddedNetworkFolder> drives = new(StringComparer.OrdinalIgnoreCase);
+        using (RegistryKey? network = Registry.CurrentUser.OpenSubKey("Network"))
+        {
+            foreach (string name in network?.GetSubKeyNames() ?? Array.Empty<string>())
+            {
+                using RegistryKey? drive = network!.OpenSubKey(name);
+                if (name.Length == 1 && char.IsLetter(name[0]) && drive?.GetValue("RemotePath") is string remote && remote.Length > 0)
+                {
+                    string letter = name.ToUpperInvariant() + ":";
+                    drives[letter] = new AddedNetworkFolder(AddedFolderKind.MappedDrive, letter, remote, driveLetter: letter, reconnects: true);
+                }
+            }
+        }
+
+        try
+        {
+            using ManagementObjectSearcher searcher = new("SELECT DeviceID, ProviderName FROM Win32_LogicalDisk WHERE DriveType = 4");
+            foreach (ManagementBaseObject disk in searcher.Get())
+            {
+                using (disk)
+                {
+                    if (disk["DeviceID"] is string letter && disk["ProviderName"] is string remote && remote.Length > 0 && !drives.ContainsKey(letter))
+                    {
+                        drives[letter] = new AddedNetworkFolder(AddedFolderKind.MappedDrive, letter, remote, driveLetter: letter, reconnects: false);
+                    }
+                }
+            }
+        }
+        catch (ManagementException)
+        {
+            // The saved drives from the profile are still listed.
+        }
+
+        folders.AddRange(drives.Values);
+        return folders;
+    });
+
+    /// <summary>Checks that the folder's computer answers and that the folder itself can be opened.</summary>
+    public static async Task TestConnectionAsync(AddedNetworkFolder folder, CancellationToken cancellationToken = default)
+    {
+        folder.SetStatus(ConnectionState.Testing, "Testing...");
+        (ConnectionState state, string text) = await TestTargetAsync(folder.Target, cancellationToken);
+        folder.SetStatus(state, text);
+    }
+
+    private static async Task<(ConnectionState State, string Text)> TestTargetAsync(string target, CancellationToken cancellationToken)
+    {
+        if (target.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            string host = target.TrimStart('\\').Split('\\')[0];
+            long? ms = await ConnectAsync(host, 445, cancellationToken);
+            if (ms is null)
+            {
+                return (ConnectionState.Failed, $"Not reachable: {host} did not answer on file sharing (port 445). It may be off, asleep, renamed or blocked by a firewall.");
+            }
+
+            if (target.TrimStart('\\').TrimEnd('\\').IndexOf('\\') < 0)
+            {
+                // A whole computer (\\PC) rather than one shared folder: check that its shares can be listed.
+                IReadOnlyList<(string Name, string Remark)>? shares = await Task.Run(() => EnumerateShares(host), cancellationToken)
+                    .WaitAsync(TimeSpan.FromSeconds(8), cancellationToken)
+                    .ContinueWith(task => task.IsCompletedSuccessfully ? task.Result : null, TaskScheduler.Default);
+                return shares is null
+                    ? (ConnectionState.NeedsSignIn, $"Reachable ({ms} ms). Its shared folders are hidden until you sign in; open it to enter a user name and password.")
+                    : (ConnectionState.Connected, $"Connected  •  {ms} ms  •  {shares.Count} shared folder{(shares.Count == 1 ? "" : "s")}");
+            }
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    using IEnumerator<string> entries = Directory.EnumerateFileSystemEntries(target).GetEnumerator();
+                    entries.MoveNext();
+                }, cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                return (ConnectionState.Connected, $"Connected  •  {ms} ms");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return (ConnectionState.NeedsSignIn, $"Reachable ({ms} ms), but access was denied. Open it to sign in.");
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return (ConnectionState.Failed, $"{host} answered ({ms} ms), but the shared folder was not found.");
+            }
+            catch (TimeoutException)
+            {
+                return (ConnectionState.Failed, $"{host} answered ({ms} ms), but the folder did not respond within 10 seconds.");
+            }
+            catch (IOException exception)
+            {
+                int code = exception.HResult & 0xFFFF;
+                // 1326 wrong password, 1219 other credentials in use, 1244 not authenticated, 86 bad password,
+                // 1331 account disabled, 1909 account locked, 1907 password must change.
+                if (code is 1326 or 1219 or 1244 or 86 or 1331 or 1907 or 1909)
+                {
+                    return (ConnectionState.NeedsSignIn, $"Reachable ({ms} ms), sign-in needed. Open it to enter a user name and password.");
+                }
+
+                // 67 network name not found, 53 network path not found, 3 path not found.
+                return code is 67 or 53 or 3
+                    ? (ConnectionState.Failed, $"{host} answered ({ms} ms), but the shared folder was not found.")
+                    : (ConnectionState.Failed, $"{host} answered ({ms} ms), but the folder could not be opened: {exception.Message}");
+            }
+        }
+
+        if (Uri.TryCreate(target, UriKind.Absolute, out Uri? uri) && uri.Host.Length > 0)
+        {
+            if (uri.Scheme is "http" or "https")
+            {
+                try
+                {
+                    Stopwatch watch = Stopwatch.StartNew();
+                    using HttpRequestMessage request = new(HttpMethod.Head, uri);
+                    using HttpResponseMessage response = await WebClient.SendAsync(request, cancellationToken);
+                    long elapsed = watch.ElapsedMilliseconds;
+                    return response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+                        ? (ConnectionState.NeedsSignIn, $"Reachable ({elapsed} ms), sign-in needed.")
+                        : (ConnectionState.Connected, $"Connected  •  {elapsed} ms");
+                }
+                catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+                {
+                    return (ConnectionState.Failed, $"Not reachable: {uri.Host} did not answer.");
+                }
+            }
+
+            long? ms = await ConnectAsync(uri.Host, uri.Port, cancellationToken);
+            return ms is null
+                ? (ConnectionState.Failed, $"Not reachable: {uri.Host} did not answer on port {uri.Port}.")
+                : (ConnectionState.Connected, $"Connected  •  {ms} ms");
+        }
+
+        return (ConnectionState.Failed, "The address of this location could not be read.");
+    }
+
+    private static readonly HttpClient WebClient = new() { Timeout = TimeSpan.FromSeconds(8) };
+
+    /// <summary>TCP connect time in milliseconds, or null when the host cannot be found or does not answer.</summary>
+    private static async Task<long?> ConnectAsync(string host, int port, CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(4));
+        try
+        {
+            IPAddress[] addresses = IPAddress.TryParse(host, out IPAddress? literal)
+                ? new[] { literal }
+                : await Dns.GetHostAddressesAsync(host, timeout.Token);
+            addresses = addresses.OrderBy(address => address.AddressFamily == AddressFamily.InterNetwork ? 0 : 1).ToArray();
+            if (addresses.Length == 0)
+            {
+                return null;
+            }
+
+            using TcpClient client = new(addresses[0].AddressFamily);
+            Stopwatch watch = Stopwatch.StartNew();
+            await client.ConnectAsync(addresses[0], port, timeout.Token);
+            return Math.Max(1, watch.ElapsedMilliseconds);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Removes a network location from This PC, or disconnects a mapped drive and stops it reconnecting at sign-in.
+    /// The drive is disconnected in the user's normal session too (through a one-off scheduled task that runs as the
+    /// signed-in user without elevation), because the elevated dashboard cannot see that session's drives.
+    /// </summary>
+    public async Task<FolderRemoveResult> RemoveAddedFolderAsync(AddedNetworkFolder folder, CancellationToken cancellationToken = default)
+    {
+        if (folder.Kind == AddedFolderKind.NetworkLocation)
+        {
+            return await Task.Run(() => RemoveNetworkLocation(folder), cancellationToken);
+        }
+
+        string letter = folder.DriveLetter ?? string.Empty;
+        if (letter.Length != 2 || !char.IsLetter(letter[0]) || letter[1] != ':')
+        {
+            return new FolderRemoveResult(false, "The drive letter could not be read.");
+        }
+
+        string output = await RunPowerShellAsync(BuildDisconnectDriveScript(letter), cancellationToken);
+        string[] lines = output.Split('\n').Select(line => line.Trim()).ToArray();
+        bool removed = lines.Any(line => line == "RESULT:REMOVED");
+        bool sessionDone = lines.Any(line => line == "SESSION:DONE");
+        if (!removed)
+        {
+            return new FolderRemoveResult(false, $"{letter} could not be removed from your profile. {output.Trim()}");
+        }
+
+        return new FolderRemoveResult(true, sessionDone
+            ? $"{letter} ({folder.Target}) was disconnected and will not reconnect at sign-in."
+            : $"{letter} ({folder.Target}) will not reconnect at sign-in. It may stay in File Explorer until you sign out.");
+    }
+
+    internal static string BuildDisconnectDriveScript(string letter) => $$"""
+        $letter = '{{letter}}'
+        $task = 'WindowsUtility-DisconnectDrive-' + [guid]::NewGuid().ToString('N')
+        $session = 'SKIPPED'
+        try {
+            $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+            $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument ('/c net use ' + $letter + ' /delete /y')
+            $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
+            Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Force -ErrorAction Stop | Out-Null
+            Start-ScheduledTask -TaskName $task -ErrorAction Stop
+            $deadline = (Get-Date).AddSeconds(15)
+            do { Start-Sleep -Milliseconds 500; $state = (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue).State }
+            while (($state -eq 'Running' -or $state -eq 'Queued') -and (Get-Date) -lt $deadline)
+            $session = 'DONE'
+        } catch { $session = 'FAILED ' + $_.Exception.Message }
+        finally { Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue }
+        & net.exe use $letter /delete /y 2>&1 | Out-Null
+        $key = 'HKCU:\Network\' + $letter.TrimEnd(':')
+        Remove-Item -Path $key -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path $key) { 'RESULT:FAIL' } else { 'RESULT:REMOVED' }
+        'SESSION:' + $session
+        """;
+
+    private static FolderRemoveResult RemoveNetworkLocation(AddedNetworkFolder folder)
+    {
+        string root = Path.GetFullPath(NetworkShortcutsRoot) + Path.DirectorySeparatorChar;
+        string path = Path.GetFullPath(folder.LocationPath ?? string.Empty);
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            return new FolderRemoveResult(false, "Only network locations in This PC > Network locations can be removed here.");
+        }
+
+        if (Directory.Exists(path))
+        {
+            // Network-location folders are read-only and their desktop.ini is hidden + system.
+            foreach (string file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+            {
+                File.SetAttributes(file, FileAttributes.Normal);
+            }
+
+            File.SetAttributes(path, FileAttributes.Directory);
+            Directory.Delete(path, recursive: true);
+            SHChangeNotify(ShcneRmdir, ShcnfPathW, path, IntPtr.Zero);
+        }
+        else if (File.Exists(path))
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+            File.Delete(path);
+            SHChangeNotify(ShcneDelete, ShcnfPathW, path, IntPtr.Zero);
+        }
+        else
+        {
+            return new FolderRemoveResult(true, $"\"{folder.Name}\" was already removed.");
+        }
+
+        return new FolderRemoveResult(true, $"\"{folder.Name}\" was removed from This PC > Network locations.");
+    }
+
+    /// <summary>Target of a shortcut: the path WScript reports, or the first network address stored in the file.</summary>
+    private static string ReadShortcutTarget(string shortcutPath)
+    {
+        try
+        {
+            Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
+            if (shellType is not null)
+            {
+                dynamic shell = Activator.CreateInstance(shellType)!;
+                try
+                {
+                    dynamic shortcut = shell.CreateShortcut(shortcutPath);
+                    string target = shortcut.TargetPath as string ?? string.Empty;
+                    Marshal.FinalReleaseComObject(shortcut);
+                    if (target.StartsWith(@"\\", StringComparison.Ordinal) || target.Contains("://", StringComparison.Ordinal))
+                    {
+                        return target;
+                    }
+                }
+                finally
+                {
+                    Marshal.FinalReleaseComObject(shell);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Fall back to reading the shortcut file.
+        }
+
+        try
+        {
+            // Shortcuts made by "Add a network location" keep the target in their item list; it is stored as text.
+            byte[] bytes = File.ReadAllBytes(shortcutPath);
+            foreach (string text in new[] { System.Text.Encoding.Unicode.GetString(bytes), System.Text.Encoding.Latin1.GetString(bytes) })
+            {
+                System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(text,
+                    @"(\\\\[A-Za-z0-9._\-$]+(?:\\[^\x00-\x1f\\""<>|*?]+)*|(?:https?|ftp)://[^\x00-\x20""<>]+)");
+                if (match.Success)
+                {
+                    return match.Value.TrimEnd('\\');
+                }
+            }
+        }
+        catch (IOException)
+        {
+        }
+
+        return "(address unknown)";
+    }
+
+    private static async Task<string> RunPowerShellAsync(string script, CancellationToken cancellationToken)
+    {
+        ProcessStartInfo startInfo = new("powershell.exe")
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-NonInteractive");
+        startInfo.ArgumentList.Add("-ExecutionPolicy");
+        startInfo.ArgumentList.Add("Bypass");
+        startInfo.ArgumentList.Add("-Command");
+        startInfo.ArgumentList.Add(script);
+
+        using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("PowerShell could not be started.");
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(1));
+        Task<string> output = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        Task<string> error = process.StandardError.ReadToEndAsync(timeout.Token);
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            throw new TimeoutException("Disconnecting the drive took too long and was stopped.");
+        }
+
+        return (await output) + Environment.NewLine + (await error);
+    }
+
+    private const int ShcneDelete = 0x4;
+    private const int ShcneRmdir = 0x10;
+    private const uint ShcnfPathW = 0x5;
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern void SHChangeNotify(int eventId, uint flags, string item1, IntPtr item2);
 
     private static void CreateShortcut(string shortcutPath, string target)
     {

@@ -30,6 +30,116 @@ public partial class MainWindow
         }
     }
 
+    private async void RefreshAddedFoldersButton_Click(object sender, RoutedEventArgs e) => await RefreshAddedFoldersAsync(testAll: true);
+
+    /// <summary>Lists the network locations and mapped drives added to this PC, then tests them all.</summary>
+    private async Task RefreshAddedFoldersAsync(bool testAll)
+    {
+        try
+        {
+            IReadOnlyList<AddedNetworkFolder> folders = await _sharedFoldersService.GetAddedNetworkFoldersAsync();
+            AddedFoldersList.ItemsSource = folders;
+            int drives = folders.Count(folder => folder.Kind == AddedFolderKind.MappedDrive);
+            AddedFoldersHeaderText.Text = $"Network folders added to this PC ({folders.Count - drives} locations, {drives} mapped drives)";
+            AddedFoldersEmptyText.Text = "No network locations or mapped network drives have been added. Use Add to File Explorer on a share below.";
+            AddedFoldersEmptyText.Visibility = folders.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            TestAllAddedFoldersButton.IsEnabled = folders.Count > 0;
+            if (testAll)
+            {
+                await TestAddedFoldersAsync(folders);
+            }
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Added network folders", exception);
+            AddedFoldersEmptyText.Text = $"Could not read the network folders added to this PC: {exception.Message}";
+            AddedFoldersEmptyText.Visibility = Visibility.Visible;
+        }
+    }
+
+    private async void TestAllAddedFoldersButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (AddedFoldersList.ItemsSource is IReadOnlyList<AddedNetworkFolder> folders)
+        {
+            await TestAddedFoldersAsync(folders);
+        }
+    }
+
+    private async Task TestAddedFoldersAsync(IReadOnlyList<AddedNetworkFolder> folders)
+    {
+        TestAllAddedFoldersButton.IsEnabled = false;
+        try
+        {
+            await Task.WhenAll(folders.Select(folder => SharedFoldersService.TestConnectionAsync(folder)));
+            int connected = folders.Count(folder => folder.State == ConnectionState.Connected);
+            if (folders.Count > 0)
+            {
+                StatusText.Text = $"Network folders tested: {connected} of {folders.Count} connected.";
+            }
+        }
+        finally
+        {
+            TestAllAddedFoldersButton.IsEnabled = folders.Count > 0;
+        }
+    }
+
+    private async void TestAddedFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: AddedNetworkFolder folder } element)
+        {
+            return;
+        }
+
+        element.IsEnabled = false;
+        try
+        {
+            await SharedFoldersService.TestConnectionAsync(folder);
+            StatusText.Text = $"{folder.Title.Trim()}: {folder.StatusText}";
+        }
+        finally
+        {
+            element.IsEnabled = true;
+        }
+    }
+
+    private async void RemoveAddedFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: AddedNetworkFolder folder } element)
+        {
+            return;
+        }
+
+        string question = folder.Kind == AddedFolderKind.MappedDrive
+            ? $"Disconnect mapped drive {folder.DriveLetter} ({folder.Target})?\n\nThe drive is removed from File Explorer and will not reconnect at sign-in. Files on the network are not touched. Close any files open from this drive first."
+            : $"Remove \"{folder.Name}\" ({folder.Target}) from This PC > Network locations?\n\nOnly the shortcut is removed. The shared folder and its files are not touched.";
+        if (WpfMessageBox.Show(this, question, "Remove network folder", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        element.IsEnabled = false;
+        try
+        {
+            FolderRemoveResult result = await _sharedFoldersService.RemoveAddedFolderAsync(folder);
+            ApplicationLogService.WriteMessage("Added network folders", result.Message);
+            StatusText.Text = result.Message;
+            if (!result.Removed)
+            {
+                WpfMessageBox.Show(this, result.Message, "Remove network folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Remove network folder", exception);
+            WpfMessageBox.Show(this, exception.Message, "Remove network folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            element.IsEnabled = true;
+            await RefreshAddedFoldersAsync(testAll: true);
+        }
+    }
+
     private async void ScanNetworkSharesButton_Click(object sender, RoutedEventArgs e)
     {
         if (_scanningShares)
@@ -96,6 +206,7 @@ public partial class MainWindow
             string location = SharedFoldersService.AddToFileExplorer(share.UncPath, share.LocationName);
             ApplicationLogService.WriteMessage("Shared folders", $"Added {share.UncPath} to File Explorer at {location}.");
             StatusText.Text = $"{share.UncPath} added to File Explorer under This PC > Network locations.";
+            _ = RefreshAddedFoldersAsync(testAll: true);
             if (WpfMessageBox.Show(this,
                     $"{share.UncPath} now appears in File Explorer under This PC > Network locations.\n\nOpen This PC now?",
                     "Add to File Explorer", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)

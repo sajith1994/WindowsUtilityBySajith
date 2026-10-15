@@ -282,6 +282,7 @@ public partial class MainWindow : Window
                 }
 
                 _ = RefreshLocalSharesAsync();
+                _ = RefreshAddedFoldersAsync(testAll: true);
                 break;
             case 2:
                 HeaderTitleText.Text = "Utility Tools";
