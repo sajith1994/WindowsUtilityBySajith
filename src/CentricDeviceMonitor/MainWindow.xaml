@@ -789,77 +789,147 @@
                         <TextBlock Text="See managed-device reachability immediately, scan the local subnet and inspect the current network path."
                                    Style="{StaticResource SectionDescriptionStyle}" />
 
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="0.95*"/></Grid.ColumnDefinitions>
-
-                            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <!-- IP scanner, automatic monitoring and the managed IP addresses in one card. -->
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE721;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
                                         <TextBlock Text="IP Scanner &amp; Monitoring" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock x:Name="DeviceCountText" Text="0 device(s)" Style="{StaticResource InfoLabelStyle}" Margin="10,1,0,0" />
                                     </StackPanel>
-                                    <TextBlock Text="Discover devices on the local subnet and configure automatic availability checks."
-                                               Style="{StaticResource CardDescriptionStyle}" />
-                                    <Button Content="Open IP scanner &amp; manage addresses"
-                                            Tag="&#xE721;"
-                                            Style="{StaticResource IconPrimaryButton}"
-                                            Click="OpenIpScannerButton_Click"
-                                            Margin="0,16,0,16"
-                                            ToolTip="Scan the local IPv4 subnet, manage monitored IPs and check common TCP ports." />
-                                    <Grid Margin="0,0,0,12">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <ToggleButton x:Name="AutomaticMonitoringCheckBox"
-                                                      Content="Automatic ping monitoring"
-                                                      Style="{StaticResource ToggleSwitch}"
-                                                      FontSize="11"
-                                                      Checked="AutomaticMonitoringCheckBox_Changed"
-                                                      Unchecked="AutomaticMonitoringCheckBox_Changed"
-                                                      ToolTip="Enable background ping checks for saved managed devices and log outages/recoveries." />
-                                        <TextBlock Grid.Column="1" Text="Live status below" Style="{StaticResource InfoLabelStyle}" />
-                                    </Grid>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <TextBlock Text="Interval" Style="{StaticResource InfoLabelStyle}" />
-                                        <ComboBox Grid.Column="1" x:Name="PingIntervalComboBox" Margin="8,0,12,0" FontSize="11" SelectionChanged="PingIntervalComboBox_SelectionChanged" ToolTip="Choose how often saved managed devices are checked for reachability.">
-                                            <ComboBoxItem Content="10 seconds" Tag="10"/><ComboBoxItem Content="15 seconds" Tag="15"/><ComboBoxItem Content="30 seconds" Tag="30"/>
-                                            <ComboBoxItem Content="1 minute" Tag="60"/><ComboBoxItem Content="2 minutes" Tag="120"/><ComboBoxItem Content="5 minutes" Tag="300"/><ComboBoxItem Content="10 minutes" Tag="600"/><ComboBoxItem Content="30 minutes" Tag="1800"/>
-                                        </ComboBox>
-                                        <TextBlock Grid.Column="2" x:Name="PingCountdownText" Text="Next ping: --:--" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Content="Check all now" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshAllButton_Click" Margin="0,0,8,0" ToolTip="Immediately ping every saved managed device instead of waiting for the next interval." />
+                                        <Button Content="Open IP scanner &amp; manage addresses" Tag="&#xE721;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenIpScannerButton_Click" Margin="0" ToolTip="Scan the local IPv4 subnet, add, edit or remove monitored IP addresses and check common TCP ports." />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="Discover devices on the local subnet, keep a list of managed IP addresses and check them automatically. Live availability comes from the dashboard or the LocalSystem monitoring service. Double-click a device to open its connection history."
+                                           Style="{StaticResource CardDescriptionStyle}" />
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="24"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <ToggleButton x:Name="AutomaticMonitoringCheckBox"
+                                                  Content="Automatic ping monitoring"
+                                                  Style="{StaticResource ToggleSwitch}"
+                                                  FontSize="11"
+                                                  Checked="AutomaticMonitoringCheckBox_Changed"
+                                                  Unchecked="AutomaticMonitoringCheckBox_Changed"
+                                                  ToolTip="Enable background ping checks for saved managed devices and log outages/recoveries." />
+                                    <TextBlock Grid.Column="2" Text="Interval" Style="{StaticResource InfoLabelStyle}" />
+                                    <ComboBox Grid.Column="3" x:Name="PingIntervalComboBox" Margin="8,0,12,0" FontSize="11" SelectionChanged="PingIntervalComboBox_SelectionChanged" ToolTip="Choose how often saved managed devices are checked for reachability.">
+                                        <ComboBoxItem Content="10 seconds" Tag="10"/><ComboBoxItem Content="15 seconds" Tag="15"/><ComboBoxItem Content="30 seconds" Tag="30"/>
+                                        <ComboBoxItem Content="1 minute" Tag="60"/><ComboBoxItem Content="2 minutes" Tag="120"/><ComboBoxItem Content="5 minutes" Tag="300"/><ComboBoxItem Content="10 minutes" Tag="600"/><ComboBoxItem Content="30 minutes" Tag="1800"/>
+                                    </ComboBox>
+                                    <TextBlock Grid.Column="4" x:Name="PingCountdownText" Text="Next ping: --:--" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                </Grid>
+                                <DataGrid x:Name="DeviceGrid"
+                                          ItemsSource="{Binding Devices}"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          CanUserResizeRows="False"
+                                          HeadersVisibility="Column"
+                                          SelectionMode="Single"
+                                          RowHeaderWidth="0"
+                                          MinHeight="220"
+                                          Margin="0,12,0,0"
+                                          SelectionChanged="DeviceGrid_SelectionChanged"
+                                          MouseDoubleClick="DeviceGrid_MouseDoubleClick">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="1.1*" />
+                                        <DataGridTextColumn Header="IP address" Binding="{Binding IpAddress}" Width="1*" />
+                                        <DataGridTemplateColumn Header="Status" Width="90">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Online"><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Offline"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Checking"><Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="Response" Binding="{Binding ResponseDisplay}" Width="85" />
+                                        <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.25*" />
+                                        <DataGridTextColumn Header="Last checked" Binding="{Binding LastCheckedDisplay}" Width="150" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
 
-                            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-                                <StackPanel>
-                                    <Grid Margin="0,0,0,12">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="&#xE95E;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                            <TextBlock Text="Current Connection" Style="{StaticResource CardTitleStyle}" />
-                                        </StackPanel>
-                                        <Button Grid.Column="1" Content="Refresh" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshSystemHealthDetailsButton_Click" Margin="0" ToolTip="Refresh local adapter, gateway/DNS and public connection details." />
+                        <!-- Every active connection, plus the public address the internet sees. -->
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE95E;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Current Connection" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Refresh" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshSystemHealthDetailsButton_Click" Margin="0" ToolTip="Refresh the active connections and the public connection details." />
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="94"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="Network" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                                            <TextBlock Grid.Column="1" x:Name="NetworkStatusText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                                        </Grid>
+                                        <TextBlock x:Name="ActiveConnectionsHeaderText" Text="Active connections" Style="{StaticResource InfoLabelStyle}" Margin="0,8,0,4"/>
+                                        <ItemsControl x:Name="ActiveConnectionsList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,7" Margin="0,0,0,6" ToolTip="{Binding Description}">
+                                                        <StackPanel>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Headline}" FontSize="12" FontWeight="SemiBold" />
+                                                                <Border Background="{DynamicResource SuccessBrush}" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                                    <Border.Style>
+                                                                        <Style TargetType="Border">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding UsedForInternet}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Border.Style>
+                                                                    <TextBlock Text="Internet" FontSize="10" FontWeight="SemiBold" Foreground="White" />
+                                                                </Border>
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding LinkDisplay}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                                            <TextBlock Text="{Binding AddressDisplay}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock x:Name="ActiveConnectionsEmptyText" Text="Checking connections..." Style="{StaticResource CardDescriptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="2" VerticalAlignment="Top">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="86"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="Public IP" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="0" Grid.Column="1" x:Name="PublicIpText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="1" Text="IP location" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="1" Grid.Column="1" x:Name="PublicLocationText" Text="Checking IP location..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="2" Text="ISP / server" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="2" Grid.Column="1" x:Name="PublicServerText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
                                     </Grid>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="94"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="Network" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="0" Grid.Column="1" x:Name="NetworkStatusText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
-                                        <TextBlock Grid.Row="1" Text="Wi-Fi" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="1" Grid.Column="1" x:Name="WifiStrengthText" Text="Checking signal..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                                        <TextBlock Grid.Row="2" Text="Local IP" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="2" Grid.Column="1" x:Name="LocalIpText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
-                                        <TextBlock Grid.Row="3" Text="Gateway / DNS" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="3" Grid.Column="1" x:Name="GatewayDnsText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                                        <TextBlock Grid.Row="4" Text="Public IP" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="4" Grid.Column="1" x:Name="PublicIpText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
-                                        <TextBlock Grid.Row="5" Text="IP location" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="5" Grid.Column="1" x:Name="PublicLocationText" Text="Checking IP location..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                                        <TextBlock Grid.Row="6" Text="ISP / server" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="6" Grid.Column="1" x:Name="PublicServerText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                                        <TextBlock Grid.Row="7" Text="Adapters" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="7" Grid.Column="1" x:Name="NetworkDetailText" Text="Checking adapters..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                                        <TextBlock Grid.Row="8" Text="Link bandwidth" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="8" Grid.Column="1" x:Name="ActiveLinkSpeedText" Text="Checking active link..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="Negotiated Ethernet/Wi-Fi link rate. Works even when the internet is unavailable."/>
-                                    </Grid>
-                                    <TextBlock x:Name="SystemHealthUpdatedText" Text="Extended details refresh automatically." Style="{StaticResource CardDescriptionStyle}" Margin="0,12,0,10" />
-                                    <UniformGrid Columns="2">
-                                        <Button Content="Packet loss &amp; speed tests" Tag="&#xE721;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenNetworkSpeedTestButton_Click" Margin="0,0,6,0" ToolTip="Tests packet loss and jitter, shows local link bandwidth, opens FAST.com for internet speed, and measures actual PC-to-PC LAN throughput without internet." />
-                                        <Button Content="View system health log" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewSystemHealthLogButton_Click" Margin="0" ToolTip="Review saved system/network health samples and changes." />
-                                    </UniformGrid>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
+                                </Grid>
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="SystemHealthUpdatedText" Text="Extended details refresh automatically." Style="{StaticResource CardDescriptionStyle}" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="Packet loss &amp; speed tests" Tag="&#xE721;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenNetworkSpeedTestButton_Click" Margin="0,0,8,0" ToolTip="Tests packet loss and jitter, shows local link bandwidth, opens FAST.com for internet speed, and measures actual PC-to-PC LAN throughput without internet." />
+                                    <Button Grid.Column="2" Content="View system health log" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewSystemHealthLogButton_Click" Margin="0" ToolTip="Review saved system/network health samples and changes." />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
 
                         <!-- Adapter IPv4 / DNS configuration -->
                         <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
@@ -870,7 +940,10 @@
                                         <TextBlock Text="&#xE839;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
                                         <TextBlock Text="Network Adapter Settings (Administrator)" Style="{StaticResource CardTitleStyle}" />
                                     </StackPanel>
-                                    <Button Grid.Column="1" Content="Refresh" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshNetworkAdaptersButton_Click" Margin="0" ToolTip="Reload adapters and their current settings." />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Content="Windows adapters" Tag="&#xE8A7;" Style="{StaticResource IconCompactButton}" Click="OpenWindowsNetworkConnectionsButton_Click" Margin="0,0,8,0" ToolTip="Open Windows Network Connections (ncpa.cpl) to enable, disable, rename or configure adapters." />
+                                        <Button Content="Refresh" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshNetworkAdaptersButton_Click" Margin="0" ToolTip="Reload adapters and their current settings." />
+                                    </StackPanel>
                                 </Grid>
                                 <TextBlock Text="Choose an adapter, then switch between automatic (DHCP) and a static IP, and pick a DNS service. Changing these can briefly drop the connection, including RDP and VPN sessions."
                                            Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />
@@ -1108,66 +1181,6 @@
                                 </UniformGrid>
                                 <TextBlock Text="Winsock/TCP-IP reset requires a Windows restart before all changes take effect."
                                            Style="{StaticResource InfoLabelStyle}" Margin="0,10,0,0" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE8B7;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="Managed IP Addresses" Style="{StaticResource CardTitleStyle}" />
-                                        <TextBlock x:Name="DeviceCountText" Text="0 device(s)" Style="{StaticResource InfoLabelStyle}" Margin="10,1,0,0" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <Button Content="Check all now" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshAllButton_Click" Margin="0,0,8,0" ToolTip="Immediately ping every saved managed device instead of waiting for the next interval." />
-                                        <Button Content="Manage addresses" Tag="&#xE721;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenIpScannerButton_Click" Margin="0" ToolTip="Add, edit or remove monitored device IP addresses and open the local IP scanner." />
-                                    </StackPanel>
-                                </Grid>
-                                <TextBlock Text="Live availability from the dashboard or LocalSystem monitoring service. Double-click a device to open its connection history."
-                                           Style="{StaticResource CardDescriptionStyle}" />
-                                <DataGrid x:Name="DeviceGrid"
-                                          ItemsSource="{Binding Devices}"
-                                          AutoGenerateColumns="False"
-                                          IsReadOnly="True"
-                                          CanUserAddRows="False"
-                                          CanUserDeleteRows="False"
-                                          CanUserResizeRows="False"
-                                          HeadersVisibility="Column"
-                                          SelectionMode="Single"
-                                          RowHeaderWidth="0"
-                                          MinHeight="280"
-                                          Margin="0,14,0,0"
-                                          SelectionChanged="DeviceGrid_SelectionChanged"
-                                          MouseDoubleClick="DeviceGrid_MouseDoubleClick">
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="1.1*" />
-                                        <DataGridTextColumn Header="IP address" Binding="{Binding IpAddress}" Width="1*" />
-                                        <DataGridTemplateColumn Header="Status" Width="90">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" VerticalAlignment="Center">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding Status}" Value="Online"><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" /></DataTrigger>
-                                                                    <DataTrigger Binding="{Binding Status}" Value="Offline"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
-                                                                    <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
-                                                                    <DataTrigger Binding="{Binding Status}" Value="Checking"><Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" /></DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="Response" Binding="{Binding ResponseDisplay}" Width="85" />
-                                        <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.25*" />
-                                        <DataGridTextColumn Header="Last checked" Binding="{Binding LastCheckedDisplay}" Width="150" />
-                                    </DataGrid.Columns>
-                                </DataGrid>
                             </StackPanel>
                         </Border>
                     </StackPanel>

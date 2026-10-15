@@ -13,6 +13,20 @@ public partial class MainWindow
 
     private void RefreshNetworkAdaptersButton_Click(object sender, RoutedEventArgs e) => RefreshNetworkAdapters();
 
+    /// <summary>Opens Windows Network Connections (Control Panel > Network and Internet > Change adapter options).</summary>
+    private void OpenWindowsNetworkConnectionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("control.exe", "ncpa.cpl") { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Open Network Connections", exception);
+            WpfMessageBox.Show(this, exception.Message, "Network Connections", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     /// <summary>Loads adapters, keeping the current selection when it still exists.</summary>
     private void RefreshNetworkAdapters()
     {

@@ -118,7 +118,8 @@ public sealed class SystemResourceMonitorService
         List<NetworkAdapterState> adapters = new();
         foreach (NetworkInterface networkInterface in NetworkInterface.GetAllNetworkInterfaces())
         {
-            if (networkInterface.NetworkInterfaceType is not (NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211))
+            if (networkInterface.NetworkInterfaceType is not (NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211
+                    or NetworkInterfaceType.Wwanpp or NetworkInterfaceType.Wwanpp2))
             {
                 continue;
             }
@@ -131,9 +132,12 @@ public sealed class SystemResourceMonitorService
                 continue;
             }
 
-            string type = networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211
-                ? "Wi-Fi"
-                : "Ethernet";
+            string type = networkInterface.NetworkInterfaceType switch
+            {
+                NetworkInterfaceType.Wireless80211 => "Wi-Fi",
+                NetworkInterfaceType.Wwanpp or NetworkInterfaceType.Wwanpp2 => "Mobile broadband",
+                _ => "Ethernet"
+            };
 
             string addresses = string.Empty;
             bool connected = false;
@@ -181,7 +185,7 @@ public sealed class SystemResourceMonitorService
         return octets.Length == 4 && octets[0] == 169 && octets[1] == 254;
     }
 
-    private static bool IsVirtualAdapter(NetworkInterface networkInterface)
+    internal static bool IsVirtualAdapter(NetworkInterface networkInterface)
     {
         string haystack = $"{networkInterface.Name} {networkInterface.Description}";
         foreach (string marker in VirtualAdapterMarkers)

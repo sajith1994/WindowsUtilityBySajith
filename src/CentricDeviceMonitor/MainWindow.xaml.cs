@@ -40,7 +40,6 @@ public partial class MainWindow : Window
     private readonly SystemHealthLogService _systemHealthLogService = new();
     private readonly SystemResourceMonitorService _systemResourceMonitorService = new();
     private readonly SystemHealthDetailsService _systemHealthDetailsService = new();
-    private readonly NetworkSpeedTestService _networkSpeedTestService = new();
     private readonly SystemHardwareInventoryService _systemHardwareInventoryService = new();
     private readonly AppSettingsService _settingsService = new();
     private readonly NetworkDeviceService _networkService = new();
@@ -163,6 +162,8 @@ public partial class MainWindow : Window
 
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
+        System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
+        Closed += (_, _) => System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
         InitializeTrayIcon();
         WpfApplication.Current.SessionEnding += (_, _) => _allowApplicationExit = true;
     }
@@ -2910,7 +2911,6 @@ public partial class MainWindow : Window
             CpuUsageText.Text = "--%";
             RamUsageText.Text = "--%";
             NetworkStatusText.Text = "Unavailable";
-            NetworkDetailText.Text = exception.Message;
         }
     }
 
@@ -2948,9 +2948,6 @@ public partial class MainWindow : Window
         NetworkStatusText.Foreground = snapshot.NetworkConnected
             ? WpfBrushes.SeaGreen
             : WarningCpuTemperatureBrush;
-        NetworkDetailText.Text = string.IsNullOrWhiteSpace(snapshot.NetworkSummary)
-            ? "No active Ethernet or Wi-Fi connection detected."
-            : snapshot.NetworkSummary;
     }
 
     private void DisplaySystemResourceReading(SystemResourceReading reading, string source)
@@ -2986,7 +2983,6 @@ public partial class MainWindow : Window
         NetworkStatusText.Foreground = reading.NetworkConnected
             ? WpfBrushes.SeaGreen
             : WarningCpuTemperatureBrush;
-        NetworkDetailText.Text = reading.NetworkSummary;
     }
 
     private static string FormatBytesAsGb(ulong bytes) =>
@@ -3068,18 +3064,10 @@ public partial class MainWindow : Window
             SystemHealthDetails details = await _systemHealthDetailsService.GetAsync(forcePublicRefresh);
             WindowsVersionText.Text = details.WindowsDisplay;
             BatteryPercentText.Text = details.BatteryDisplay;
-            WifiStrengthText.Text = details.WifiDisplay;
-            LocalIpText.Text = details.LocalIpDisplay;
-            GatewayDnsText.Text = details.GatewayDnsDisplay;
+            await RefreshActiveConnectionsAsync();
             PublicIpText.Text = details.PublicIpDisplay;
             PublicLocationText.Text = details.PublicLocationDisplay;
             PublicServerText.Text = details.PublicServerDisplay;
-
-            NetworkLinkSnapshot link = await _networkSpeedTestService.GetActiveLinkAsync(
-                checkInternet: false,
-                measureGatewayLatency: false,
-                measureCurrentTraffic: false);
-            ActiveLinkSpeedText.Text = link.CompactLinkDisplay;
 
             SystemHealthUpdatedText.Text = $"Updated {details.UpdatedAt:HH:mm:ss}";
         }
@@ -3093,6 +3081,42 @@ public partial class MainWindow : Window
             _refreshingSystemHealthDetails = false;
         }
     }
+
+    /// <summary>Shows every active connection (Wi-Fi, Ethernet, mobile broadband, VPN), the internet one first.</summary>
+    private async Task RefreshActiveConnectionsAsync()
+    {
+        try
+        {
+            IReadOnlyList<ActiveConnection> connections = await ActiveConnectionsService.GetAsync();
+            ActiveConnectionsList.ItemsSource = connections;
+            ActiveConnectionsHeaderText.Text = connections.Count > 1 ? $"Active connections ({connections.Count})" : "Active connection";
+            ActiveConnectionsEmptyText.Text = "No active network connection. Wi-Fi, Ethernet and mobile broadband are all disconnected.";
+            ActiveConnectionsEmptyText.Visibility = connections.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Active connections", exception);
+            ActiveConnectionsEmptyText.Text = $"Could not read the active connections: {exception.Message}";
+            ActiveConnectionsEmptyText.Visibility = Visibility.Visible;
+        }
+    }
+
+    /// <summary>Refreshes the connection list shortly after Windows reports an address change (connect, disconnect, roam).</summary>
+    private void OnNetworkAddressChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _activeConnectionsDebounce ??= new DispatcherTimer(TimeSpan.FromSeconds(2), DispatcherPriority.Background, async (_, _) =>
+            {
+                _activeConnectionsDebounce!.Stop();
+                await RefreshActiveConnectionsAsync();
+            }, Dispatcher);
+            _activeConnectionsDebounce.Stop();
+            _activeConnectionsDebounce.Start();
+        }));
+    }
+
+    private DispatcherTimer? _activeConnectionsDebounce;
 
     private async void RefreshSystemHealthDetailsButton_Click(object sender, RoutedEventArgs e)
     {

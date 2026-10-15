@@ -260,6 +260,20 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.62] - 2026-10-15
+
+### Changed
+- **IP Scanner & Monitoring and Managed IP Addresses are one card** at the top of Network Diagnostics: scanner and
+  address management, Check all now, automatic ping monitoring with its interval, and the live device list together.
+- **Current Connection shows every active connection** instead of a single adapter and a Wi-Fi row that said
+  "not connected" while Ethernet was in use. Each connection (Wi-Fi, Ethernet, mobile broadband, VPN) shows its
+  name and type, Wi-Fi network and signal or link speed, IP address, gateway and DNS; the one Windows uses for the
+  internet is marked. Virtual switches without a gateway (Hyper-V Default Switch, WSL) are no longer shown as the
+  connection. The list refreshes by itself when a connection comes up or drops.
+- Mobile broadband (cellular) connections now count as connected.
+
+### Added
+- **Windows adapters** button on Network Adapter Settings opens Windows Network Connections (ncpa.cpl).
 ## [2.0.61] - 2026-10-15
 
 ### Added
