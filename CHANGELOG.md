@@ -260,6 +260,12 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.60] - 2026-10-15
+
+### Fixed
+- **Update window release notes were squeezed to a single line**, so "What's new" showed only a fragment. The window
+  is taller, the notes area always shows several lines (scroll for more) and starts at the top, and sub-points are
+  indented under their main point. On small screens the whole window scrolls instead.
 ## [2.0.59] - 2026-10-15
 
 ### Added

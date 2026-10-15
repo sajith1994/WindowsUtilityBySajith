@@ -163,7 +163,8 @@ public partial class UpdateWindow : Window
             }
             else if (trimmed.StartsWith("- ", StringComparison.Ordinal))
             {
-                lines.Add("•  " + trimmed[2..]);
+                bool nested = line.StartsWith("  ", StringComparison.Ordinal);
+                lines.Add((nested ? "      –  " : "•  ") + trimmed[2..]);
             }
             else if (trimmed.Length > 0 && lines.Count > 0 && lines[^1].Length > 0 && line.StartsWith("  ", StringComparison.Ordinal))
             {
@@ -277,6 +278,7 @@ public partial class UpdateWindow : Window
         NotesPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         NotesHeader.Text = header ?? string.Empty;
         NotesText.Text = show ? FormatReleaseNotes(notes!) : string.Empty;
+        NotesScroller.ScrollToTop();
     }
 
     private static string ReleasedSuffix(UpdateManifest? manifest)
