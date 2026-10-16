@@ -23,6 +23,7 @@
   <ItemGroup>
     <Compile Include="..\CentricDeviceMonitor\Models\AppSettings.cs" Link="Models\AppSettings.cs" />
     <Compile Include="..\CentricDeviceMonitor\Models\BackgroundServiceSnapshot.cs" Link="Models\BackgroundServiceSnapshot.cs" />
+    <Compile Include="..\CentricDeviceMonitor\Models\RemoteMonitoring.cs" Link="Models\RemoteMonitoring.cs" />
     <Compile Include="..\CentricDeviceMonitor\Models\CpuTemperatureLogEntry.cs" Link="Models\CpuTemperatureLogEntry.cs" />
     <Compile Include="..\CentricDeviceMonitor\Models\CpuTemperatureSampleEntry.cs" Link="Models\CpuTemperatureSampleEntry.cs" />
     <Compile Include="..\CentricDeviceMonitor\Models\DeviceEntry.cs" Link="Models\DeviceEntry.cs" />

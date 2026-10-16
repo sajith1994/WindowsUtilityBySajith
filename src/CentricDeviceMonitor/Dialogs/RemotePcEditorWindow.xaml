@@ -1,0 +1,53 @@
+<Window x:Class="CentricDeviceMonitor.Dialogs.RemotePcEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Add a PC to monitor"
+        Width="500"
+        Height="560"
+        MinWidth="440"
+        MinHeight="460"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,0,10">
+                <TextBlock x:Name="HeadingText" Text="Add a PC to monitor" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="On the other PC, open Windows Utility > Network PCs, turn on &quot;Allow this PC to be monitored&quot;, then enter its address and the pairing code it shows."
+                           Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,16" />
+
+                <TextBlock Text="Name (optional)" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBox x:Name="NameTextBox" Height="40" Padding="10,4" FontSize="13" VerticalContentAlignment="Center" MaxLength="60"
+                         ToolTip="A friendly name. Left empty, the PC's own name is used." />
+
+                <TextBlock Text="PC name or IP address" FontWeight="SemiBold" Margin="0,14,0,6" />
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+                    <TextBox x:Name="HostTextBox" Height="40" Padding="10,4" FontSize="13" VerticalContentAlignment="Center" MaxLength="253"
+                             ToolTip="Example: 192.168.1.50 or OFFICE-PC" />
+                    <TextBlock Grid.Column="1" Text="Port" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" Margin="12,0,8,0" />
+                    <TextBox Grid.Column="2" x:Name="PortTextBox" Height="40" Padding="10,4" FontSize="13" VerticalContentAlignment="Center" MaxLength="5"
+                             ToolTip="Leave at 47810 unless it was changed on that PC." />
+                </Grid>
+
+                <TextBlock Text="Pairing code" FontWeight="SemiBold" Margin="0,14,0,6" />
+                <TextBox x:Name="CodeTextBox" Height="40" Padding="10,4" FontSize="15" FontFamily="Consolas" VerticalContentAlignment="Center" MaxLength="20"
+                         CharacterCasing="Upper" ToolTip="The code shown under This PC on the other PC, for example ABCD-EFGH-JKLM." />
+
+                <Button x:Name="TestButton" Content="Test connection" Tag="&#xE703;" Style="{StaticResource IconCompactButton}"
+                        HorizontalAlignment="Left" Margin="0,14,0,0" Click="TestButton_Click" />
+                <TextBlock x:Name="ResultText" TextWrapping="Wrap" MinHeight="20" Margin="0,10,0,0" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Cancel" Tag="&#xE711;" Style="{StaticResource IconButton}" Width="100" MinHeight="36" Click="CancelButton_Click" />
+            <Button x:Name="SaveButton" Content="Save" Tag="&#xE74E;" Style="{StaticResource IconPrimaryButton}" Width="110" MinHeight="36" Margin="8,0,0,0"
+                    IsDefault="True" Click="SaveButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

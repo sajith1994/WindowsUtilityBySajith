@@ -93,6 +93,13 @@ internal sealed class MonitoringEngine : IDisposable
         "Background service",
         "Waiting for the first background GPU power scan.");
     private DateTime? _lastGpuPowerRecordedAt;
+    private readonly RemoteStatsServer _remoteServer;
+    private volatile BackgroundServiceSnapshot? _lastSnapshot;
+
+    public MonitoringEngine()
+    {
+        _remoteServer = new RemoteStatsServer(() => _lastSnapshot);
+    }
 
     public void Start()
     {
@@ -139,6 +146,7 @@ internal sealed class MonitoringEngine : IDisposable
             source.Dispose();
             _cancellationTokenSource = null;
             _runTask = null;
+            _remoteServer.Dispose();
         }
 
         ServiceLog.Write("Service", "Stopped.");
@@ -159,6 +167,7 @@ internal sealed class MonitoringEngine : IDisposable
                 _cpuAlertThresholdCelsius = NormalizeCpuAlertThreshold(settings.CpuTemperatureAlertThresholdCelsius);
                 NormalizePowerSchedule(settings);
                 _lastSettings = settings;
+                _remoteServer.Apply(settings.RemoteSharingEnabled, settings.RemoteSharingPort, settings.RemoteSharingCode);
 
                 if (monitoringEnabled != _lastMonitoringEnabled || intervalSeconds != _lastIntervalSeconds)
                 {
@@ -916,9 +925,12 @@ internal sealed class MonitoringEngine : IDisposable
             CpuTemperatureAlertActive = _lastCpuReading.IsCpuSpecific &&
                 _lastCpuReading.ValueCelsius.HasValue &&
                 _lastCpuReading.ValueCelsius.Value > _cpuAlertThresholdCelsius,
+            RemoteSharingActive = _remoteServer.IsActive,
+            RemoteSharingStatus = _remoteServer.Status,
             Devices = statuses
         };
 
+        _lastSnapshot = snapshot;
         await _runtimeStore.SaveAsync(snapshot);
         _lastSnapshotAt = DateTime.Now;
     }
@@ -957,6 +969,7 @@ internal sealed class MonitoringEngine : IDisposable
                 settings.PowerScheduleLastTriggeredDate = marker;
                 await _settingsService.SaveAsync(settings);
                 _lastSettings = settings;
+                _remoteServer.Apply(settings.RemoteSharingEnabled, settings.RemoteSharingPort, settings.RemoteSharingCode);
 
                 bool restart = string.Equals(settings.PowerScheduleAction, "Restart", StringComparison.OrdinalIgnoreCase);
                 string action = restart ? "restart" : "shutdown";
@@ -981,6 +994,7 @@ internal sealed class MonitoringEngine : IDisposable
                     settings.PowerScheduleLastTriggeredDate = string.Empty;
                     await _settingsService.SaveAsync(settings);
                     _lastSettings = settings;
+                _remoteServer.Apply(settings.RemoteSharingEnabled, settings.RemoteSharingPort, settings.RemoteSharingCode);
                     ServiceLog.WriteException("Power schedule", exception);
                 }
 

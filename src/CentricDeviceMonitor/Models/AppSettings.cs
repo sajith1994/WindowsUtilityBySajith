@@ -59,6 +59,17 @@ public sealed class AppSettings
 
     /// <summary>Tiles pinned to the desktop as widgets, restored when the dashboard starts.</summary>
     public List<DesktopWidgetLayout> DesktopWidgets { get; set; } = new();
+
+    /// <summary>Lets other PCs on the local network read this PC's stats (served by the background service).</summary>
+    public bool RemoteSharingEnabled { get; set; }
+
+    /// <summary>Pairing code another PC needs to read this PC's stats.</summary>
+    public string RemoteSharingCode { get; set; } = string.Empty;
+
+    public int RemoteSharingPort { get; set; } = RemoteMonitoringProtocol.DefaultPort;
+
+    /// <summary>PCs monitored from this PC (Network PCs page).</summary>
+    public List<RemotePcEntry> RemotePcs { get; set; } = new();
 }
 
 public sealed class DashboardTileLayout

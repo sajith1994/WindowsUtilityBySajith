@@ -1,6 +1,6 @@
 ﻿#define MyAppName "Windows Utility"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.62"
+#define MyAppVersion "2.0.63"
 #endif
 #define MyAppExeName "WindowsUtilityBySajith.exe"
 #define MyLegacyAppExeName "CentricDeviceMonitor.exe"
@@ -80,6 +80,7 @@ Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Check: IsRelaunchRequest
 Filename: "{cmd}"; Parameters: "/c taskkill /IM {#MyTrayExeName} /F >nul 2>&1"; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricDashboardStartup.ps1"" -Action Uninstall"; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricService.ps1"" -Action Uninstall"; Flags: runhidden waituntilterminated
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Windows Utility remote monitoring"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveRemoteMonitoringFirewallRule"
 
 [Code]
 

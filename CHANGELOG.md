@@ -260,6 +260,21 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.63] - 2026-10-16
+
+### Added
+- **Network PCs: monitor other PCs on the local network.** The same app runs on every PC; each PC can share its
+  stats, watch other PCs, or both.
+  - **This PC:** "Allow this PC to be monitored" makes the background service answer with this PC's stats (CPU
+    load and model, temperature, fan and power, memory, disks, uptime, Windows version). It works before anyone
+    signs in. A pairing code (Copy, New code) is needed to read anything, the code itself never crosses the
+    network (requests are signed with it), nothing can be changed remotely, and an address that sends 10 wrong
+    codes in a minute is ignored for a minute. A Windows Firewall rule opens TCP port 47810 to the local subnet on
+    Private and Domain networks only; the page warns when the network is set to Public.
+  - **Monitored PCs:** add a PC by name or IP address and its pairing code (Test connection checks it first), or
+    use Find PCs to list PCs on this network with sharing turned on. Live tiles refresh every 5 seconds with CPU,
+    temperature, RAM and each disk, and show Online, Hot, Disk low, wrong code, not sharing or Offline.
+  - Turning sharing off, or uninstalling, removes the firewall rule.
 ## [2.0.62] - 2026-10-15
 
 ### Changed

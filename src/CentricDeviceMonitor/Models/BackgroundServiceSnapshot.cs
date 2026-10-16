@@ -96,6 +96,12 @@ public sealed class BackgroundServiceSnapshot
 
     public bool CpuTemperatureAlertActive { get; set; }
 
+    /// <summary>Whether other PCs can currently read this PC's stats.</summary>
+    public bool RemoteSharingActive { get; set; }
+
+    /// <summary>Remote monitoring endpoint state, e.g. "Sharing on port 47810" or why it could not start.</summary>
+    public string RemoteSharingStatus { get; set; } = "Off";
+
     public List<DeviceRuntimeStatus> Devices { get; set; } = new();
 }
 

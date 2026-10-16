@@ -267,6 +267,8 @@ public partial class MainWindow : Window
         NetworkDiagnosticsPage.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
         UtilityToolsPage.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
         PowerBatteryPage.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
+        NetworkPcsPage.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
+        SetRemotePcsPolling(index == 4);
 
         switch (index)
         {
@@ -300,6 +302,14 @@ public partial class MainWindow : Window
                 PowerBatteryPage.ScrollToTop();
                 _ = RefreshPowerPlansAsync();
                 break;
+            case 4:
+                HeaderTitleText.Text = "Network PCs";
+                HeaderSubtitleText.Text = "Monitor other PCs on the local network";
+                HeaderPrimaryActionButton.Content = "Add PC";
+                HeaderPrimaryActionButton.Tag = "\uE710";
+                NetworkPcsPage.ScrollToTop();
+                LoadRemoteMonitoringPage();
+                break;
             default:
                 HeaderTitleText.Text = "System Stats";
                 HeaderSubtitleText.Text = "Live health, hardware inventory and monitoring overview";
@@ -324,6 +334,9 @@ public partial class MainWindow : Window
                 break;
             case 3:
                 OpenBatteryDiagnosticsButton_Click(sender, e);
+                break;
+            case 4:
+                AddRemotePcButton_Click(sender, e);
                 break;
             default:
                 StatusText.Text = "Refreshing system overview...";

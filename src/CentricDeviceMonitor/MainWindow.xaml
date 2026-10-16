@@ -193,6 +193,12 @@
                             <TextBlock Text="Power &amp; Battery" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListBoxItem>
+                    <ListBoxItem>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7F4;" Style="{StaticResource IconGlyphStyle}" />
+                            <TextBlock Text="Network PCs" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ListBoxItem>
                 </ListBox>
 
                 <StackPanel Grid.Row="3">
@@ -1445,6 +1451,219 @@
                                 </Border>
                             </StackPanel>
                         </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- NETWORK PCS: remote monitoring between copies of this app on the local network. -->
+                <ScrollViewer x:Name="NetworkPcsPage"
+                              Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="24,22,24,32" MaxWidth="1080" HorizontalAlignment="Stretch">
+                        <TextBlock Text="REMOTE MONITORING" Style="{StaticResource SectionEyebrowStyle}" />
+                        <TextBlock Text="Network PCs" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Watch CPU load, temperature, memory and storage of other PCs on your local network. Every PC uses this same app: turn on sharing on each PC you want to watch, then add it here with the pairing code it shows."
+                                   Style="{StaticResource SectionDescriptionStyle}" />
+
+                        <!-- This PC: let other PCs read its stats. -->
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE977;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="This PC" Style="{StaticResource CardTitleStyle}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" x:Name="SharingStatusText" Text="Sharing is off" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                                </Grid>
+                                <ToggleButton x:Name="RemoteSharingToggle"
+                                              Content="Allow this PC to be monitored from other PCs on the local network"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              FontSize="11"
+                                              Checked="RemoteSharingToggle_Changed"
+                                              Unchecked="RemoteSharingToggle_Changed"
+                                              ToolTip="The background service answers with this PC's stats to PCs that have the pairing code. Nothing can be changed remotely." />
+                                <TextBlock Text="Other PCs can only read stats (CPU, temperature, memory, disks, uptime). Nothing on this PC can be changed or opened remotely, and only PCs with the pairing code can read anything. Windows Firewall allows the port from the local network on Private networks only."
+                                           Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,0" />
+
+                                <Border x:Name="SharingDetailsPanel" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,12,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Text="Pairing code" Style="{StaticResource InfoLabelStyle}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <TextBlock x:Name="SharingCodeText" FontFamily="Consolas" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <Button Content="Copy" Style="{StaticResource HeaderMiniButton}" Click="CopySharingCodeButton_Click" Margin="14,0,0,0" VerticalAlignment="Center" />
+                                            <Button Content="New code" Style="{StaticResource HeaderMiniButton}" Click="NewSharingCodeButton_Click" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                    ToolTip="Replace the code. PCs that monitor this one stop seeing it until they are given the new code." />
+                                        </StackPanel>
+                                        <TextBlock Grid.Row="1" Text="Add it as" Style="{StaticResource InfoLabelStyle}" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="SharingAddressText" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="2" Text="Network" Style="{StaticResource InfoLabelStyle}" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="SharingNetworkText" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- PCs monitored from this PC. -->
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE7F4;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Monitored PCs" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock x:Name="RemotePcsCountText" Text="" Style="{StaticResource InfoLabelStyle}" Margin="10,1,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button x:Name="FindRemotePcsButton" Content="Find PCs" Tag="&#xE721;" Style="{StaticResource IconCompactButton}" Click="FindRemotePcsButton_Click" Margin="0,0,8,0"
+                                                ToolTip="Search this network for PCs running Windows Utility with sharing turned on." />
+                                        <Button Content="Add PC" Tag="&#xE710;" Style="{StaticResource IconCompactPrimaryButton}" Click="AddRemotePcButton_Click" Margin="0"
+                                                ToolTip="Add a PC by name or IP address and its pairing code." />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="Live tiles refresh every 5 seconds while this page is open. A tile turns amber when a PC runs hot, a disk is over 90% full or the code is wrong, and red when the PC cannot be reached."
+                                           Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />
+
+                                <Border x:Name="FoundPcsPanel" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <TextBlock x:Name="FoundPcsHeaderText" Text="Found on the network" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                        <ItemsControl x:Name="FoundPcsList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,2,0,3">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Hello.MachineName}" FontSize="12" FontWeight="SemiBold" />
+                                                            <TextBlock Style="{StaticResource CardDescriptionStyle}">
+                                                                <Run Text="{Binding Address, Mode=OneWay}" /><Run Text="  •  Windows Utility " /><Run Text="{Binding Hello.AppVersion, Mode=OneWay}" />
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" Content="Add" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="AddFoundPcButton_Click" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock x:Name="FoundPcsEmptyText" Style="{StaticResource CardDescriptionStyle}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <ItemsControl x:Name="RemotePcsList">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="300" Margin="0,0,12,12" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                                                <StackPanel>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                        <StackPanel ToolTip="{Binding AddressToolTip}">
+                                                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                        <Border Grid.Column="1" CornerRadius="9" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Top">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Background" Value="{DynamicResource MutedTextBrush}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding StatusKind}" Value="Online"><Setter Property="Background" Value="{DynamicResource SuccessBrush}" /></DataTrigger>
+                                                                        <DataTrigger Binding="{Binding StatusKind}" Value="Warning"><Setter Property="Background" Value="{DynamicResource WarningBrush}" /></DataTrigger>
+                                                                        <DataTrigger Binding="{Binding StatusKind}" Value="Offline"><Setter Property="Background" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <TextBlock Text="{Binding StatusLabel}" FontSize="10" FontWeight="SemiBold" Foreground="White" />
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <TextBlock Text="{Binding Message}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,8,0,0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasStats}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+
+                                                    <StackPanel Margin="0,10,0,0">
+                                                        <StackPanel.Style>
+                                                            <Style TargetType="StackPanel">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasStats}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </StackPanel.Style>
+                                                        <Grid ToolTip="{Binding CpuModel}">
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="CPU" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                                                            <ProgressBar Grid.Column="1" Value="{Binding CpuPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding CpuText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                                        </Grid>
+                                                        <Grid Margin="0,6,0,0">
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Temp" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
+                                                            <TextBlock Grid.Column="1" FontSize="12" TextTrimming="CharacterEllipsis">
+                                                                <Run Text="{Binding TemperatureText, Mode=OneWay}" FontWeight="SemiBold">
+                                                                    <Run.Style>
+                                                                        <Style TargetType="Run">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsHot}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Run.Style>
+                                                                </Run><Run Text="   " /><Run Text="{Binding TemperatureDetail, Mode=OneWay}" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
+                                                            </TextBlock>
+                                                        </Grid>
+                                                        <Grid Margin="0,6,0,0" ToolTip="{Binding RamDetail}">
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="RAM" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                                                            <ProgressBar Grid.Column="1" Value="{Binding RamPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding RamText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding RamDetail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="44,1,0,0" />
+                                                        <ItemsControl ItemsSource="{Binding Disks}" Margin="0,4,0,0">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <StackPanel Margin="0,4,0,0">
+                                                                        <Grid>
+                                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions>
+                                                                            <TextBlock Text="{Binding Name}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                                                                            <ProgressBar Grid.Column="1" Value="{Binding UsedPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
+                                                                            <TextBlock Grid.Column="2" Text="{Binding PercentText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right">
+                                                                                <TextBlock.Style>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding IsLow}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </TextBlock.Style>
+                                                                            </TextBlock>
+                                                                        </Grid>
+                                                                        <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="44,1,0,0" />
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+
+                                                    <Grid Margin="0,10,0,0">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding UpdatedText}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                                                        <Button Grid.Column="1" Content="Edit" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="EditRemotePcButton_Click" Margin="6,0,0,0" />
+                                                        <Button Grid.Column="2" Content="Remove" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="RemoveRemotePcButton_Click" Margin="6,0,0,0" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="RemotePcsEmptyText" Text="No PCs added yet. Turn on sharing on the PCs you want to watch, then use Find PCs or Add PC." Style="{StaticResource CardDescriptionStyle}" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
