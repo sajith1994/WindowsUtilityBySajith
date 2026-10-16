@@ -927,6 +927,7 @@ internal sealed class MonitoringEngine : IDisposable
                 _lastCpuReading.ValueCelsius.Value > _cpuAlertThresholdCelsius,
             RemoteSharingActive = _remoteServer.IsActive,
             RemoteSharingStatus = _remoteServer.Status,
+            RemoteViewers = _remoteServer.Viewers,
             Devices = statuses
         };
 

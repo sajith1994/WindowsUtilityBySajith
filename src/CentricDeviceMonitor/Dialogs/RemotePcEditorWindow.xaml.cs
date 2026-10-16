@@ -13,7 +13,7 @@ public partial class RemotePcEditorWindow : Window
 
     public RemotePcEntry Result { get; }
 
-    public RemotePcEditorWindow(RemoteMonitorClient client, RemotePcEntry? existing = null, string? host = null, string? name = null)
+    public RemotePcEditorWindow(RemoteMonitorClient client, RemotePcEntry? existing = null, string? host = null, string? name = null, string? code = null)
     {
         InitializeComponent();
         _client = client;
@@ -38,7 +38,7 @@ public partial class RemotePcEditorWindow : Window
         NameTextBox.Text = existing?.DisplayName ?? name ?? string.Empty;
         HostTextBox.Text = existing?.Host ?? host ?? string.Empty;
         PortTextBox.Text = (existing?.Port ?? RemoteMonitoringProtocol.DefaultPort).ToString();
-        CodeTextBox.Text = existing?.PairingCode ?? string.Empty;
+        CodeTextBox.Text = existing?.PairingCode ?? code ?? string.Empty;
 
         InputLanguageManager.SetRestoreInputLanguage(NameTextBox, false);
         InputLanguageManager.SetRestoreInputLanguage(HostTextBox, false);
@@ -73,7 +73,7 @@ public partial class RemotePcEditorWindow : Window
             return false;
         }
 
-        if (RemoteMonitoringProtocol.NormalizeCode(code).Length < 8)
+        if (RemoteMonitoringProtocol.NormalizeCode(code).Length < RemoteMonitoringProtocol.MinimumCodeLength)
         {
             ShowResult("Enter the pairing code shown on that PC (for example ABCD-EFGH-JKLM).", "DangerBrush");
             CodeTextBox.Focus();

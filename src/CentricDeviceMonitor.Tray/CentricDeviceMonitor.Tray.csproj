@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <Compile Include="..\CentricDeviceMonitor\Models\BackgroundServiceSnapshot.cs" Link="Models\BackgroundServiceSnapshot.cs" />
+    <Compile Include="..\CentricDeviceMonitor\Models\RemoteMonitoring.cs" Link="Models\RemoteMonitoring.cs" />
     <Compile Include="..\CentricDeviceMonitor\Services\SharedDataPaths.cs" Link="Services\SharedDataPaths.cs" />
   </ItemGroup>
 </Project>

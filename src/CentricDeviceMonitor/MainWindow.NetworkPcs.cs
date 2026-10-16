@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Management;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Windows;
@@ -19,10 +21,19 @@ public partial class MainWindow
 {
     private readonly RemoteMonitorClient _remoteMonitorClient = new();
     private readonly ObservableCollection<RemotePcView> _remotePcViews = new();
+    private readonly ConcurrentDictionary<string, string> _viewerNames = new(StringComparer.OrdinalIgnoreCase);
     private DispatcherTimer? _remotePcsTimer;
     private bool _pollingRemotePcs;
     private bool _loadingRemoteSharing;
     private bool _findingRemotePcs;
+
+    /// <summary>The hidden code was re-entered on this visit to the page, so it can be shown and changed.</summary>
+    private bool _sharingCodeUnlocked;
+
+    /// <summary>When the code was last saved; older snapshots still list the previous code's viewers.</summary>
+    private DateTime _sharingCodeSavedAt = DateTime.MinValue;
+
+    private List<RemoteViewerInfo> _sharingViewers = new();
 
     private void LoadRemoteMonitoringPage()
     {
@@ -30,9 +41,10 @@ public partial class MainWindow
         RemoteSharingToggle.IsChecked = _appSettings.RemoteSharingEnabled;
         _loadingRemoteSharing = false;
 
+        _sharingCodeUnlocked = false;
         RemotePcsList.ItemsSource ??= _remotePcViews;
         SyncRemotePcViews();
-        UpdateSharingPanel();
+        UpdateSharingPanel(resetCodeBox: true);
         _ = RefreshSharingNetworkTextAsync();
         _ = PollRemotePcsAsync();
     }
@@ -100,6 +112,8 @@ public partial class MainWindow
         }
     }
 
+    // ---- This PC: sharing ----------------------------------------------------------------------------------
+
     private async void RemoteSharingToggle_Changed(object sender, RoutedEventArgs e)
     {
         if (_loadingRemoteSharing)
@@ -108,9 +122,21 @@ public partial class MainWindow
         }
 
         bool enabled = RemoteSharingToggle.IsChecked == true;
+        if (!enabled && _sharingViewers.Count > 0 &&
+            WpfMessageBox.Show(this,
+                $"Stop sharing this PC's stats?\n\n{DescribeViewers()} monitor{(_sharingViewers.Count == 1 ? "s" : "")} this PC and will show it as not sharing.",
+                "Network PCs", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            _loadingRemoteSharing = true;
+            RemoteSharingToggle.IsChecked = true;
+            _loadingRemoteSharing = false;
+            return;
+        }
+
         if (enabled && string.IsNullOrWhiteSpace(_appSettings.RemoteSharingCode))
         {
             _appSettings.RemoteSharingCode = RemoteMonitoringProtocol.NewPairingCode();
+            _sharingCodeSavedAt = DateTime.Now;
         }
 
         _appSettings.RemoteSharingEnabled = enabled;
@@ -119,15 +145,31 @@ public partial class MainWindow
         StatusText.Text = enabled
             ? "Sharing turned on. Other PCs can add this PC with the pairing code shown."
             : "Sharing turned off. Other PCs can no longer read this PC's stats.";
-        UpdateSharingPanel();
+        UpdateSharingPanel(resetCodeBox: true);
         _ = RefreshSharingNetworkTextAsync();
     }
 
-    private void UpdateSharingPanel()
+    private bool IsSharingCodeHidden => _appSettings.RemoteSharingCodeLocked && !_sharingCodeUnlocked;
+
+    private void UpdateSharingPanel(bool resetCodeBox = false)
     {
         bool enabled = _appSettings.RemoteSharingEnabled;
         SharingDetailsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
-        SharingCodeText.Text = _appSettings.RemoteSharingCode;
+
+        bool hidden = IsSharingCodeHidden;
+        SharingCodeLockedPanel.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed;
+        SharingCodeEditPanel.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
+        if (hidden || resetCodeBox)
+        {
+            SharingCodeBox.Text = hidden ? string.Empty : _appSettings.RemoteSharingCode;
+        }
+
+        SharingCodeHintText.Text = hidden
+            ? "Hidden because a PC is monitoring this one with it. Show or change asks for the current code first."
+            : _appSettings.RemoteSharingCodeLocked
+                ? "PCs monitoring this one use this code; changing it disconnects them until they are given the new code."
+                : $"Type your own code to use the same one on several PCs (at least {RemoteMonitoringProtocol.MinimumCodeLength} letters or numbers; capitals and dashes do not matter). It is hidden once a PC connects with it.";
+        UpdateSaveSharingCodeButton();
 
         List<string> addresses = GetLocalIpv4Addresses();
         string port = _appSettings.RemoteSharingPort == RemoteMonitoringProtocol.DefaultPort
@@ -140,6 +182,96 @@ public partial class MainWindow
         if (!enabled)
         {
             SetSharingStatus("Sharing is off", "MutedTextBrush");
+        }
+    }
+
+    private void SharingCodeBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) => UpdateSaveSharingCodeButton();
+
+    private void UpdateSaveSharingCodeButton()
+    {
+        string typed = RemoteMonitoringProtocol.NormalizeCode(SharingCodeBox.Text);
+        SaveSharingCodeButton.IsEnabled = !IsSharingCodeHidden
+            && typed.Length >= RemoteMonitoringProtocol.MinimumCodeLength
+            && typed != RemoteMonitoringProtocol.NormalizeCode(_appSettings.RemoteSharingCode);
+    }
+
+    private async void SaveSharingCodeButton_Click(object sender, RoutedEventArgs e)
+    {
+        string code = SharingCodeBox.Text.Trim();
+        if (RemoteMonitoringProtocol.NormalizeCode(code).Length < RemoteMonitoringProtocol.MinimumCodeLength)
+        {
+            WpfMessageBox.Show(this, $"Use at least {RemoteMonitoringProtocol.MinimumCodeLength} letters or numbers.", "Pairing code", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (_appSettings.RemoteSharingCodeLocked &&
+            WpfMessageBox.Show(this,
+                $"Change the pairing code?\n\n{(_sharingViewers.Count > 0 ? DescribeViewers() : "PCs that monitor this one")} will show \"Wrong pairing code\" until you enter the new code on them.",
+                "Pairing code", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _appSettings.RemoteSharingCode = code;
+        _appSettings.RemoteSharingCodeLocked = false;
+        _sharingCodeSavedAt = DateTime.Now;
+        _sharingCodeUnlocked = false;
+        _sharingViewers = new List<RemoteViewerInfo>();
+        await SaveRemoteSettingsAsync();
+        ApplicationLogService.WriteMessage("Network PCs", "Pairing code changed.");
+        StatusText.Text = "Pairing code saved. Use it when adding this PC on the primary PC.";
+        UpdateSharingPanel(resetCodeBox: true);
+        UpdateViewersText();
+    }
+
+    private void NewSharingCodeButton_Click(object sender, RoutedEventArgs e)
+    {
+        SharingCodeBox.Text = RemoteMonitoringProtocol.NewPairingCode();
+        SharingCodeBox.Focus();
+        StatusText.Text = "Random code filled in. Select Save code to use it.";
+    }
+
+    private void CopySharingCodeButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(SharingCodeBox.Text.Trim());
+            StatusText.Text = "Pairing code copied.";
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            StatusText.Text = "The clipboard is busy. Try Copy again.";
+        }
+    }
+
+    private void UnlockSharingCodeButton_Click(object sender, RoutedEventArgs e)
+    {
+        CodePromptWindow prompt = new(
+            "Pairing code",
+            "Enter the current code",
+            "The pairing code is hidden because a PC is monitoring this one with it. Enter it to show or change it.",
+            "Show code",
+            code => RemoteMonitoringProtocol.CodesMatch(code, _appSettings.RemoteSharingCode) ? null : "That is not the current code.",
+            masked: true,
+            offerForgot: true)
+        { Owner = this };
+
+        if (prompt.ShowDialog() == true)
+        {
+            _sharingCodeUnlocked = true;
+            UpdateSharingPanel(resetCodeBox: true);
+            return;
+        }
+
+        if (prompt.ForgotRequested &&
+            WpfMessageBox.Show(this,
+                "Set a new pairing code instead?\n\nType the new code and select Save code. PCs monitoring this one will need the new code too.",
+                "Pairing code", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+        {
+            _sharingCodeUnlocked = true;
+            UpdateSharingPanel();
+            SharingCodeBox.Text = string.Empty;
+            SharingCodeBox.Focus();
         }
     }
 
@@ -160,8 +292,10 @@ public partial class MainWindow
         if (snapshot is null || DateTime.Now - snapshot.UpdatedAt > TimeSpan.FromMinutes(1))
         {
             SetSharingStatus("Waiting for the background service...", "MutedTextBrush");
+            return;
         }
-        else if (snapshot.RemoteSharingActive)
+
+        if (snapshot.RemoteSharingActive)
         {
             SetSharingStatus(snapshot.RemoteSharingStatus, "SuccessBrush");
         }
@@ -170,6 +304,72 @@ public partial class MainWindow
             SetSharingStatus(snapshot.RemoteSharingStatus == "Off" ? "Starting..." : snapshot.RemoteSharingStatus,
                 snapshot.RemoteSharingStatus == "Off" ? "MutedTextBrush" : "DangerBrush");
         }
+
+        // A snapshot written before the last code change still lists the previous code's viewers.
+        if (snapshot.UpdatedAt > _sharingCodeSavedAt.AddSeconds(3))
+        {
+            _sharingViewers = snapshot.RemoteViewers;
+            UpdateViewersText();
+            if (_sharingViewers.Count > 0 && !_appSettings.RemoteSharingCodeLocked)
+            {
+                // A PC now uses this code: hide it so it cannot be changed by accident.
+                _appSettings.RemoteSharingCodeLocked = true;
+                _sharingCodeUnlocked = false;
+                await SaveRemoteSettingsAsync();
+                UpdateSharingPanel();
+            }
+        }
+    }
+
+    private void UpdateViewersText()
+    {
+        if (_sharingViewers.Count == 0)
+        {
+            SharingViewersText.Text = "No PC has connected yet.";
+            return;
+        }
+
+        SharingViewersText.Text = string.Join("\n", _sharingViewers.Select(viewer =>
+        {
+            DateTime lastSeen = viewer.LastSeenUtc.ToLocalTime();
+            string when = DateTime.Now - lastSeen < TimeSpan.FromMinutes(1) ? "connected now" : $"last seen {lastSeen:dd/MM HH:mm}";
+            return $"{ViewerName(viewer.Address)}  •  {when}";
+        }));
+    }
+
+    private string DescribeViewers() =>
+        _sharingViewers.Count == 1
+            ? ViewerName(_sharingViewers[0].Address)
+            : $"{_sharingViewers.Count} PCs ({string.Join(", ", _sharingViewers.Select(viewer => ViewerName(viewer.Address)))})";
+
+    /// <summary>"192.168.1.118 (OFFICE-PC)" once the name is looked up; the address alone until then.</summary>
+    private string ViewerName(string address)
+    {
+        if (_viewerNames.TryGetValue(address, out string? name))
+        {
+            return name.Length == 0 ? address : $"{address} ({name})";
+        }
+
+        _viewerNames[address] = string.Empty;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(3));
+                IPHostEntry entry = await Dns.GetHostEntryAsync(address, timeout.Token);
+                string host = entry.HostName.Split('.')[0];
+                if (host.Length > 0 && !IPAddress.TryParse(entry.HostName, out _))
+                {
+                    _viewerNames[address] = host.ToUpperInvariant();
+                    await Dispatcher.InvokeAsync(UpdateViewersText);
+                }
+            }
+            catch (Exception)
+            {
+                // Shown by address only.
+            }
+        });
+        return address;
     }
 
     private void SetSharingStatus(string text, string brushKey)
@@ -256,50 +456,29 @@ public partial class MainWindow
         return addresses.Distinct().ToList();
     }
 
-    private void CopySharingCodeButton_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            System.Windows.Clipboard.SetText(_appSettings.RemoteSharingCode);
-            StatusText.Text = "Pairing code copied.";
-        }
-        catch (System.Runtime.InteropServices.COMException)
-        {
-            StatusText.Text = "The clipboard is busy. Try Copy again.";
-        }
-    }
-
-    private async void NewSharingCodeButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (WpfMessageBox.Show(this,
-                "Create a new pairing code?\n\nPCs that monitor this one will show \"Wrong pairing code\" until you enter the new code on them.",
-                "New pairing code", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        _appSettings.RemoteSharingCode = RemoteMonitoringProtocol.NewPairingCode();
-        await SaveRemoteSettingsAsync();
-        ApplicationLogService.WriteMessage("Network PCs", "Pairing code replaced.");
-        UpdateSharingPanel();
-        StatusText.Text = "New pairing code created.";
-    }
+    // ---- Monitored PCs ---------------------------------------------------------------------------------------
 
     private async void AddRemotePcButton_Click(object sender, RoutedEventArgs e) => await AddRemotePcAsync(null, null);
 
     private async Task AddRemotePcAsync(string? host, string? name)
     {
-        RemotePcEditorWindow editor = new(_remoteMonitorClient, host: host, name: name) { Owner = this };
+        RemotePcEditorWindow editor = new(_remoteMonitorClient, host: host, name: name, code: _appSettings.RemoteNetworkCode) { Owner = this };
         if (editor.ShowDialog() != true)
         {
             return;
         }
 
         _appSettings.RemotePcs.Add(editor.Result);
+        if (string.IsNullOrWhiteSpace(_appSettings.RemoteNetworkCode))
+        {
+            // The first code used becomes the network code that Add all and the next Add PC start from.
+            _appSettings.RemoteNetworkCode = editor.Result.PairingCode;
+        }
+
         await SaveRemoteSettingsAsync();
         ApplicationLogService.WriteMessage("Network PCs", $"Added {editor.Result.Host} to monitored PCs.");
         SyncRemotePcViews();
-        RemoveFromFoundList(editor.Result.Host);
+        RemoveFromFoundList(new[] { editor.Result.Host });
         await PollRemotePcsAsync();
     }
 
@@ -355,6 +534,7 @@ public partial class MainWindow
 
         _findingRemotePcs = true;
         FindRemotePcsButton.IsEnabled = false;
+        AddAllFoundPcsButton.Visibility = Visibility.Collapsed;
         FoundPcsPanel.Visibility = Visibility.Visible;
         FoundPcsList.ItemsSource = null;
         FoundPcsHeaderText.Text = "Searching this network...";
@@ -371,12 +551,9 @@ public partial class MainWindow
                     && !string.Equals(existing.Host, pc.Hello.MachineName, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
-            FoundPcsList.ItemsSource = candidates;
-            FoundPcsHeaderText.Text = $"Found on the network ({candidates.Count})";
-            FoundPcsEmptyText.Text = found.Count > candidates.Count
+            ShowFoundPcs(candidates, found.Count > candidates.Count
                 ? "Every PC found is already added (or is this PC)."
-                : "No other PCs found. On each PC to watch: update Windows Utility, open Network PCs and turn on \"Allow this PC to be monitored\". Its network must be set to Private.";
-            FoundPcsEmptyText.Visibility = candidates.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                : "No other PCs found. On each PC to watch: update Windows Utility, open Network PCs and turn on \"Allow this PC to be monitored\". Its network must be set to Private.");
             StatusText.Text = $"Network PC search finished: {candidates.Count} new PC{(candidates.Count == 1 ? "" : "s")} found.";
         }
         catch (Exception exception)
@@ -392,6 +569,15 @@ public partial class MainWindow
         }
     }
 
+    private void ShowFoundPcs(List<DiscoveredRemotePc> candidates, string emptyText)
+    {
+        FoundPcsList.ItemsSource = candidates;
+        FoundPcsHeaderText.Text = $"Found on the network ({candidates.Count})";
+        FoundPcsEmptyText.Text = emptyText;
+        FoundPcsEmptyText.Visibility = candidates.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        AddAllFoundPcsButton.Visibility = candidates.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private async void AddFoundPcButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: DiscoveredRemotePc pc })
@@ -400,15 +586,85 @@ public partial class MainWindow
         }
     }
 
-    private void RemoveFromFoundList(string host)
+    /// <summary>Adds every PC found that accepts the network code; asks for the code once and remembers it.</summary>
+    private async void AddAllFoundPcsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (FoundPcsList.ItemsSource is not List<DiscoveredRemotePc> candidates || candidates.Count == 0)
+        {
+            return;
+        }
+
+        CodePromptWindow prompt = new(
+            "Network code",
+            $"Add {candidates.Count} PC{(candidates.Count == 1 ? "" : "s")}",
+            "Enter the pairing code set on those PCs. Every PC that accepts it is added. The code is remembered on this PC for next time.",
+            "Add all",
+            code => RemoteMonitoringProtocol.NormalizeCode(code).Length >= RemoteMonitoringProtocol.MinimumCodeLength
+                ? null
+                : $"Use at least {RemoteMonitoringProtocol.MinimumCodeLength} letters or numbers.",
+            initialCode: _appSettings.RemoteNetworkCode)
+        { Owner = this };
+        if (prompt.ShowDialog() != true)
+        {
+            return;
+        }
+
+        string code = prompt.Code;
+        _appSettings.RemoteNetworkCode = code;
+        AddAllFoundPcsButton.IsEnabled = false;
+        FoundPcsHeaderText.Text = $"Adding {candidates.Count} PC{(candidates.Count == 1 ? "" : "s")}...";
+        try
+        {
+            (DiscoveredRemotePc Pc, RemoteStatsResult Result)[] results = await Task.WhenAll(candidates.Select(async pc =>
+                (pc, await _remoteMonitorClient.GetStatsAsync(pc.Address, RemoteMonitoringProtocol.DefaultPort, code))));
+
+            List<DiscoveredRemotePc> added = new();
+            List<string> failed = new();
+            foreach ((DiscoveredRemotePc pc, RemoteStatsResult result) in results)
+            {
+                if (result.State == RemoteStatsState.Online)
+                {
+                    _appSettings.RemotePcs.Add(new RemotePcEntry
+                    {
+                        DisplayName = result.Stats?.MachineName ?? pc.Hello.MachineName,
+                        Host = pc.Address,
+                        Port = RemoteMonitoringProtocol.DefaultPort,
+                        PairingCode = code
+                    });
+                    added.Add(pc);
+                }
+                else
+                {
+                    failed.Add($"{pc.Hello.MachineName} ({pc.Address}): {result.Message}");
+                }
+            }
+
+            await SaveRemoteSettingsAsync();
+            ApplicationLogService.WriteMessage("Network PCs", $"Add all: {added.Count} added, {failed.Count} not added.");
+            SyncRemotePcViews();
+            RemoveFromFoundList(added.Select(pc => pc.Address));
+            StatusText.Text = $"{added.Count} PC{(added.Count == 1 ? "" : "s")} added.";
+            if (failed.Count > 0)
+            {
+                WpfMessageBox.Show(this,
+                    $"{added.Count} PC{(added.Count == 1 ? " was" : "s were")} added. These were not:\n\n{string.Join("\n", failed)}\n\nThose PCs use a different code. Add them one at a time with their own code.",
+                    "Add all", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+
+            await PollRemotePcsAsync();
+        }
+        finally
+        {
+            AddAllFoundPcsButton.IsEnabled = true;
+        }
+    }
+
+    private void RemoveFromFoundList(IEnumerable<string> hosts)
     {
         if (FoundPcsList.ItemsSource is List<DiscoveredRemotePc> found)
         {
-            List<DiscoveredRemotePc> remaining = found.Where(pc => !string.Equals(pc.Address, host, StringComparison.OrdinalIgnoreCase)).ToList();
-            FoundPcsList.ItemsSource = remaining;
-            FoundPcsHeaderText.Text = $"Found on the network ({remaining.Count})";
-            FoundPcsEmptyText.Text = "Every PC found is added.";
-            FoundPcsEmptyText.Visibility = remaining.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            HashSet<string> remove = hosts.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            ShowFoundPcs(found.Where(pc => !remove.Contains(pc.Address)).ToList(), "Every PC found is added.");
         }
     }
 

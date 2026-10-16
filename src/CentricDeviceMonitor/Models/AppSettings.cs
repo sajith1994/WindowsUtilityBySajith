@@ -68,6 +68,12 @@ public sealed class AppSettings
 
     public int RemoteSharingPort { get; set; } = RemoteMonitoringProtocol.DefaultPort;
 
+    /// <summary>Set once another PC has connected with the code: the code is then hidden until re-entered.</summary>
+    public bool RemoteSharingCodeLocked { get; set; }
+
+    /// <summary>Code this PC uses when adding PCs (Add all, and pre-filled in Add PC).</summary>
+    public string RemoteNetworkCode { get; set; } = string.Empty;
+
     /// <summary>PCs monitored from this PC (Network PCs page).</summary>
     public List<RemotePcEntry> RemotePcs { get; set; } = new();
 }

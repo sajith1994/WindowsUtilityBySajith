@@ -46,6 +46,16 @@ public static class RemoteMonitoringProtocol
     public static string NormalizeCode(string? code) =>
         new((code ?? string.Empty).Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
+    /// <summary>Shortest code accepted (letters and digits after normalizing).</summary>
+    public const int MinimumCodeLength = 8;
+
+    public static bool CodesMatch(string? first, string? second) =>
+        NormalizeCode(first) is { Length: > 0 } normalized && normalized == NormalizeCode(second);
+
+    /// <summary>Fingerprint of a code, so the service can tell when it changed without storing it twice.</summary>
+    public static string Fingerprint(string? code) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(NormalizeCode(code))));
+
     public static string Sign(string code, long unixSeconds, string path) =>
         Convert.ToBase64String(HMACSHA256.HashData(
             Encoding.UTF8.GetBytes(NormalizeCode(code)),
@@ -118,6 +128,21 @@ public sealed class RemoteDiskInfo
     public string Format { get; set; } = string.Empty;
     public long TotalBytes { get; set; }
     public long FreeBytes { get; set; }
+}
+
+/// <summary>A PC that has read this PC's stats with the current pairing code.</summary>
+public sealed class RemoteViewerInfo
+{
+    public string Address { get; set; } = string.Empty;
+    public DateTime FirstSeenUtc { get; set; }
+    public DateTime LastSeenUtc { get; set; }
+}
+
+/// <summary>Viewers of this PC, saved by the service with the fingerprint of the code they used.</summary>
+public sealed class RemoteViewerStore
+{
+    public string CodeFingerprint { get; set; } = string.Empty;
+    public List<RemoteViewerInfo> Viewers { get; set; } = new();
 }
 
 /// <summary>A PC added on the primary PC's Network PCs page.</summary>

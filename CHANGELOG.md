@@ -260,6 +260,21 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.64] - 2026-10-16
+
+### Added
+- **Your own pairing code, and Add all.** On each PC to monitor, the pairing code is now editable: type one code
+  (for example OFFICE-2026-HQ) on every PC, or use Random. Capitals, spaces and dashes do not matter; at least
+  8 letters or numbers.
+  - On the primary PC, **Find PCs** has **Add all**: enter the network code once and every PC found that accepts
+    it is added; PCs that use a different code are listed. The code is remembered and pre-filled in Add PC.
+- **Monitored by** on This PC lists the PCs that read its stats, with their names and when they last connected.
+
+### Changed
+- **The pairing code hides once a PC uses it**, so it cannot be changed by accident: it shows as dots until
+  Show or change, which asks for the current code first. Forgot it? Set a new code (with a confirmation).
+  Changing the code or turning sharing off while a PC is monitoring this one asks for confirmation.
+- Amber status badges on Network PCs tiles use dark text so they stay readable in dark mode.
 ## [2.0.63] - 2026-10-16
 
 ### Added

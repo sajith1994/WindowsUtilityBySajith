@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using CentricDeviceMonitor.Models;
+using CentricDeviceMonitor.Services;
 using Microsoft.Win32;
 
 namespace CentricDeviceMonitor.ServiceHost;
@@ -37,11 +38,34 @@ internal sealed class RemoteStatsServer : IDisposable
     private HashSet<string>? _partitionDrives;
     private DateTime _partitionDrivesReadAt;
 
+    private readonly string _viewersFilePath;
+    private readonly object _viewerLock = new();
+    private RemoteViewerStore? _viewerStore;
+    private string? _fingerprintedCode;
+    private DateTime _viewersSavedAt;
+
     /// <param name="listenHost">"+" (all addresses) in the service; tests use "localhost", which needs no administrator rights.</param>
-    public RemoteStatsServer(Func<BackgroundServiceSnapshot?> snapshotProvider, string listenHost = "+")
+    /// <param name="viewersFilePath">Where viewers are saved; tests use a temporary file.</param>
+    public RemoteStatsServer(Func<BackgroundServiceSnapshot?> snapshotProvider, string listenHost = "+", string? viewersFilePath = null)
     {
         _snapshotProvider = snapshotProvider;
         _listenHost = listenHost;
+        _viewersFilePath = viewersFilePath ?? SharedDataPaths.RemoteViewersFilePath;
+    }
+
+    /// <summary>PCs that have read stats with the current code, most recent first.</summary>
+    public List<RemoteViewerInfo> Viewers
+    {
+        get
+        {
+            lock (_viewerLock)
+            {
+                return LoadViewerStore().Viewers
+                    .OrderByDescending(viewer => viewer.LastSeenUtc)
+                    .Select(viewer => new RemoteViewerInfo { Address = viewer.Address, FirstSeenUtc = viewer.FirstSeenUtc, LastSeenUtc = viewer.LastSeenUtc })
+                    .ToList();
+            }
+        }
     }
 
     public bool IsActive => _listener?.IsListening == true;
@@ -73,6 +97,7 @@ internal sealed class RemoteStatsServer : IDisposable
         }
 
         _code = code;
+        SyncViewerFingerprint(code);
         if (IsActive && port == _port)
         {
             return;
@@ -177,6 +202,7 @@ internal sealed class RemoteStatsServer : IDisposable
             }
 
             _failures.TryRemove(caller, out _);
+            RecordViewer(caller);
             Respond(context, 200, BuildPayload());
         }
         catch (Exception exception)
@@ -259,6 +285,100 @@ internal sealed class RemoteStatsServer : IDisposable
         }
 
         return payload;
+    }
+
+    /// <summary>A new code makes the old viewers meaningless: they can no longer connect, so start a fresh list.</summary>
+    private void SyncViewerFingerprint(string code)
+    {
+        if (ReferenceEquals(code, _fingerprintedCode) || code == _fingerprintedCode)
+        {
+            return;
+        }
+
+        lock (_viewerLock)
+        {
+            _fingerprintedCode = code;
+            RemoteViewerStore store = LoadViewerStore();
+            string fingerprint = RemoteMonitoringProtocol.Fingerprint(code);
+            if (store.CodeFingerprint != fingerprint)
+            {
+                if (store.Viewers.Count > 0)
+                {
+                    ServiceLog.Write("Remote monitoring", "Pairing code changed; the list of monitoring PCs was cleared.");
+                }
+
+                store.CodeFingerprint = fingerprint;
+                store.Viewers.Clear();
+                SaveViewerStore(store);
+            }
+        }
+    }
+
+    private void RecordViewer(string address)
+    {
+        lock (_viewerLock)
+        {
+            RemoteViewerStore store = LoadViewerStore();
+            DateTime now = DateTime.UtcNow;
+            RemoteViewerInfo? viewer = store.Viewers.FirstOrDefault(item => item.Address == address);
+            bool isNew = viewer is null;
+            if (viewer is null)
+            {
+                viewer = new RemoteViewerInfo { Address = address, FirstSeenUtc = now };
+                store.Viewers.Add(viewer);
+                ServiceLog.Write("Remote monitoring", $"{address} is now monitoring this PC.");
+            }
+
+            viewer.LastSeenUtc = now;
+            // Last-seen times only need to survive a restart roughly, so save new viewers at once and the rest rarely.
+            if (isNew || now - _viewersSavedAt > TimeSpan.FromMinutes(5))
+            {
+                SaveViewerStore(store);
+            }
+        }
+    }
+
+    private RemoteViewerStore LoadViewerStore()
+    {
+        if (_viewerStore is not null)
+        {
+            return _viewerStore;
+        }
+
+        try
+        {
+            if (File.Exists(_viewersFilePath))
+            {
+                _viewerStore = JsonSerializer.Deserialize<RemoteViewerStore>(File.ReadAllText(_viewersFilePath), JsonOptions);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
+        {
+            ServiceLog.WriteException("Remote monitoring viewers load", exception);
+        }
+
+        return _viewerStore ??= new RemoteViewerStore();
+    }
+
+    private void SaveViewerStore(RemoteViewerStore store)
+    {
+        try
+        {
+            string? directory = Path.GetDirectoryName(_viewersFilePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            string temporary = _viewersFilePath + ".tmp";
+            File.WriteAllText(temporary, JsonSerializer.Serialize(store, JsonOptions));
+            File.Move(temporary, _viewersFilePath, overwrite: true);
+            _viewersSavedAt = DateTime.UtcNow;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ServiceLog.WriteException("Remote monitoring viewers save", exception);
+        }
     }
 
     /// <summary>Drive letters backed by a disk partition, refreshed at most once a minute; null if WMI fails.</summary>

@@ -28,6 +28,8 @@ public static class SharedDataPaths
 
     public static string ServiceLogFilePath => Path.Combine(ServiceDirectory, "service.log");
 
+    public static string RemoteViewersFilePath => Path.Combine(ServiceDirectory, "remote-viewers.json");
+
     public static string DashboardTrayReadyFilePath => Path.Combine(ServiceDirectory, "dashboard-tray.ready");
 
     public static string PrivilegedCommandsDirectory => Path.Combine(ServiceDirectory, "commands");

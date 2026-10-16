@@ -1489,18 +1489,32 @@
                                 <Border x:Name="SharingDetailsPanel" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,12,0,0">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-                                        <TextBlock Text="Pairing code" Style="{StaticResource InfoLabelStyle}" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                            <TextBlock x:Name="SharingCodeText" FontFamily="Consolas" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                            <Button Content="Copy" Style="{StaticResource HeaderMiniButton}" Click="CopySharingCodeButton_Click" Margin="14,0,0,0" VerticalAlignment="Center" />
-                                            <Button Content="New code" Style="{StaticResource HeaderMiniButton}" Click="NewSharingCodeButton_Click" Margin="6,0,0,0" VerticalAlignment="Center"
-                                                    ToolTip="Replace the code. PCs that monitor this one stop seeing it until they are given the new code." />
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Text="Pairing code" Style="{StaticResource InfoLabelStyle}" VerticalAlignment="Top" Margin="0,8,0,0" />
+                                        <StackPanel Grid.Column="1">
+                                            <!-- Editable until a PC connects with the code; then hidden until the current code is re-entered. -->
+                                            <StackPanel x:Name="SharingCodeEditPanel" Orientation="Horizontal">
+                                                <TextBox x:Name="SharingCodeBox" Width="240" Height="34" Padding="8,2" FontFamily="Consolas" FontSize="16" FontWeight="SemiBold"
+                                                         VerticalContentAlignment="Center" CharacterCasing="Upper" MaxLength="40" TextChanged="SharingCodeBox_TextChanged"
+                                                         ToolTip="Type your own code to use the same one on several PCs. At least 8 letters or numbers." />
+                                                <Button x:Name="SaveSharingCodeButton" Content="Save code" Style="{StaticResource HeaderMiniButton}" Click="SaveSharingCodeButton_Click" Margin="10,0,0,0" VerticalAlignment="Center" IsEnabled="False" />
+                                                <Button Content="Random" Style="{StaticResource HeaderMiniButton}" Click="NewSharingCodeButton_Click" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                        ToolTip="Fill in a random code (Save code to use it)." />
+                                                <Button Content="Copy" Style="{StaticResource HeaderMiniButton}" Click="CopySharingCodeButton_Click" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <StackPanel x:Name="SharingCodeLockedPanel" Orientation="Horizontal" Visibility="Collapsed">
+                                                <TextBlock Text="••••-••••-••••" FontFamily="Consolas" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <Button Content="Show or change" Style="{StaticResource HeaderMiniButton}" Click="UnlockSharingCodeButton_Click" Margin="14,0,0,0" VerticalAlignment="Center"
+                                                        ToolTip="Asks for the current code first, so it cannot be changed by accident." />
+                                            </StackPanel>
+                                            <TextBlock x:Name="SharingCodeHintText" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                         </StackPanel>
                                         <TextBlock Grid.Row="1" Text="Add it as" Style="{StaticResource InfoLabelStyle}" Margin="0,8,0,0" />
                                         <TextBlock Grid.Row="1" Grid.Column="1" x:Name="SharingAddressText" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
-                                        <TextBlock Grid.Row="2" Text="Network" Style="{StaticResource InfoLabelStyle}" Margin="0,8,0,0" />
-                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="SharingNetworkText" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="2" Text="Monitored by" Style="{StaticResource InfoLabelStyle}" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="SharingViewersText" Text="No PC has connected yet." FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="3" Text="Network" Style="{StaticResource InfoLabelStyle}" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="SharingNetworkText" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
                                     </Grid>
                                 </Border>
                             </StackPanel>
@@ -1528,7 +1542,12 @@
 
                                 <Border x:Name="FoundPcsPanel" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,12">
                                     <StackPanel>
-                                        <TextBlock x:Name="FoundPcsHeaderText" Text="Found on the network" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="FoundPcsHeaderText" Text="Found on the network" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <Button Grid.Column="1" x:Name="AddAllFoundPcsButton" Content="Add all" Tag="&#xE710;" Style="{StaticResource IconCompactPrimaryButton}" Click="AddAllFoundPcsButton_Click" Margin="0"
+                                                    Visibility="Collapsed" ToolTip="Add every PC found, using the network code (the code set on those PCs)." />
+                                        </Grid>
                                         <ItemsControl x:Name="FoundPcsList">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
@@ -1574,7 +1593,17 @@
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </Border.Style>
-                                                            <TextBlock Text="{Binding StatusLabel}" FontSize="10" FontWeight="SemiBold" Foreground="White" />
+                                                            <TextBlock Text="{Binding StatusLabel}" FontSize="10" FontWeight="SemiBold">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="White" />
+                                                                        <Style.Triggers>
+                                                                            <!-- Amber is light in dark mode; dark text keeps it readable in both themes. -->
+                                                                            <DataTrigger Binding="{Binding StatusKind}" Value="Warning"><Setter Property="Foreground" Value="#1F1F1F" /></DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
                                                         </Border>
                                                     </Grid>
 

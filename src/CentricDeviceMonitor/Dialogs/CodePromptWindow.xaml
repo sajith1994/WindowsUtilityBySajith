@@ -1,0 +1,26 @@
+<Window x:Class="CentricDeviceMonitor.Dialogs.CodePromptWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pairing code"
+        Width="460"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="18">
+        <TextBlock x:Name="HeadingText" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock x:Name="MessageText" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,14" />
+        <TextBox x:Name="CodeTextBox" Height="40" Padding="10,4" FontSize="15" FontFamily="Consolas" VerticalContentAlignment="Center"
+                 MaxLength="40" CharacterCasing="Upper" />
+        <PasswordBox x:Name="CodePasswordBox" Height="40" Padding="10,4" FontSize="15" FontFamily="Consolas" VerticalContentAlignment="Center"
+                     MaxLength="40" Visibility="Collapsed" />
+        <TextBlock x:Name="ErrorText" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed" />
+        <Grid Margin="0,16,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Button x:Name="ForgotButton" Content="Forgot it? Set a new code" Style="{StaticResource HeaderMiniButton}" HorizontalAlignment="Left" VerticalAlignment="Center"
+                    Visibility="Collapsed" Click="ForgotButton_Click" />
+            <Button Grid.Column="1" Content="Cancel" Tag="&#xE711;" Style="{StaticResource IconButton}" Width="100" MinHeight="36" Click="CancelButton_Click" />
+            <Button Grid.Column="2" x:Name="OkButton" Content="OK" Tag="&#xE73E;" Style="{StaticResource IconPrimaryButton}" MinWidth="100" MinHeight="36" Margin="8,0,0,0"
+                    IsDefault="True" Click="OkButton_Click" />
+        </Grid>
+    </StackPanel>
+</Window>
