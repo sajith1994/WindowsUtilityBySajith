@@ -74,6 +74,17 @@ public sealed class AppSettings
     /// <summary>Code this PC uses when adding PCs (Add all, and pre-filled in Add PC).</summary>
     public string RemoteNetworkCode { get; set; } = string.Empty;
 
+    /// <summary>Notify about problems on monitored PCs (checked in the background every 30 seconds).</summary>
+    public bool RemoteAlertsEnabled { get; set; } = true;
+
+    public bool RemoteAlertOverheat { get; set; } = true;
+
+    public bool RemoteAlertDisk { get; set; } = true;
+
+    public bool RemoteAlertMemory { get; set; } = true;
+
+    public bool RemoteAlertOffline { get; set; } = true;
+
     /// <summary>PCs monitored from this PC (Network PCs page).</summary>
     public List<RemotePcEntry> RemotePcs { get; set; } = new();
 }

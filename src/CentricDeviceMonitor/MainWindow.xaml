@@ -1540,6 +1540,22 @@
                                 <TextBlock Text="Live tiles refresh every 5 seconds while this page is open. A tile turns amber when a PC runs hot, a disk is over 90% full or the code is wrong, and red when the PC cannot be reached."
                                            Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />
 
+                                <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <ToggleButton x:Name="RemoteAlertsToggle" Content="Notify me when a monitored PC has a problem" Style="{StaticResource ToggleSwitch}" FontSize="11"
+                                                      Checked="RemoteAlertSetting_Changed" Unchecked="RemoteAlertSetting_Changed"
+                                                      ToolTip="Checked every 30 seconds in the background, also while the dashboard is only in the notification area." />
+                                        <WrapPanel x:Name="RemoteAlertOptionsPanel" Margin="0,8,0,0">
+                                            <CheckBox x:Name="RemoteAlertOverheatCheck" Content="Overheating (above that PC's alert temperature)" FontSize="11" Margin="0,0,18,6" Checked="RemoteAlertSetting_Changed" Unchecked="RemoteAlertSetting_Changed" />
+                                            <CheckBox x:Name="RemoteAlertDiskCheck" Content="Drive nearly full (under 10% free) or full" FontSize="11" Margin="0,0,18,6" Checked="RemoteAlertSetting_Changed" Unchecked="RemoteAlertSetting_Changed" />
+                                            <CheckBox x:Name="RemoteAlertMemoryCheck" Content="Memory over 95%" FontSize="11" Margin="0,0,18,6" Checked="RemoteAlertSetting_Changed" Unchecked="RemoteAlertSetting_Changed" />
+                                            <CheckBox x:Name="RemoteAlertOfflineCheck" Content="PC goes offline (and when it is back)" FontSize="11" Margin="0,0,18,6" Checked="RemoteAlertSetting_Changed" Unchecked="RemoteAlertSetting_Changed" />
+                                        </WrapPanel>
+                                        <TextBlock x:Name="RemoteAlertsNoteText" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="RecentRemoteAlertsText" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed" />
+                                    </StackPanel>
+                                </Border>
+
                                 <Border x:Name="FoundPcsPanel" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,12">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,6">
@@ -1579,8 +1595,8 @@
                                                     <Grid>
                                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                                         <StackPanel ToolTip="{Binding AddressToolTip}">
-                                                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
                                                         </StackPanel>
                                                         <Border Grid.Column="1" CornerRadius="9" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Top">
                                                             <Border.Style>
@@ -1635,7 +1651,7 @@
                                                         <Grid Margin="0,6,0,0">
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                                             <TextBlock Text="Temp" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
-                                                            <TextBlock Grid.Column="1" FontSize="12" TextTrimming="CharacterEllipsis">
+                                                            <TextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap">
                                                                 <Run Text="{Binding TemperatureText, Mode=OneWay}" FontWeight="SemiBold">
                                                                     <Run.Style>
                                                                         <Style TargetType="Run">
@@ -1644,9 +1660,10 @@
                                                                             </Style.Triggers>
                                                                         </Style>
                                                                     </Run.Style>
-                                                                </Run><Run Text="   " /><Run Text="{Binding TemperatureDetail, Mode=OneWay}" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
+                                                                </Run>
                                                             </TextBlock>
                                                         </Grid>
+                                                        <TextBlock Text="{Binding TemperatureDetail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
                                                         <Grid Margin="0,6,0,0" ToolTip="{Binding RamDetail}">
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions>
                                                             <TextBlock Text="RAM" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
@@ -1679,12 +1696,13 @@
                                                         </ItemsControl>
                                                     </StackPanel>
 
-                                                    <Grid Margin="0,10,0,0">
-                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                                        <TextBlock Text="{Binding UpdatedText}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
-                                                        <Button Grid.Column="1" Content="Edit" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="EditRemotePcButton_Click" Margin="6,0,0,0" />
-                                                        <Button Grid.Column="2" Content="Remove" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="RemoveRemotePcButton_Click" Margin="6,0,0,0" />
-                                                    </Grid>
+                                                    <TextBlock Text="{Binding UpdatedText}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="0,10,0,0" />
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                        <Button Content="Speed test" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="SpeedTestRemotePcButton_Click"
+                                                                ToolTip="Local network speed between this PC and that PC, and that PC's internet speed." />
+                                                        <Button Content="Edit" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="EditRemotePcButton_Click" Margin="6,0,0,0" />
+                                                        <Button Content="Remove" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="RemoveRemotePcButton_Click" Margin="6,0,0,0" />
+                                                    </StackPanel>
                                                 </StackPanel>
                                             </Border>
                                         </DataTemplate>

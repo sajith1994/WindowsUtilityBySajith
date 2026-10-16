@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -110,6 +111,148 @@ public sealed class RemoteMonitorClient
         catch (JsonException)
         {
             return new RemoteStatsResult(RemoteStatsState.Error, null, "The PC sent an answer this version cannot read.");
+        }
+    }
+
+    // ---- Speed tests ---------------------------------------------------------------------------------------
+
+    private static readonly HttpClient LongHttp = new() { Timeout = Timeout.InfiniteTimeSpan };
+
+    /// <summary>Median round trip of five hello requests, in milliseconds.</summary>
+    public async Task<double> MeasureLatencyAsync(string host, int port, CancellationToken cancellationToken = default)
+    {
+        List<double> samples = new();
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+            if (await HelloAsync(host, port, cancellationToken) is null)
+            {
+                throw new InvalidOperationException("That PC answered, but it is not sharing its stats.");
+            }
+
+            samples.Add(watch.Elapsed.TotalMilliseconds);
+        }
+
+        samples.Sort();
+        return samples[samples.Count / 2];
+    }
+
+    /// <summary>Megabits per second while reading test data from the PC for <paramref name="duration"/>.</summary>
+    public async Task<double> MeasureLanDownloadAsync(RemotePcEntry pc, TimeSpan duration, CancellationToken cancellationToken = default)
+    {
+        await EnsureClockAsync(pc, cancellationToken);
+        using HttpRequestMessage request = Signed(HttpMethod.Get, pc, RemoteMonitoringProtocol.SpeedDownloadPath, "?mb=1024");
+        using HttpResponseMessage response = await LongHttp.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        ThrowIfFailed(response);
+        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        byte[] buffer = new byte[256 * 1024];
+        long total = 0;
+        System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+        int read;
+        while (watch.Elapsed < duration && (read = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            total += read;
+        }
+
+        return total * 8 / Math.Max(0.001, watch.Elapsed.TotalSeconds) / 1_000_000;
+    }
+
+    /// <summary>Megabits per second while sending test data to the PC for <paramref name="duration"/> (timed by that PC).</summary>
+    public async Task<double> MeasureLanUploadAsync(RemotePcEntry pc, TimeSpan duration, CancellationToken cancellationToken = default)
+    {
+        await EnsureClockAsync(pc, cancellationToken);
+        using HttpRequestMessage request = Signed(HttpMethod.Post, pc, RemoteMonitoringProtocol.SpeedUploadPath, string.Empty);
+        request.Content = new TimedUploadContent(duration);
+        using HttpResponseMessage response = await LongHttp.SendAsync(request, cancellationToken);
+        ThrowIfFailed(response);
+        RemoteUploadResult? result = JsonSerializer.Deserialize<RemoteUploadResult>(await response.Content.ReadAsStringAsync(cancellationToken), JsonOptions);
+        if (result is null || result.Bytes == 0)
+        {
+            throw new InvalidOperationException("That PC did not receive any test data.");
+        }
+
+        return result.Bytes * 8 / Math.Max(0.001, result.Milliseconds / 1000.0) / 1_000_000;
+    }
+
+    /// <summary>Asks the PC to measure its own internet speed (takes about 15 seconds).</summary>
+    public async Task<RemoteInternetSpeedResult> RunInternetSpeedTestAsync(RemotePcEntry pc, CancellationToken cancellationToken = default)
+    {
+        await EnsureClockAsync(pc, cancellationToken);
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(90));
+        using HttpRequestMessage request = Signed(HttpMethod.Get, pc, RemoteMonitoringProtocol.InternetSpeedPath, string.Empty);
+        using HttpResponseMessage response = await LongHttp.SendAsync(request, timeout.Token);
+        if (response.StatusCode != HttpStatusCode.Conflict)
+        {
+            ThrowIfFailed(response);
+        }
+
+        return JsonSerializer.Deserialize<RemoteInternetSpeedResult>(await response.Content.ReadAsStringAsync(timeout.Token), JsonOptions)
+            ?? new RemoteInternetSpeedResult { Error = "That PC sent an empty answer." };
+    }
+
+    private async Task EnsureClockAsync(RemotePcEntry pc, CancellationToken cancellationToken)
+    {
+        if (!_clockOffsets.ContainsKey(Key(pc.Host, pc.Port)) && await HelloAsync(pc.Host, pc.Port, cancellationToken) is null)
+        {
+            throw new InvalidOperationException("That PC answered, but it is not sharing its stats.");
+        }
+    }
+
+    private HttpRequestMessage Signed(HttpMethod method, RemotePcEntry pc, string path, string query)
+    {
+        long time = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + _clockOffsets.GetValueOrDefault(Key(pc.Host, pc.Port));
+        HttpRequestMessage request = new(method, BuildUri(pc.Host, pc.Port, path + query));
+        request.Headers.Add(RemoteMonitoringProtocol.TimeHeader, time.ToString());
+        request.Headers.Add(RemoteMonitoringProtocol.SignatureHeader, RemoteMonitoringProtocol.Sign(pc.PairingCode, time, path));
+        return request;
+    }
+
+    private static void ThrowIfFailed(HttpResponseMessage response)
+    {
+        switch (response.StatusCode)
+        {
+            case HttpStatusCode.OK:
+                return;
+            case HttpStatusCode.Unauthorized:
+                throw new InvalidOperationException("Wrong pairing code. Edit this PC and enter the code shown on it.");
+            case HttpStatusCode.TooManyRequests:
+                throw new InvalidOperationException("Too many wrong codes. That PC is ignoring this PC for a minute.");
+            case HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed:
+                throw new InvalidOperationException("That PC runs an older Windows Utility without speed tests. Update it to 2.0.65 or later.");
+            default:
+                throw new InvalidOperationException($"That PC answered with HTTP {(int)response.StatusCode}.");
+        }
+    }
+
+    /// <summary>Request body that keeps sending random 1 MB blocks until the time is up (chunked, no length).</summary>
+    private sealed class TimedUploadContent : HttpContent
+    {
+        private static readonly byte[] Block = CreateBlock();
+        private readonly TimeSpan _duration;
+
+        public TimedUploadContent(TimeSpan duration) => _duration = duration;
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+            while (watch.Elapsed < _duration)
+            {
+                await stream.WriteAsync(Block);
+            }
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+
+        private static byte[] CreateBlock()
+        {
+            byte[] block = new byte[1024 * 1024];
+            Random.Shared.NextBytes(block);
+            return block;
         }
     }
 

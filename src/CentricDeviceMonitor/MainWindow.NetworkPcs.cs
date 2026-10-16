@@ -22,7 +22,10 @@ public partial class MainWindow
     private readonly RemoteMonitorClient _remoteMonitorClient = new();
     private readonly ObservableCollection<RemotePcView> _remotePcViews = new();
     private readonly ConcurrentDictionary<string, string> _viewerNames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly RemoteAlertTracker _remoteAlertTracker = new();
+    private readonly List<RemoteAlert> _recentRemoteAlerts = new();
     private DispatcherTimer? _remotePcsTimer;
+    private bool _remotePcsPageVisible;
     private bool _pollingRemotePcs;
     private bool _loadingRemoteSharing;
     private bool _findingRemotePcs;
@@ -42,6 +45,14 @@ public partial class MainWindow
         _loadingRemoteSharing = false;
 
         _sharingCodeUnlocked = false;
+        _loadingRemoteSharing = true;
+        RemoteAlertsToggle.IsChecked = _appSettings.RemoteAlertsEnabled;
+        RemoteAlertOverheatCheck.IsChecked = _appSettings.RemoteAlertOverheat;
+        RemoteAlertDiskCheck.IsChecked = _appSettings.RemoteAlertDisk;
+        RemoteAlertMemoryCheck.IsChecked = _appSettings.RemoteAlertMemory;
+        RemoteAlertOfflineCheck.IsChecked = _appSettings.RemoteAlertOffline;
+        _loadingRemoteSharing = false;
+        UpdateRemoteAlertPanel();
         RemotePcsList.ItemsSource ??= _remotePcViews;
         SyncRemotePcViews();
         UpdateSharingPanel(resetCodeBox: true);
@@ -49,10 +60,27 @@ public partial class MainWindow
         _ = PollRemotePcsAsync();
     }
 
-    /// <summary>Polls every 5 seconds while the page is open, and stops when another page is shown.</summary>
-    private void SetRemotePcsPolling(bool active)
+    /// <summary>At startup: create the tiles and, when notifications are on, start checking in the background.</summary>
+    private void StartRemotePcMonitoring()
     {
-        if (!active)
+        SyncRemotePcViews();
+        UpdateRemotePollingTimer();
+    }
+
+    private void SetRemotePcsPolling(bool pageVisible)
+    {
+        _remotePcsPageVisible = pageVisible;
+        UpdateRemotePollingTimer();
+    }
+
+    /// <summary>
+    /// Every 5 seconds while the Network PCs page is open; otherwise every 30 seconds when problem notifications are
+    /// on (also while the dashboard is only in the notification area); otherwise not at all.
+    /// </summary>
+    private void UpdateRemotePollingTimer()
+    {
+        bool background = _appSettings.RemoteAlertsEnabled && _appSettings.RemotePcs.Count > 0;
+        if (!_remotePcsPageVisible && !background)
         {
             _remotePcsTimer?.Stop();
             return;
@@ -60,6 +88,12 @@ public partial class MainWindow
 
         _remotePcsTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Background,
             async (_, _) => await PollRemotePcsAsync(), Dispatcher);
+        TimeSpan interval = TimeSpan.FromSeconds(_remotePcsPageVisible ? 5 : 30);
+        if (_remotePcsTimer.Interval != interval)
+        {
+            _remotePcsTimer.Interval = interval;
+        }
+
         _remotePcsTimer.Start();
     }
 
@@ -81,10 +115,13 @@ public partial class MainWindow
 
     private async Task PollRemotePcsAsync()
     {
-        // Sharing status comes from the service snapshot, so keep it current even with no PCs added.
-        await RefreshSharingStatusAsync();
+        if (_remotePcsPageVisible)
+        {
+            // Sharing status comes from the service snapshot, so keep it current even with no PCs added.
+            await RefreshSharingStatusAsync();
+        }
 
-        if (_pollingRemotePcs || _remotePcViews.Count == 0 || !IsVisible || WindowState == WindowState.Minimized)
+        if (_pollingRemotePcs || _remotePcViews.Count == 0)
         {
             return;
         }
@@ -99,6 +136,13 @@ public partial class MainWindow
                 if (ReferenceEquals(entry, view.Entry))
                 {
                     view.Update(result);
+                    if (_appSettings.RemoteAlertsEnabled)
+                    {
+                        foreach (RemoteAlert alert in _remoteAlertTracker.Evaluate(entry, view.Title, result, _appSettings, DateTime.Now))
+                        {
+                            ShowRemoteAlert(alert);
+                        }
+                    }
                 }
             }));
         }
@@ -478,6 +522,7 @@ public partial class MainWindow
         await SaveRemoteSettingsAsync();
         ApplicationLogService.WriteMessage("Network PCs", $"Added {editor.Result.Host} to monitored PCs.");
         SyncRemotePcViews();
+        UpdateRemotePollingTimer();
         RemoveFromFoundList(new[] { editor.Result.Host });
         await PollRemotePcsAsync();
     }
@@ -520,7 +565,9 @@ public partial class MainWindow
         }
 
         _appSettings.RemotePcs.RemoveAll(pc => pc.Id == view.Entry.Id);
+        _remoteAlertTracker.Forget(view.Entry.Id);
         await SaveRemoteSettingsAsync();
+        UpdateRemotePollingTimer();
         ApplicationLogService.WriteMessage("Network PCs", $"Removed {view.Entry.Host} from monitored PCs.");
         SyncRemotePcViews();
     }
@@ -642,6 +689,7 @@ public partial class MainWindow
             await SaveRemoteSettingsAsync();
             ApplicationLogService.WriteMessage("Network PCs", $"Add all: {added.Count} added, {failed.Count} not added.");
             SyncRemotePcViews();
+            UpdateRemotePollingTimer();
             RemoveFromFoundList(added.Select(pc => pc.Address));
             StatusText.Text = $"{added.Count} PC{(added.Count == 1 ? "" : "s")} added.";
             if (failed.Count > 0)
@@ -666,6 +714,69 @@ public partial class MainWindow
             HashSet<string> remove = hosts.ToHashSet(StringComparer.OrdinalIgnoreCase);
             ShowFoundPcs(found.Where(pc => !remove.Contains(pc.Address)).ToList(), "Every PC found is added.");
         }
+    }
+
+    private void SpeedTestRemotePcButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: RemotePcView view })
+        {
+            new RemoteSpeedTestWindow(_remoteMonitorClient, view.Entry, view.Title) { Owner = this }.ShowDialog();
+        }
+    }
+
+    // ---- Problem notifications ---------------------------------------------------------------------------
+
+    private async void RemoteAlertSetting_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingRemoteSharing)
+        {
+            return;
+        }
+
+        _appSettings.RemoteAlertsEnabled = RemoteAlertsToggle.IsChecked == true;
+        _appSettings.RemoteAlertOverheat = RemoteAlertOverheatCheck.IsChecked == true;
+        _appSettings.RemoteAlertDisk = RemoteAlertDiskCheck.IsChecked == true;
+        _appSettings.RemoteAlertMemory = RemoteAlertMemoryCheck.IsChecked == true;
+        _appSettings.RemoteAlertOffline = RemoteAlertOfflineCheck.IsChecked == true;
+        await SaveRemoteSettingsAsync();
+        UpdateRemoteAlertPanel();
+        UpdateRemotePollingTimer();
+    }
+
+    private void UpdateRemoteAlertPanel()
+    {
+        RemoteAlertOptionsPanel.IsEnabled = _appSettings.RemoteAlertsEnabled;
+        RemoteAlertOptionsPanel.Opacity = _appSettings.RemoteAlertsEnabled ? 1 : 0.5;
+        RemoteAlertsNoteText.Text = !_appSettings.RemoteAlertsEnabled
+            ? "Off: problems still show on the tiles, but nothing is announced."
+            : _appSettings.DesktopNotificationsEnabled && _appSettings.TrayIconEnabled
+                ? "Checked every 30 seconds in the background (every 5 seconds while this page is open), also while the dashboard is only in the notification area. Each problem is announced once, and again only after it has cleared."
+                : "Desktop notifications or the notification-area icon are turned off in Settings, so problems are listed below and in the log instead of popping up.";
+        UpdateRecentRemoteAlertsText();
+    }
+
+    private void ShowRemoteAlert(RemoteAlert alert)
+    {
+        ApplicationLogService.WriteMessage("Network PCs alert", $"{alert.Title}: {alert.Message}");
+        _recentRemoteAlerts.Insert(0, alert);
+        if (_recentRemoteAlerts.Count > 5)
+        {
+            _recentRemoteAlerts.RemoveAt(_recentRemoteAlerts.Count - 1);
+        }
+
+        UpdateRecentRemoteAlertsText();
+        StatusText.Text = $"{alert.Title}. {alert.Message}";
+        if (_appSettings.DesktopNotificationsEnabled && _trayIcon is { Visible: true })
+        {
+            _trayIcon.ShowBalloonTip(8000, alert.Title, alert.Message,
+                alert.IsRecovery ? System.Windows.Forms.ToolTipIcon.Info : System.Windows.Forms.ToolTipIcon.Warning);
+        }
+    }
+
+    private void UpdateRecentRemoteAlertsText()
+    {
+        RecentRemoteAlertsText.Visibility = _recentRemoteAlerts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        RecentRemoteAlertsText.Text = "Recent: " + string.Join("\n", _recentRemoteAlerts.Select(alert => $"{alert.At:HH:mm}  {alert.Title}"));
     }
 
     private async Task SaveRemoteSettingsAsync()

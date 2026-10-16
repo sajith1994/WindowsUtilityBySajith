@@ -15,6 +15,18 @@ public static class RemoteMonitoringProtocol
     public const int DefaultPort = 47810;
     public const string HelloPath = "/wu/v1/hello";
     public const string StatsPath = "/wu/v1/stats";
+
+    /// <summary>GET ?mb=N: test data for the LAN download speed (this PC reading from the monitored PC).</summary>
+    public const string SpeedDownloadPath = "/wu/v1/speed/download";
+
+    /// <summary>POST: test data for the LAN upload speed (this PC sending to the monitored PC).</summary>
+    public const string SpeedUploadPath = "/wu/v1/speed/upload";
+
+    /// <summary>GET: the monitored PC measures its own internet speed and reports it.</summary>
+    public const string InternetSpeedPath = "/wu/v1/speed/internet";
+
+    /// <summary>Paths that need a signed request.</summary>
+    public static readonly string[] SignedPaths = { StatsPath, SpeedDownloadPath, SpeedUploadPath, InternetSpeedPath };
     public const string TimeHeader = "X-WU-Time";
     public const string SignatureHeader = "X-WU-Signature";
     public const string FirewallRuleName = "Windows Utility remote monitoring";
@@ -128,6 +140,23 @@ public sealed class RemoteDiskInfo
     public string Format { get; set; } = string.Empty;
     public long TotalBytes { get; set; }
     public long FreeBytes { get; set; }
+}
+
+/// <summary>What the monitored PC received during a LAN upload test.</summary>
+public sealed class RemoteUploadResult
+{
+    public long Bytes { get; set; }
+    public long Milliseconds { get; set; }
+}
+
+/// <summary>The monitored PC's own internet speed.</summary>
+public sealed class RemoteInternetSpeedResult
+{
+    public double? DownloadMbps { get; set; }
+    public double? UploadMbps { get; set; }
+    public double? LatencyMs { get; set; }
+    public string Server { get; set; } = string.Empty;
+    public string Error { get; set; } = string.Empty;
 }
 
 /// <summary>A PC that has read this PC's stats with the current pairing code.</summary>

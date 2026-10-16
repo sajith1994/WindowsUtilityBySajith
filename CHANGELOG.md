@@ -260,6 +260,25 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.65] - 2026-10-16
+
+### Added
+- **Speed test for monitored PCs** (Speed test on each Network PCs tile):
+  - **Local network:** response time, then 6 seconds of data each way between this PC and that PC.
+  - **Internet on that PC:** the other PC tests its own connection against Cloudflare's speed test (latency,
+    download, upload) and reports back. Results are written to the application log.
+- **Notifications for problems on monitored PCs**, with a switch and a choice of problems: overheating (above that
+  PC's own alert temperature for over a minute), a drive nearly full (under 10% free) or full (under 2% or 1 GB),
+  memory over 95% for over a minute, and a PC going offline for over a minute (and coming back). Checked every
+  30 seconds in the background, also while the dashboard is only in the notification area; each problem is
+  announced once and again only after it has cleared. The last few alerts are listed on the page.
+
+### Fixed
+- **"Show or change" and "Add all" crashed the app**: their code prompt used a button style that only exists in the
+  main window.
+- Text that was cut off: the temperature details on the Network PCs tiles now have their own line, tile names and
+  Windows versions wrap instead of being shortened, and the speed test labels wrap.
+- Password boxes follow the theme (the code prompt was bright white in dark mode).
 ## [2.0.64] - 2026-10-16
 
 ### Added

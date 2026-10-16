@@ -150,16 +150,18 @@ internal sealed class RemoteStatsServer : IDisposable
                 return;
             }
 
-            _ = Task.Run(() => Handle(context));
+            _ = Task.Run(() => HandleAsync(context));
         }
     }
 
-    private void Handle(HttpListenerContext context)
+    private async Task HandleAsync(HttpListenerContext context)
     {
         try
         {
             string path = context.Request.Url?.AbsolutePath ?? string.Empty;
-            if (!string.Equals(context.Request.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase))
+            string method = context.Request.HttpMethod;
+            bool isUpload = path.Equals(RemoteMonitoringProtocol.SpeedUploadPath, StringComparison.OrdinalIgnoreCase);
+            if (!string.Equals(method, isUpload ? "POST" : "GET", StringComparison.OrdinalIgnoreCase))
             {
                 Respond(context, 405, new { error = "method" });
                 return;
@@ -176,7 +178,8 @@ internal sealed class RemoteStatsServer : IDisposable
                 return;
             }
 
-            if (!path.Equals(RemoteMonitoringProtocol.StatsPath, StringComparison.OrdinalIgnoreCase))
+            string? signedPath = RemoteMonitoringProtocol.SignedPaths.FirstOrDefault(known => known.Equals(path, StringComparison.OrdinalIgnoreCase));
+            if (signedPath is null)
             {
                 Respond(context, 404, new { error = "not-found" });
                 return;
@@ -193,7 +196,7 @@ internal sealed class RemoteStatsServer : IDisposable
                     _code,
                     context.Request.Headers[RemoteMonitoringProtocol.TimeHeader],
                     context.Request.Headers[RemoteMonitoringProtocol.SignatureHeader],
-                    RemoteMonitoringProtocol.StatsPath,
+                    signedPath,
                     DateTimeOffset.UtcNow))
             {
                 RecordFailure(caller);
@@ -203,7 +206,25 @@ internal sealed class RemoteStatsServer : IDisposable
 
             _failures.TryRemove(caller, out _);
             RecordViewer(caller);
-            Respond(context, 200, BuildPayload());
+            switch (signedPath)
+            {
+                case RemoteMonitoringProtocol.StatsPath:
+                    Respond(context, 200, BuildPayload());
+                    break;
+                case RemoteMonitoringProtocol.SpeedDownloadPath:
+                    await SendSpeedTestDataAsync(context);
+                    break;
+                case RemoteMonitoringProtocol.SpeedUploadPath:
+                    await ReceiveSpeedTestDataAsync(context);
+                    break;
+                case RemoteMonitoringProtocol.InternetSpeedPath:
+                    await RunInternetSpeedTestAsync(context);
+                    break;
+            }
+        }
+        catch (HttpListenerException)
+        {
+            // The other PC closed the connection (normal at the end of a timed speed test).
         }
         catch (Exception exception)
         {
@@ -218,6 +239,74 @@ internal sealed class RemoteStatsServer : IDisposable
         }
     }
 
+    /// <summary>Streams test data until the requested size is sent or the other PC stops reading (it times itself).</summary>
+    private static async Task SendSpeedTestDataAsync(HttpListenerContext context)
+    {
+        int megabytes = int.TryParse(context.Request.QueryString["mb"], out int requested) ? Math.Clamp(requested, 1, 1024) : 100;
+        byte[] block = SpeedTestBlock.Value;
+        context.Response.StatusCode = 200;
+        context.Response.ContentType = "application/octet-stream";
+        context.Response.ContentLength64 = (long)megabytes * block.Length;
+        Stream output = context.Response.OutputStream;
+        try
+        {
+            for (int index = 0; index < megabytes; index++)
+            {
+                await output.WriteAsync(block);
+            }
+
+            context.Response.Close();
+        }
+        catch (Exception exception) when (exception is HttpListenerException or IOException or ObjectDisposedException)
+        {
+            context.Response.Abort();
+        }
+    }
+
+    /// <summary>Reads the upload to the end and reports how much arrived and how long it took on this side.</summary>
+    private static async Task ReceiveSpeedTestDataAsync(HttpListenerContext context)
+    {
+        byte[] buffer = new byte[256 * 1024];
+        long total = 0;
+        Stopwatch watch = Stopwatch.StartNew();
+        Stream input = context.Request.InputStream;
+        int read;
+        while ((read = await input.ReadAsync(buffer)) > 0)
+        {
+            total += read;
+        }
+
+        Respond(context, 200, new RemoteUploadResult { Bytes = total, Milliseconds = watch.ElapsedMilliseconds });
+    }
+
+    /// <summary>Measures this PC's own internet speed against Cloudflare's speed test service.</summary>
+    private async Task RunInternetSpeedTestAsync(HttpListenerContext context)
+    {
+        if (!await _internetTestGate.WaitAsync(0))
+        {
+            Respond(context, 409, new RemoteInternetSpeedResult { Error = "An internet speed test is already running on this PC." });
+            return;
+        }
+
+        try
+        {
+            Respond(context, 200, await InternetSpeedTest.RunAsync());
+        }
+        finally
+        {
+            _internetTestGate.Release();
+        }
+    }
+
+    private static readonly Lazy<byte[]> SpeedTestBlock = new(() =>
+    {
+        // Random bytes so nothing along the way can compress the test data.
+        byte[] block = new byte[1024 * 1024];
+        Random.Shared.NextBytes(block);
+        return block;
+    });
+
+    private readonly SemaphoreSlim _internetTestGate = new(1, 1);
     private RemoteStatsPayload BuildPayload()
     {
         BackgroundServiceSnapshot? snapshot = _snapshotProvider();

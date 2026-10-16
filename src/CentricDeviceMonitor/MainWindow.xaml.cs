@@ -181,6 +181,7 @@ public partial class MainWindow : Window
         }
 
         _appSettings = await _settingsService.LoadAsync();
+        StartRemotePcMonitoring();
         await ReloadCpuTemperatureLogsAsync();
 
         _appSettings.PingIntervalSeconds = NormalizePingInterval(_appSettings.PingIntervalSeconds);
