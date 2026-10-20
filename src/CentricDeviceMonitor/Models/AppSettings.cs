@@ -85,6 +85,9 @@ public sealed class AppSettings
 
     public bool RemoteAlertOffline { get; set; } = true;
 
+    /// <summary>Antivirus or firewall off, or no Windows update for 30 days, on a monitored PC.</summary>
+    public bool RemoteAlertSecurity { get; set; } = true;
+
     /// <summary>PCs monitored from this PC (Network PCs page).</summary>
     public List<RemotePcEntry> RemotePcs { get; set; } = new();
 }

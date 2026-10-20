@@ -139,6 +139,9 @@ public sealed class RemoteStatsPayload
 
     public List<RemoteDiskInfo> Disks { get; set; } = new();
 
+    /// <summary>Windows Update, antivirus and firewall state (null from PCs on 2.0.68 or older, or before the first check).</summary>
+    public RemoteSecurityInfo? Security { get; set; }
+
     /// <summary>PC maker and model, e.g. "LENOVO" and "ThinkPad X1 Carbon Gen 9 (20XW005JUK)".</summary>
     public string SystemManufacturer { get; set; } = string.Empty;
     public string SystemModel { get; set; } = string.Empty;
@@ -196,6 +199,33 @@ public sealed class NetworkActivityInfo
     public double LinkBitsPerSec { get; set; }
 }
 
+/// <summary>Windows Update, antivirus and firewall state of a monitored PC.</summary>
+public sealed class RemoteSecurityInfo
+{
+    public DateTime CheckedUtc { get; set; }
+
+    /// <summary>Newest successfully installed update, definition updates excluded.</summary>
+    public DateTime? LastUpdateInstalledUtc { get; set; }
+    public string LastUpdateTitle { get; set; } = string.Empty;
+
+    /// <summary>Updates waiting to install, from Windows Update's last scan (null when it could not be read).</summary>
+    public int? PendingUpdates { get; set; }
+    public bool RestartRequired { get; set; }
+
+    public string AntivirusName { get; set; } = string.Empty;
+    public bool? AntivirusOn { get; set; }
+    public bool? RealTimeProtectionOn { get; set; }
+    public DateTime? DefinitionsUpdatedUtc { get; set; }
+
+    /// <summary>Third-party antivirus: whether Security Center reports its definitions as current.</summary>
+    public bool? DefinitionsUpToDate { get; set; }
+    public DateTime? LastScanUtc { get; set; }
+
+    public bool? FirewallOn { get; set; }
+
+    /// <summary>Profiles with the firewall off, e.g. "Public".</summary>
+    public string FirewallOffProfiles { get; set; } = string.Empty;
+}
 /// <summary>Answer to an update request.</summary>
 public sealed class RemoteUpdateResult
 {

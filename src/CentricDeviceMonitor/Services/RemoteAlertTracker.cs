@@ -62,6 +62,20 @@ public sealed class RemoteAlertTracker
                 $"{name} is running out of memory",
                 $"Memory at {stats.RamUsagePercent:0}% for over a minute ({RemotePcView.FormatGb(stats.TotalMemoryBytes - Math.Min(stats.AvailableMemoryBytes, stats.TotalMemoryBytes))} of {RemotePcView.FormatGb(stats.TotalMemoryBytes)} used).");
 
+            if (stats.Security is { } security)
+            {
+                bool securityAlerts = settings.RemoteAlertSecurity;
+                Raise("av-off", securityAlerts && (security.AntivirusOn == false || security.RealTimeProtectionOn == false), false,
+                    $"{name}: antivirus is off",
+                    security.AntivirusOn == false
+                        ? $"{(security.AntivirusName is { Length: > 0 } av && av != "No antivirus found" ? av : "No antivirus")} is not protecting this PC."
+                        : $"{security.AntivirusName} real-time protection is turned off.");
+                Raise("fw-off", securityAlerts && security.FirewallOn == false, false,
+                    $"{name}: firewall is off", $"Windows Firewall is off for: {security.FirewallOffProfiles}.");
+                Raise("updates-stale", securityAlerts && RemotePcView.UpdatesStale(security), false,
+                    $"{name}: Windows has not updated for over {RemotePcView.UpdatesStaleDays} days",
+                    $"Last update installed {security.LastUpdateInstalledUtc?.ToLocalTime():d MMM yyyy}.");
+            }
             foreach (RemoteDiskInfo disk in stats.Disks.Where(disk => disk.TotalBytes > 0))
             {
                 bool full = disk.FreeBytes < disk.TotalBytes * DiskFullFreeFraction || disk.FreeBytes < DiskFullFreeBytes;

@@ -260,6 +260,18 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.69] - 2026-10-20
+
+### Added
+- **Security status on Network PCs tiles:** when Windows last installed an update (hover for its name), how many
+  updates are waiting and whether a restart is needed to finish them; the antivirus (Microsoft Defender or the
+  installed third-party product), whether real-time protection is on, how old its definitions are and when it last
+  scanned; and whether Windows Firewall is on. Updates in amber when Windows has not updated for 30 days, a restart
+  is waiting or definitions are over a week old; protection in red (and the tile marked "At risk") when the
+  antivirus, real-time protection or the firewall is off. Checked by the monitored PC every 30 minutes without
+  changing anything (pending updates come from Windows Update's own last scan). The monitored PC needs 2.0.69.
+- **Security notifications** (new choice under "Notify me when a monitored PC has a problem"): antivirus or
+  real-time protection off, firewall off, or no Windows update for over 30 days.
 ## [2.0.68] - 2026-10-20
 
 ### Added

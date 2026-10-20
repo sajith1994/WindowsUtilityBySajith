@@ -51,6 +51,7 @@ public partial class MainWindow
         RemoteAlertDiskCheck.IsChecked = _appSettings.RemoteAlertDisk;
         RemoteAlertMemoryCheck.IsChecked = _appSettings.RemoteAlertMemory;
         RemoteAlertOfflineCheck.IsChecked = _appSettings.RemoteAlertOffline;
+        RemoteAlertSecurityCheck.IsChecked = _appSettings.RemoteAlertSecurity;
         _loadingRemoteSharing = false;
         UpdateRemoteAlertPanel();
         RemotePcsList.ItemsSource ??= _remotePcViews;
@@ -822,6 +823,7 @@ public partial class MainWindow
         _appSettings.RemoteAlertDisk = RemoteAlertDiskCheck.IsChecked == true;
         _appSettings.RemoteAlertMemory = RemoteAlertMemoryCheck.IsChecked == true;
         _appSettings.RemoteAlertOffline = RemoteAlertOfflineCheck.IsChecked == true;
+        _appSettings.RemoteAlertSecurity = RemoteAlertSecurityCheck.IsChecked == true;
         await SaveRemoteSettingsAsync();
         UpdateRemoteAlertPanel();
         UpdateRemotePollingTimer();

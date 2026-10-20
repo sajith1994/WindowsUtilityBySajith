@@ -35,7 +35,7 @@ public sealed class RemotePcView : INotifyPropertyChanged
     {
         null => "Checking",
         RemoteStatsState.Online when Stats is { ReadingsFresh: false } => "Warning",
-        RemoteStatsState.Online when IsHot || Disks.Any(disk => disk.IsLow) => "Warning",
+        RemoteStatsState.Online when IsHot || Disks.Any(disk => disk.IsLow) || ProtectionAtRisk => "Warning",
         RemoteStatsState.Online => "Online",
         RemoteStatsState.WrongCode or RemoteStatsState.NotSharing => "Warning",
         _ => "Offline"
@@ -46,6 +46,7 @@ public sealed class RemotePcView : INotifyPropertyChanged
         null => "Checking",
         RemoteStatsState.Online when IsHot => "Hot",
         RemoteStatsState.Online when Disks.Any(disk => disk.IsLow) => "Disk low",
+        RemoteStatsState.Online when ProtectionAtRisk => "At risk",
         RemoteStatsState.Online => "Online",
         RemoteStatsState.WrongCode => "Code",
         RemoteStatsState.NotSharing => "Not sharing",
@@ -152,6 +153,114 @@ public sealed class RemotePcView : INotifyPropertyChanged
 
     /// <summary>Battery worn below 60% of its design capacity.</summary>
     public bool BatteryWorn => Stats?.BatteryHealthPercent is < 60;
+    // ---- Security (Windows Update, antivirus, firewall) ----
+
+    public const int UpdatesStaleDays = 30;
+
+    public RemoteSecurityInfo? Security => Stats?.Security;
+
+    public bool HasSecurity => Security is not null;
+
+    /// <summary>Antivirus or real-time protection or firewall off.</summary>
+    public bool ProtectionAtRisk => Security is { } security
+        && (security.AntivirusOn == false || security.RealTimeProtectionOn == false || security.FirewallOn == false);
+
+    /// <summary>No Windows update for a month, or a restart waiting to finish updates, or old definitions.</summary>
+    public bool UpdatesNeedAttention => Security is { } security
+        && (UpdatesStale(security) || security.RestartRequired || DefinitionsStale(security));
+
+    internal static bool UpdatesStale(RemoteSecurityInfo security) =>
+        security.LastUpdateInstalledUtc is DateTime installed && DateTime.UtcNow - installed > TimeSpan.FromDays(UpdatesStaleDays);
+
+    private static bool DefinitionsStale(RemoteSecurityInfo security) =>
+        security.DefinitionsUpToDate == false
+        || security.DefinitionsUpdatedUtc is DateTime updated && DateTime.UtcNow - updated > TimeSpan.FromDays(7);
+
+    /// <summary>"Updated 6 days ago • 2 pending • restart needed".</summary>
+    public string UpdatesText
+    {
+        get
+        {
+            if (Security is not { } security)
+            {
+                return string.Empty;
+            }
+
+            List<string> parts = new()
+            {
+                security.LastUpdateInstalledUtc is DateTime installed ? $"Windows updated {Ago(installed)}" : "Last Windows update unknown"
+            };
+            if (security.PendingUpdates is > 0)
+            {
+                parts.Add($"{security.PendingUpdates} pending");
+            }
+
+            if (security.RestartRequired)
+            {
+                parts.Add("restart needed");
+            }
+
+            return string.Join("  •  ", parts);
+        }
+    }
+
+    public string UpdatesToolTip => Security?.LastUpdateTitle is { Length: > 0 } title ? $"Last installed: {title}" : string.Empty;
+
+    /// <summary>"Microsoft Defender on • definitions today • scanned yesterday • firewall on".</summary>
+    public string ProtectionText
+    {
+        get
+        {
+            if (Security is not { } security)
+            {
+                return string.Empty;
+            }
+
+            List<string> parts = new();
+            if (security.AntivirusOn == true)
+            {
+                parts.Add(security.RealTimeProtectionOn == false ? $"{security.AntivirusName} on, real-time protection OFF" : $"{security.AntivirusName} on");
+                if (security.DefinitionsUpdatedUtc is DateTime definitions)
+                {
+                    parts.Add($"definitions {Ago(definitions)}");
+                }
+                else if (security.DefinitionsUpToDate == false)
+                {
+                    parts.Add("definitions out of date");
+                }
+
+                if (security.LastScanUtc is DateTime scan)
+                {
+                    parts.Add($"scanned {Ago(scan)}");
+                }
+            }
+            else
+            {
+                parts.Add(security.AntivirusName is { Length: > 0 } name && name != "No antivirus found" ? $"{name} OFF" : "No antivirus running");
+            }
+
+            if (security.FirewallOn == true)
+            {
+                parts.Add("firewall on");
+            }
+            else if (security.FirewallOn == false)
+            {
+                parts.Add($"firewall OFF ({security.FirewallOffProfiles})");
+            }
+
+            return string.Join("  •  ", parts);
+        }
+    }
+
+    private static string Ago(DateTime utc)
+    {
+        TimeSpan age = DateTime.UtcNow - utc;
+        DateTime local = utc.ToLocalTime();
+        return local.Date == DateTime.Today ? "today"
+            : local.Date == DateTime.Today.AddDays(-1) ? "yesterday"
+            : age.TotalDays < 60 ? $"{(int)age.TotalDays} days ago"
+            : $"on {local:d MMM yyyy}";
+    }
     public double RamPercent => Stats?.RamUsagePercent ?? 0;
 
     public string RamText => Stats is null ? "--" : $"{Stats.RamUsagePercent:0}%";

@@ -1607,6 +1607,7 @@
                                             <CheckBox x:Name="RemoteAlertDiskCheck" Content="Drive nearly full (under 10% free) or full" FontSize="11" Margin="0,0,18,6" Checked="RemoteAlertSetting_Changed" Unchecked="RemoteAlertSetting_Changed" />
                                             <CheckBox x:Name="RemoteAlertMemoryCheck" Content="Memory over 95%" FontSize="11" Margin="0,0,18,6" Checked="RemoteAlertSetting_Changed" Unchecked="RemoteAlertSetting_Changed" />
                                             <CheckBox x:Name="RemoteAlertOfflineCheck" Content="PC goes offline (and when it is back)" FontSize="11" Margin="0,0,18,6" Checked="RemoteAlertSetting_Changed" Unchecked="RemoteAlertSetting_Changed" />
+                                            <CheckBox x:Name="RemoteAlertSecurityCheck" Content="Security (antivirus or firewall off, no Windows updates for 30 days)" FontSize="11" Margin="0,0,18,6" Checked="RemoteAlertSetting_Changed" Unchecked="RemoteAlertSetting_Changed" />
                                         </WrapPanel>
                                         <TextBlock x:Name="RemoteAlertsNoteText" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
                                         <TextBlock x:Name="RecentRemoteAlertsText" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed" />
@@ -1736,7 +1737,40 @@
                                                             <TextBlock Grid.Column="2" Text="{Binding RamText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                                         </Grid>
                                                         <TextBlock Text="{Binding RamDetail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="44,1,0,0" />
-                                                        <StackPanel Margin="0,6,0,0">
+                                                        <Grid Margin="0,6,0,0">
+                                                            <Grid.Style>
+                                                                <Style TargetType="Grid">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasSecurity}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Grid.Style>
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Security" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
+                                                            <StackPanel Grid.Column="1">
+                                                                <TextBlock Text="{Binding UpdatesText}" ToolTip="{Binding UpdatesToolTip}" FontSize="11" TextWrapping="Wrap">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding UpdatesNeedAttention}" Value="True"><Setter Property="Foreground" Value="{DynamicResource WarningBrush}" /></DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding ProtectionText}" FontSize="11" TextWrapping="Wrap">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding ProtectionAtRisk}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </StackPanel>
+                                                        </Grid>                                                        <StackPanel Margin="0,6,0,0">
                                                             <StackPanel.Style>
                                                                 <Style TargetType="StackPanel">
                                                                     <Setter Property="Visibility" Value="Collapsed" />

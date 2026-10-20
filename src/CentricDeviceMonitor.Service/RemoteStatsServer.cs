@@ -312,6 +312,7 @@ internal sealed class RemoteStatsServer : IDisposable
     private readonly SemaphoreSlim _internetTestGate = new(1, 1);
     private readonly RemoteUpdater _updater = new();
     private readonly DeviceDetailsProvider _deviceDetails = new();
+    private readonly SecurityStatusProvider _security = new();
     private RemoteStatsPayload BuildPayload()
     {
         BackgroundServiceSnapshot? snapshot = _snapshotProvider();
@@ -349,6 +350,7 @@ internal sealed class RemoteStatsServer : IDisposable
         try
         {
             _deviceDetails.Fill(payload);
+            payload.Security = _security.Current;
         }
         catch (Exception exception)
         {
