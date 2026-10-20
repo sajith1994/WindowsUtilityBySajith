@@ -1587,7 +1587,8 @@
                                         <TextBlock x:Name="RemotePcsCountText" Text="" Style="{StaticResource InfoLabelStyle}" Margin="10,1,0,0" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <Button x:Name="UpdateAllRemotePcsButton" Content="Update all" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="UpdateAllRemotePcsButton_Click" Margin="0,0,8,0"
+                                        <Button Content="Export report" Tag="&#xE9F9;" Style="{StaticResource IconCompactButton}" Click="ExportInventoryReportButton_Click" Margin="0,0,8,0"
+                                                ToolTip="Save an inventory of every monitored PC: a printable report (save it as PDF from the browser) or a CSV file for Excel." />                                        <Button x:Name="UpdateAllRemotePcsButton" Content="Update all" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="UpdateAllRemotePcsButton_Click" Margin="0,0,8,0"
                                                 ToolTip="Ask every monitored PC with an older Windows Utility to update itself to the latest release." />                                        <Button x:Name="FindRemotePcsButton" Content="Find PCs" Tag="&#xE721;" Style="{StaticResource IconCompactButton}" Click="FindRemotePcsButton_Click" Margin="0,0,8,0"
                                                 ToolTip="Search this network for PCs running Windows Utility with sharing turned on." />
                                         <Button Content="Add PC" Tag="&#xE710;" Style="{StaticResource IconCompactPrimaryButton}" Click="AddRemotePcButton_Click" Margin="0"

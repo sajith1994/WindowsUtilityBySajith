@@ -18,6 +18,14 @@ public sealed class RemotePcView : INotifyPropertyChanged
 
     public RemoteStatsPayload? Stats => _result?.Stats;
 
+    /// <summary>The last readings received, kept while the PC is offline (used by the inventory report).</summary>
+    public RemoteStatsPayload? LastKnownStats { get; private set; }
+
+    public DateTime? LastSeen => _lastSeen;
+
+    public bool IsOnline => _result?.State == RemoteStatsState.Online;
+
+    public string StateMessage => _result?.Message ?? "Not checked yet";
     public bool HasStats => Stats is not null;
 
     public string Title => !string.IsNullOrWhiteSpace(Entry.DisplayName) ? Entry.DisplayName : Stats?.MachineName ?? Entry.Host;
@@ -323,6 +331,7 @@ public sealed class RemotePcView : INotifyPropertyChanged
         if (result.State == RemoteStatsState.Online)
         {
             _lastSeen = DateTime.Now;
+            LastKnownStats = result.Stats;
             if (_updateRequested && (!string.IsNullOrEmpty(result.Stats?.UpdateStatus) || !IsOutdatedFor(result.Stats)))
             {
                 _updateRequested = false;

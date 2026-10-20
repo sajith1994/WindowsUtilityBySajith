@@ -260,6 +260,18 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.70] - 2026-10-20
+
+### Added
+- **PC inventory report** (Network PCs > Monitored PCs > Export report), one row per monitored PC: name, status and
+  last seen, address, maker and model, Windows and Windows Utility versions, uptime, processor, CPU load and
+  temperature, RAM, every drive with free space, battery charge, health, capacity and cycles, last Windows update,
+  pending updates, restart needed, antivirus, real-time protection, definition age and firewall.
+  - **Printable report (.html)** opens in the browser with a summary (online, at risk, no updates for 30 days, drives
+    under 10% free, worn batteries, older Windows Utility) and problems highlighted; print it to "Microsoft Print to
+    PDF" for a PDF, laid out on landscape A4.
+  - **Spreadsheet (.csv)** opens in Excel.
+  - Offline PCs are included with the last readings received and when they were last seen.
 ## [2.0.69] - 2026-10-20
 
 ### Added

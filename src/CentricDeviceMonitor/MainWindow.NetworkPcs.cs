@@ -717,6 +717,47 @@ public partial class MainWindow
         }
     }
 
+    // ---- Inventory report ---------------------------------------------------------------------------------
+
+    private void ExportInventoryReportButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_remotePcViews.Count == 0)
+        {
+            WpfMessageBox.Show(this, "Add PCs to monitor first; the report lists every monitored PC.", "Export report", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        Microsoft.Win32.SaveFileDialog dialog = new()
+        {
+            Title = "Export PC inventory report",
+            FileName = $"PC inventory {DateTime.Now:yyyy-MM-dd}",
+            Filter = "Printable report (*.html)|*.html|Spreadsheet for Excel (*.csv)|*.csv",
+            DefaultExt = ".html",
+            AddExtension = true
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            bool csv = dialog.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
+            string content = csv
+                ? InventoryReportService.BuildCsv(_remotePcViews)
+                : InventoryReportService.BuildHtml(_remotePcViews, Environment.MachineName);
+            // UTF-8 with BOM so Excel shows accented names and °C correctly.
+            System.IO.File.WriteAllText(dialog.FileName, content, new System.Text.UTF8Encoding(true));
+            ApplicationLogService.WriteMessage("Network PCs", $"Inventory report saved to {dialog.FileName}.");
+            StatusText.Text = $"Inventory report saved: {dialog.FileName}";
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dialog.FileName) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Export inventory report", exception);
+            WpfMessageBox.Show(this, $"The report could not be saved: {exception.Message}", "Export report", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
     // ---- Updating monitored PCs -------------------------------------------------------------------------
 
     private async void UpdateRemotePcButton_Click(object sender, RoutedEventArgs e)
