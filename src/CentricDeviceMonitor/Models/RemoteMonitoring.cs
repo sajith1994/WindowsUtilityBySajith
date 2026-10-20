@@ -139,6 +139,20 @@ public sealed class RemoteStatsPayload
 
     public List<RemoteDiskInfo> Disks { get; set; } = new();
 
+    /// <summary>PC maker and model, e.g. "LENOVO" and "ThinkPad X1 Carbon Gen 9 (20XW005JUK)".</summary>
+    public string SystemManufacturer { get; set; } = string.Empty;
+    public string SystemModel { get; set; } = string.Empty;
+
+    public bool HasBattery { get; set; }
+    public int? BatteryPercent { get; set; }
+
+    /// <summary>"Charging", "Plugged in" or "On battery".</summary>
+    public string BatteryState { get; set; } = string.Empty;
+    public int? BatteryRuntimeMinutes { get; set; }
+    public double? BatteryDesignMWh { get; set; }
+    public double? BatteryFullMWh { get; set; }
+    public double? BatteryHealthPercent { get; set; }
+    public uint? BatteryCycleCount { get; set; }
     /// <summary>Progress of an update started from another PC ("Downloading 2.0.68...", "Update failed: ..."); empty otherwise.</summary>
     public string UpdateStatus { get; set; } = string.Empty;
 

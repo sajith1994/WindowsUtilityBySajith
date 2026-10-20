@@ -99,6 +99,59 @@ public sealed class RemotePcView : INotifyPropertyChanged
         }
     }
 
+    /// <summary>"Dell Inc. Latitude 5420"; empty when the PC does not report it (or runs 2.0.67 or older).</summary>
+    public string ModelText
+    {
+        get
+        {
+            string maker = Stats?.SystemManufacturer.Trim() ?? string.Empty;
+            string model = Stats?.SystemModel.Trim() ?? string.Empty;
+            return model.StartsWith(maker, StringComparison.OrdinalIgnoreCase) ? model : $"{maker} {model}".Trim();
+        }
+    }
+
+    public bool HasModel => ModelText.Length > 0;
+
+    public bool HasBattery => Stats?.HasBattery == true;
+
+    public double BatteryPercent => Stats?.BatteryPercent ?? 0;
+
+    public string BatteryText => Stats?.BatteryPercent is int percent ? $"{percent}%" : "--";
+
+    /// <summary>"On battery • 2 h 10 m left • 49.1 of 57.0 Wh (86% health) • 312 cycles".</summary>
+    public string BatteryDetail
+    {
+        get
+        {
+            if (Stats is not { HasBattery: true } stats)
+            {
+                return string.Empty;
+            }
+
+            List<string> parts = new() { stats.BatteryState };
+            if (stats.BatteryRuntimeMinutes is int minutes)
+            {
+                parts.Add(minutes >= 60 ? $"{minutes / 60} h {minutes % 60} m left" : $"{minutes} m left");
+            }
+
+            if (stats.BatteryDesignMWh is double design)
+            {
+                parts.Add(stats.BatteryFullMWh is double full
+                    ? $"{full / 1000:0.0} of {design / 1000:0.0} Wh ({stats.BatteryHealthPercent:0}% health)"
+                    : $"{design / 1000:0.0} Wh design");
+            }
+
+            if (stats.BatteryCycleCount is uint cycles)
+            {
+                parts.Add($"{cycles} cycles");
+            }
+
+            return string.Join("  •  ", parts.Where(part => part.Length > 0));
+        }
+    }
+
+    /// <summary>Battery worn below 60% of its design capacity.</summary>
+    public bool BatteryWorn => Stats?.BatteryHealthPercent is < 60;
     public double RamPercent => Stats?.RamUsagePercent ?? 0;
 
     public string RamText => Stats is null ? "--" : $"{Stats.RamUsagePercent:0}%";

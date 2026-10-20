@@ -29,6 +29,22 @@
                         <TextBlock Text="Made for IT technicians by an IT technician." FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" />
                     </Border>
 
+                    <!-- Share: the official installer and release page, to pass on to others. -->
+                    <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="Share Windows Utility" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
+                            <TextBlock Text="Save the latest official installer to your Downloads folder to copy to a USB drive or send to a friend, or share the download page. The installer is downloaded from the official GitHub release and checked against its published checksum."
+                                       Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,10" />
+                            <WrapPanel>
+                                <Button x:Name="DownloadInstallerButton" Content="Download installer" Tag="&#xE896;" Style="{StaticResource IconCompactPrimaryButton}" Click="DownloadInstallerButton_Click" Margin="0,0,8,6" />
+                                <Button Content="Open GitHub page" Tag="&#xE774;" Style="{StaticResource IconCompactButton}" Click="OpenReleasePageButton_Click" Margin="0,0,8,6" />
+                                <Button Content="Copy link" Tag="&#xE8C8;" Style="{StaticResource IconCompactButton}" Click="CopyReleaseLinkButton_Click" Margin="0,0,8,6" />
+                            </WrapPanel>
+                            <ProgressBar x:Name="DownloadInstallerProgress" Height="6" Maximum="1" Margin="0,4,0,0" Visibility="Collapsed" />
+                            <TextBlock x:Name="ShareStatusText" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+
                     <TextBlock Text="Network scanner &amp; managed devices" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
                     <TextBlock Text="• Local IPv4 subnet scanner with responsive background scanning and multi-select import&#x0a;• Managed-device live status is visible directly in Network Center; the scanner window handles discovery and address management&#x0a;• Manual add/edit/remove by IPv4 address, hostname/MAC discovery where available&#x0a;• Configurable automatic ping monitoring with next-test countdown&#x0a;• Incident-based outage/recovery logs with downtime and active duration"
                                TextWrapping="Wrap" Margin="0,4,0,12" />

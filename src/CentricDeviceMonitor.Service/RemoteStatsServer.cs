@@ -311,6 +311,7 @@ internal sealed class RemoteStatsServer : IDisposable
 
     private readonly SemaphoreSlim _internetTestGate = new(1, 1);
     private readonly RemoteUpdater _updater = new();
+    private readonly DeviceDetailsProvider _deviceDetails = new();
     private RemoteStatsPayload BuildPayload()
     {
         BackgroundServiceSnapshot? snapshot = _snapshotProvider();
@@ -343,6 +344,15 @@ internal sealed class RemoteStatsServer : IDisposable
             payload.DiskActivity = snapshot.DiskActivity;
             payload.UpdateStatus = _updater.Status;
             payload.NetworkActivity = snapshot.NetworkActivity;
+        }
+
+        try
+        {
+            _deviceDetails.Fill(payload);
+        }
+        catch (Exception exception)
+        {
+            ServiceLog.WriteException("Remote monitoring device details", exception);
         }
 
         HashSet<string>? partitionDrives = GetPartitionBackedDrives();

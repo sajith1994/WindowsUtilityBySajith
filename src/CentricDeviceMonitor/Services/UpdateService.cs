@@ -185,6 +185,29 @@ public static class UpdateService
 
     public const string DeveloperName = "Sajith Varghese";
 
+    /// <summary>Public page of the newest release: notes and the installer, for sharing with others.</summary>
+    public const string ReleasesPageUrl = "https://github.com/sajith1994/WindowsUtilityBySajith/releases/latest";
+
+    /// <summary>
+    /// Downloads the newest official installer (checked against its published SHA-256) and saves it in
+    /// <paramref name="folder"/> under its own file name, so it can be copied or shared. Returns the saved path.
+    /// </summary>
+    public static async Task<string> SaveLatestInstallerAsync(string folder, IProgress<DownloadProgress>? progress, CancellationToken cancellationToken)
+    {
+        UpdateCheckResult check = await CheckAsync(cancellationToken);
+        if (check.Manifest is null)
+        {
+            throw new InvalidOperationException(check.Message);
+        }
+
+        string downloaded = await DownloadAsync(check.Manifest, progress, cancellationToken);
+        Directory.CreateDirectory(folder);
+        string destination = Path.Combine(folder, Path.GetFileName(downloaded));
+        File.Copy(downloaded, destination, overwrite: true);
+        try { File.Delete(downloaded); } catch { /* the temporary copy is cleaned up on the next download */ }
+        return destination;
+    }
+
     /// <summary>Installer size in bytes: from update.json when published with it, otherwise asked from the server.</summary>
     public static async Task<long?> GetDownloadSizeAsync(UpdateManifest manifest, CancellationToken cancellationToken)
     {

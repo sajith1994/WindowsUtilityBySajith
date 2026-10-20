@@ -260,7 +260,20 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
-## [2.0.67] - 2026-10-20
+## [2.0.68] - 2026-10-20
+
+### Added
+- **Share Windows Utility** (About Windows Utility):
+  - **Download installer** saves the latest official installer to your Downloads folder (downloaded from the
+    GitHub release and checked against its published checksum, with progress), then shows it in File Explorer,
+    ready to copy to a USB drive or send to someone.
+  - **Open GitHub page** opens the latest release page, where anyone can download it.
+  - **Copy link** copies that page's address to share.
+- **PC model and battery on Network PCs tiles:** each tile shows the PC's maker and model (Lenovo's friendly name,
+  such as "ThinkPad X1 Carbon Gen 9", instead of its machine type). Laptops and other PCs with a battery get a
+  Battery row: charge level, whether it is charging, plugged in or on battery, time left, current and design
+  capacity with battery health (in amber below 60%), and cycle count where the battery reports it. The monitored
+  PC needs 2.0.68 for these.## [2.0.67] - 2026-10-20
 
 ### Added
 - **Disk activity and Network activity tiles on System Stats**, next to Memory (also on dashboards with a saved
