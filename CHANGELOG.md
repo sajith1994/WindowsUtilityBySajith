@@ -260,6 +260,26 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.66] - 2026-10-20
+
+### Fixed
+- **Dark mode in dialogs.** About, Check for updates and every other window kept a white background in dark mode,
+  which made their light text unreadable (the theme's window style only reached plain windows, not dialogs). All
+  windows now use the theme's page and text colours.
+- **Title bars follow the theme.** The title bar of the dashboard and every window is dark in dark mode (and
+  matches the page colour on Windows 11), and changes straight away when the theme is switched.
+
+### Changed
+- **Network Diagnostics is now Network Center**, as the page covers watched devices and the IP scanner, the
+  current connection, adapter settings, shared folders and NAS, and troubleshooting and repair.
+- **Finding NAS boxes and file servers** (Network Center > Shared Folders > Scan network):
+  - Searches every network this PC is connected to (for example both Wi-Fi and cable), not only the first.
+  - Waits longer for slow devices and also checks NetBIOS file sharing (port 139).
+  - Listens for Bonjour/mDNS announcements, which find NAS boxes that ignore ping or only offer NFS/AFP.
+  - Identifies NAS boxes (Synology, QNAP, TrueNAS, Unraid, Asustor, TerraMaster, WD My Cloud, Buffalo, ReadyNAS
+    and others, with the model when announced) and Windows PCs, lists NAS boxes first, and adds a **Web admin**
+    button that opens the NAS's management page.
+  - This PC no longer lists itself when it has two connections, and each scan is written to the application log.
 ## [2.0.65] - 2026-10-16
 
 ### Added

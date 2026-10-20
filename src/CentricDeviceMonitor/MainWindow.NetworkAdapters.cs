@@ -5,7 +5,7 @@ using WpfMessageBox = System.Windows.MessageBox;
 
 namespace CentricDeviceMonitor;
 
-/// <summary>Network Diagnostics: per-adapter DHCP/static IPv4 and DNS settings.</summary>
+/// <summary>Network Center: per-adapter DHCP/static IPv4 and DNS settings.</summary>
 public partial class MainWindow
 {
     private readonly NetworkAdapterConfigService _adapterConfigService = new();

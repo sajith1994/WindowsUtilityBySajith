@@ -30,7 +30,7 @@
                     </Border>
 
                     <TextBlock Text="Network scanner &amp; managed devices" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />
-                    <TextBlock Text="• Local IPv4 subnet scanner with responsive background scanning and multi-select import&#x0a;• Managed-device live status is visible directly in Network Diagnostics; the scanner window handles discovery and address management&#x0a;• Manual add/edit/remove by IPv4 address, hostname/MAC discovery where available&#x0a;• Configurable automatic ping monitoring with next-test countdown&#x0a;• Incident-based outage/recovery logs with downtime and active duration"
+                    <TextBlock Text="• Local IPv4 subnet scanner with responsive background scanning and multi-select import&#x0a;• Managed-device live status is visible directly in Network Center; the scanner window handles discovery and address management&#x0a;• Manual add/edit/remove by IPv4 address, hostname/MAC discovery where available&#x0a;• Configurable automatic ping monitoring with next-test countdown&#x0a;• Incident-based outage/recovery logs with downtime and active duration"
                                TextWrapping="Wrap" Margin="0,4,0,12" />
 
                     <TextBlock Text="CPU, RAM &amp; hardware monitoring" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" />

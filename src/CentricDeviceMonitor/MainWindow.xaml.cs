@@ -274,8 +274,8 @@ public partial class MainWindow : Window
         switch (index)
         {
             case 1:
-                HeaderTitleText.Text = "Network Diagnostics";
-                HeaderSubtitleText.Text = "Scanner, monitoring and connection details";
+                HeaderTitleText.Text = "Network Center";
+                HeaderSubtitleText.Text = "Devices, connection, adapters, shared folders and repair";
                 HeaderPrimaryActionButton.Content = "IP Scanner";
                 HeaderPrimaryActionButton.Tag = "\uE721";
                 NetworkDiagnosticsPage.ScrollToTop();
@@ -4393,7 +4393,7 @@ public partial class MainWindow : Window
     {
         public string TargetLabel => Target switch
         {
-            "network" => "Open Network Diagnostics",
+            "network" => "Open Network Center",
             "cpu" => "Open CPU & Cooling: live graph, temperature history and fans",
             "storage" => "Open Storage & disks: health, speed, disk tools and cleanup",
             "memory" => "Open Memory: live graph, modules and incidents",

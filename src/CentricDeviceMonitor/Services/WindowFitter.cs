@@ -19,17 +19,29 @@ public static class WindowFitter
     }
 
     /// <summary>
-    /// Text with no colour of its own inherits the window's Foreground, which defaults to black and was unreadable in
-    /// dark mode. Every window now defaults to the theme's text colour (and follows theme changes).
+    /// The App.xaml Window style only reaches plain Window objects, not dialogs (which are Window subclasses), so
+    /// dialogs kept a white background and black default text. Every window now defaults to the theme's page colour
+    /// and text colour (both follow theme changes), and its title bar matches the theme.
     /// </summary>
     private static void ApplyThemeText(object sender, RoutedEventArgs e)
     {
-        if (sender is Window window && window is not DesktopWidgetWindow
-            && ReferenceEquals(e.OriginalSource, window)
-            && window.ReadLocalValue(System.Windows.Controls.Control.ForegroundProperty) == DependencyProperty.UnsetValue)
+        if (sender is not Window window || window is DesktopWidgetWindow || !ReferenceEquals(e.OriginalSource, window))
+        {
+            return;
+        }
+
+        if (window.ReadLocalValue(System.Windows.Controls.Control.ForegroundProperty) == DependencyProperty.UnsetValue)
         {
             window.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextBrush");
         }
+
+        if (window.ReadLocalValue(System.Windows.Controls.Control.BackgroundProperty) == DependencyProperty.UnsetValue
+            && !window.AllowsTransparency)
+        {
+            window.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "PageBrush");
+        }
+
+        ThemeManager.ApplyWindowChrome(window);
     }
 
     private static void OnWindowLoaded(object sender, RoutedEventArgs e)

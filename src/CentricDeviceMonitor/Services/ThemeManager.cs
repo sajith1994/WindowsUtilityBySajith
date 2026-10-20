@@ -1,5 +1,7 @@
 using Microsoft.Win32;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 using WpfApplication = System.Windows.Application;
 using WpfColor = System.Windows.Media.Color;
@@ -39,8 +41,55 @@ public static class ThemeManager
         };
 
         ApplyPalette(dark);
+        IsDark = dark;
+        foreach (Window window in WpfApplication.Current.Windows)
+        {
+            ApplyWindowChrome(window);
+        }
+
         return dark;
     }
+
+    /// <summary>True while the dark palette is applied.</summary>
+    public static bool IsDark { get; private set; }
+
+    /// <summary>
+    /// Matches the window's title bar to the theme: dark title bar text and buttons in dark mode, and on Windows 11
+    /// the title bar colour of the page. Without this the title bars stayed white in dark mode.
+    /// </summary>
+    public static void ApplyWindowChrome(Window window)
+    {
+        try
+        {
+            IntPtr handle = new WindowInteropHelper(window).Handle;
+            if (handle == IntPtr.Zero)
+            {
+                return;
+            }
+
+            int dark = IsDark ? 1 : 0;
+            if (DwmSetWindowAttribute(handle, DwmwaUseImmersiveDarkMode, ref dark, sizeof(int)) != 0)
+            {
+                // Windows 10 before 20H1 used attribute 19 for the same setting.
+                DwmSetWindowAttribute(handle, DwmwaUseImmersiveDarkModeOld, ref dark, sizeof(int));
+            }
+
+            WpfColor page = (WpfColor)WpfColorConverter.ConvertFromString(IsDark ? "#1E1E1E" : "#F5F5F7");
+            int captionColor = page.R | (page.G << 8) | (page.B << 16);
+            DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int)); // Windows 11 only; ignored elsewhere
+        }
+        catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException)
+        {
+            // No DWM (very old Windows): the title bar keeps the system colours.
+        }
+    }
+
+    private const int DwmwaUseImmersiveDarkModeOld = 19;
+    private const int DwmwaUseImmersiveDarkMode = 20;
+    private const int DwmwaCaptionColor = 35;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     public static bool IsWindowsAppThemeDark()
     {

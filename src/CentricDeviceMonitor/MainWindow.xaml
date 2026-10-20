@@ -178,7 +178,7 @@
                     <ListBoxItem>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE721;" Style="{StaticResource IconGlyphStyle}" />
-                            <TextBlock Text="Network Diagnostics" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="Network Center" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem>
@@ -764,7 +764,7 @@
                                     <TextBlock Text="&#xE95E;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
                                     <TextBlock Text="Windows Overview" Style="{StaticResource CardTitleStyle}" />
                                 </StackPanel>
-                                <TextBlock Text="Operating system and licence state. Network-specific diagnostics live in Network Diagnostics."
+                                <TextBlock Text="Operating system and licence state. Network-specific diagnostics live in Network Center."
                                            Style="{StaticResource CardDescriptionStyle}"
                                            Margin="0,7,0,10" />
                                 <Grid>
@@ -784,15 +784,15 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- NETWORK DIAGNOSTICS -->
+                <!-- NETWORK CENTER -->
                 <ScrollViewer x:Name="NetworkDiagnosticsPage"
                               Visibility="Collapsed"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="24,22,24,32" MaxWidth="1080" HorizontalAlignment="Stretch">
                         <TextBlock Text="NETWORK" Style="{StaticResource SectionEyebrowStyle}" />
-                        <TextBlock Text="Network diagnostics" Style="{StaticResource SectionTitleStyle}" />
-                        <TextBlock Text="See managed-device reachability immediately, scan the local subnet and inspect the current network path."
+                        <TextBlock Text="Network center" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Everything for this network in one place: watched devices and the IP scanner, the current connection, adapter settings, shared folders and NAS, and troubleshooting and repair tools."
                                    Style="{StaticResource SectionDescriptionStyle}" />
 
                         <!-- IP scanner, automatic monitoring and the managed IP addresses in one card. -->
@@ -1122,25 +1122,27 @@
 
                                 <Grid Margin="0,14,0,4">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="NetworkSharesHeaderText" Text="Shared on the network" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="NetworkSharesHeaderText" Text="Shared on the network (PCs and NAS)" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <Button Grid.Column="1" x:Name="ScanNetworkSharesButton" Content="Scan network" Style="{StaticResource HeaderMiniButton}" Click="ScanNetworkSharesButton_Click" Margin="0" />
                                 </Grid>
                                 <ItemsControl x:Name="NetworkSharesList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Margin="0,2,0,3">
-                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                                 <StackPanel>
-                                                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Detail}" />
+                                                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" />
                                                 </StackPanel>
-                                                <Button Grid.Column="1" Content="Open" Style="{StaticResource HeaderMiniButton}" Tag="{Binding UncPath}" Click="OpenShareButton_Click" Margin="8,0,0,0" VerticalAlignment="Center" />
-                                                <Button Grid.Column="2" Content="Add to File Explorer" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="AddShareToExplorerButton_Click" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                <Button Grid.Column="1" Content="Web admin" Style="{StaticResource HeaderMiniButton}" Tag="{Binding AdminUrl}" Click="OpenNasAdminButton_Click" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                        Visibility="{Binding AdminVisibility}" ToolTip="{Binding AdminUrl}" />
+                                                <Button Grid.Column="2" Content="Open" Style="{StaticResource HeaderMiniButton}" Tag="{Binding UncPath}" Click="OpenShareButton_Click" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                <Button Grid.Column="3" Content="Add to File Explorer" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="AddShareToExplorerButton_Click" Margin="6,0,0,0" VerticalAlignment="Center" />
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <TextBlock x:Name="NetworkSharesEmptyText" Text="Not scanned yet. Scan network looks for PCs with file sharing (SMB) on this subnet." Style="{StaticResource CardDescriptionStyle}" />
+                                <TextBlock x:Name="NetworkSharesEmptyText" Text="Not scanned yet. Scan network looks for PCs and NAS boxes with shared folders on every network this PC is connected to (file sharing, plus NAS announcements over Bonjour/mDNS)." Style="{StaticResource CardDescriptionStyle}" />
                             </StackPanel>
                         </Border>
 

@@ -24,13 +24,23 @@ public sealed class LocalIpScannerService
 
     private readonly NetworkDeviceService _networkDeviceService = new();
 
-    public LocalSubnetInfo? GetLocalSubnet()
+    public LocalSubnetInfo? GetLocalSubnet() => GetLocalSubnets(includeVirtual: true).FirstOrDefault();
+
+    /// <summary>
+    /// Every active Ethernet/Wi-Fi subnet this PC is on (the one with a gateway first), each limited to the /24
+    /// around this PC. A NAS on the second network of a PC with both Wi-Fi and a cable was missed when only the
+    /// first subnet was searched. Virtual switches (Hyper-V, WSL, VPN) are skipped unless asked for.
+    /// </summary>
+    public IReadOnlyList<LocalSubnetInfo> GetLocalSubnets(bool includeVirtual = false)
     {
+        List<LocalSubnetInfo> subnets = new();
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         IEnumerable<NetworkInterface> candidates = NetworkInterface.GetAllNetworkInterfaces()
             .Where(networkInterface =>
                 networkInterface.OperationalStatus == OperationalStatus.Up &&
                 (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
-                 networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211))
+                 networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211) &&
+                (includeVirtual || !SystemResourceMonitorService.IsVirtualAdapter(networkInterface)))
             .OrderByDescending(HasIpv4Gateway);
 
         foreach (NetworkInterface networkInterface in candidates)
@@ -42,7 +52,8 @@ public sealed class LocalIpScannerService
                     .UnicastAddresses
                     .FirstOrDefault(address =>
                         address.Address.AddressFamily == AddressFamily.InterNetwork &&
-                        !IPAddress.IsLoopback(address.Address));
+                        !IPAddress.IsLoopback(address.Address) &&
+                        !address.Address.ToString().StartsWith("169.254.", StringComparison.Ordinal));
 
                 if (unicast?.IPv4Mask is null)
                 {
@@ -62,6 +73,11 @@ public sealed class LocalIpScannerService
                 uint mask = PrefixToMask(scanPrefixLength);
                 uint network = ip & mask;
                 uint broadcast = network | ~mask;
+                string cidr = $"{FromUInt32(network)}/{scanPrefixLength}";
+                if (!seen.Add(cidr))
+                {
+                    continue;
+                }
 
                 List<string> addresses = new();
                 for (uint value = network + 1; value < broadcast && addresses.Count < 254; value++)
@@ -74,11 +90,11 @@ public sealed class LocalIpScannerService
                     addresses.Add(FromUInt32(value).ToString());
                 }
 
-                return new LocalSubnetInfo(
+                subnets.Add(new LocalSubnetInfo(
                     networkInterface.Name,
                     unicast.Address.ToString(),
-                    $"{FromUInt32(network)}/{scanPrefixLength}",
-                    addresses);
+                    cidr,
+                    addresses));
             }
             catch
             {
@@ -86,9 +102,8 @@ public sealed class LocalIpScannerService
             }
         }
 
-        return null;
+        return subnets;
     }
-
     public async Task<IReadOnlyList<IpScanResult>> ScanAsync(
         LocalSubnetInfo subnet,
         IProgress<IpScanProgress>? progress = null,
@@ -209,7 +224,7 @@ public sealed class LocalIpScannerService
             .ToList();
     }
 
-    private static async Task<IReadOnlyDictionary<string, string>> ReadArpCacheAsync(CancellationToken cancellationToken)
+    internal static async Task<IReadOnlyDictionary<string, string>> ReadArpCacheAsync(CancellationToken cancellationToken)
     {
         Dictionary<string, string> entries = new(StringComparer.OrdinalIgnoreCase);
 

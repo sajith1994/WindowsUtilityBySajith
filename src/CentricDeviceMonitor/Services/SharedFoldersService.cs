@@ -19,16 +19,25 @@ public sealed record LocalShareInfo(string Name, string Path, string Description
     public string Detail => string.IsNullOrWhiteSpace(Description) ? Path : $"{Path}  •  {Description}";
 }
 
-/// <summary>A share (or a PC whose shares need a sign-in to list) found on the local network.</summary>
-public sealed record NetworkShareInfo(string Host, string Address, string ShareName, string Remark, bool NeedsSignIn)
+/// <summary>
+/// A share (or a PC/NAS whose shares need a sign-in to list) found on the local network. DeviceLabel says what the
+/// device is ("NAS • Synology DS920+", "Windows PC"); AdminUrl is a NAS's web admin page when one was found.
+/// </summary>
+public sealed record NetworkShareInfo(string Host, string Address, string ShareName, string Remark, bool NeedsSignIn,
+    string DeviceLabel = "", string? AdminUrl = null, bool IsNas = false)
 {
     public string UncPath => string.IsNullOrEmpty(ShareName) ? $@"\\{Host}" : $@"\\{Host}\{ShareName}";
 
     public string Title => NeedsSignIn ? $@"\\{Host}" : UncPath;
 
-    public string Detail => NeedsSignIn
-        ? $"{Address}  •  Shares are hidden until you sign in. Open it to browse with a user name and password."
-        : string.IsNullOrWhiteSpace(Remark) ? Address : $"{Address}  •  {Remark}";
+    public string Detail => string.Join("  •  ", new[]
+    {
+        DeviceLabel,
+        Address,
+        NeedsSignIn ? "Shares are hidden until you sign in. Open it to browse with a user name and password." : Remark
+    }.Where(part => !string.IsNullOrWhiteSpace(part)));
+
+    public System.Windows.Visibility AdminVisibility => AdminUrl is null ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
     /// <summary>Name used for the File Explorer network location.</summary>
     public string LocationName => string.IsNullOrEmpty(ShareName) ? Host : $"{ShareName} ({Host})";
@@ -147,57 +156,206 @@ public sealed class SharedFoldersService
         return shares.OrderBy(share => share.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     });
 
+    /// <summary>
+    /// PCs and NAS boxes with file sharing on every local subnet: a TCP check of SMB (445, then 139) on each address,
+    /// plus mDNS (Bonjour) announcements, which find NAS boxes that ignore ping or only offer NFS/AFP. Each device is
+    /// identified (NAS brand and model, Windows PC) and its shares are listed when Windows is allowed to.
+    /// </summary>
     public async Task<IReadOnlyList<NetworkShareInfo>> ScanNetworkSharesAsync(CancellationToken cancellationToken = default)
     {
-        LocalSubnetInfo subnet = _subnetService.GetLocalSubnet()
-            ?? throw new InvalidOperationException("No active Ethernet or Wi-Fi network was found to scan.");
+        IReadOnlyList<LocalSubnetInfo> subnets = _subnetService.GetLocalSubnets();
+        if (subnets.Count == 0)
+        {
+            throw new InvalidOperationException("No active Ethernet or Wi-Fi network was found to scan.");
+        }
 
-        ConcurrentBag<string> smbHosts = new();
-        await Parallel.ForEachAsync(subnet.Addresses, new ParallelOptions { MaxDegreeOfParallelism = 64, CancellationToken = cancellationToken },
+        // Every address of this PC (a PC with Wi-Fi and a cable on one network has two), so it never lists itself.
+        HashSet<string> own = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+            .SelectMany(nic => nic.GetIPProperties().UnicastAddresses)
+            .Where(unicast => unicast.Address.AddressFamily == AddressFamily.InterNetwork)
+            .Select(unicast => unicast.Address.ToString())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Task<IReadOnlyDictionary<string, MdnsDevice>> mdnsTask = MdnsDiscovery.DiscoverAsync(TimeSpan.FromSeconds(3), cancellationToken);
+
+        ConcurrentDictionary<string, bool> smbHosts = new(StringComparer.OrdinalIgnoreCase);
+        await Parallel.ForEachAsync(subnets.SelectMany(subnet => subnet.Addresses).Distinct(),
+            new ParallelOptions { MaxDegreeOfParallelism = 64, CancellationToken = cancellationToken },
             async (address, token) =>
             {
-                using TcpClient client = new();
-                using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-                timeout.CancelAfter(TimeSpan.FromMilliseconds(400));
-                try
+                // A slow Wi-Fi device or a NAS waking its network port can take most of a second to answer.
+                if (await IsPortOpenAsync(address, 445, 1000, token) || await IsPortOpenAsync(address, 139, 700, token))
                 {
-                    await client.ConnectAsync(address, 445, timeout.Token);
-                    smbHosts.Add(address);
-                }
-                catch (Exception) when (!token.IsCancellationRequested)
-                {
-                    // Not a file-sharing host.
+                    smbHosts[address] = true;
                 }
             });
 
+        IReadOnlyDictionary<string, MdnsDevice> mdns = await mdnsTask;
+        IReadOnlyDictionary<string, string> arp = await LocalIpScannerService.ReadArpCacheAsync(cancellationToken);
+        HashSet<string> candidates = new(smbHosts.Keys, StringComparer.OrdinalIgnoreCase);
+        foreach (MdnsDevice device in mdns.Values.Where(device => device.Services.Any(IsFileService)))
+        {
+            candidates.Add(device.Address);
+        }
+
+        candidates.ExceptWith(own);
+
         ConcurrentBag<NetworkShareInfo> shares = new();
-        await Parallel.ForEachAsync(smbHosts, new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = cancellationToken },
+        await Parallel.ForEachAsync(candidates, new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = cancellationToken },
             async (address, token) =>
             {
-                string host = await ResolveHostAsync(address, token);
+                mdns.TryGetValue(address, out MdnsDevice? announced);
+                arp.TryGetValue(address, out string? mac);
+                Task<string> hostTask = ResolveHostAsync(address, token);
+                Task<DeviceIdentity> identityTask = IdentifyAsync(address, announced, mac, token);
+                string host = await hostTask;
+                DeviceIdentity identity = await identityTask;
+                if (host == address && identity.Name.Length == 0 && !string.IsNullOrEmpty(announced?.HostName))
+                {
+                    identity = identity with { Name = announced.HostName };
+                }
+
+                string label = identity.Name.Length > 0 && !string.Equals(identity.Name, host, StringComparison.OrdinalIgnoreCase)
+                    ? $"{identity.Label} ({identity.Name})"
+                    : identity.Label;
+
+                if (!smbHosts.ContainsKey(address))
+                {
+                    shares.Add(new NetworkShareInfo(host, address, string.Empty,
+                        "No Windows file sharing (SMB) answered; it may only offer NFS, AFP or its web interface.", false,
+                        label, identity.AdminUrl, identity.IsNas));
+                    return;
+                }
+
                 IReadOnlyList<(string Name, string Remark)>? found = await Task.Run(() => EnumerateShares(host), token)
                     .WaitAsync(TimeSpan.FromSeconds(8), token)
                     .ContinueWith(task => task.IsCompletedSuccessfully ? task.Result : null, TaskScheduler.Default);
-
-                if (found is null)
+                if (found is null && host != address)
                 {
-                    shares.Add(new NetworkShareInfo(host, address, string.Empty, string.Empty, NeedsSignIn: true));
+                    // Some NAS boxes answer by address but not by the name DNS returned.
+                    found = await Task.Run(() => EnumerateShares(address), token)
+                        .WaitAsync(TimeSpan.FromSeconds(8), token)
+                        .ContinueWith(task => task.IsCompletedSuccessfully ? task.Result : null, TaskScheduler.Default);
+                }
+
+                if (found is null || found.Count == 0)
+                {
+                    shares.Add(new NetworkShareInfo(host, address, string.Empty, string.Empty, found is null, label, identity.AdminUrl, identity.IsNas));
                     return;
                 }
 
                 foreach ((string name, string remark) in found)
                 {
-                    shares.Add(new NetworkShareInfo(host, address, name, remark, NeedsSignIn: false));
+                    shares.Add(new NetworkShareInfo(host, address, name, remark, false, label, identity.AdminUrl, identity.IsNas));
                 }
             });
 
-        return shares
-            .OrderBy(share => share.NeedsSignIn)
+        List<NetworkShareInfo> ordered = shares
+            .OrderByDescending(share => share.IsNas)
+            .ThenBy(share => share.NeedsSignIn)
             .ThenBy(share => share.Host, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(share => share.ShareName, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+        ApplicationLogService.WriteMessage("Network share scan",
+            $"Searched {string.Join(", ", subnets.Select(subnet => subnet.Cidr))}: {smbHosts.Count} with SMB, {mdns.Count} answered mDNS, "
+            + $"{ordered.Select(share => share.Address).Distinct().Count()} devices listed ({ordered.Where(share => share.IsNas).Select(share => share.Address).Distinct().Count()} NAS).");
+        return ordered;
     }
 
+    private static bool IsFileService(string service) =>
+        service.StartsWith("_smb.", StringComparison.OrdinalIgnoreCase)
+        || service.StartsWith("_afpovertcp.", StringComparison.OrdinalIgnoreCase)
+        || service.StartsWith("_nfs.", StringComparison.OrdinalIgnoreCase)
+        || service.StartsWith("_adisk.", StringComparison.OrdinalIgnoreCase);
+
+    private static async Task<bool> IsPortOpenAsync(string address, int port, int timeoutMs, CancellationToken cancellationToken)
+    {
+        using TcpClient client = new();
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(timeoutMs);
+        try
+        {
+            await client.ConnectAsync(address, port, timeout.Token);
+            return true;
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+
+    private sealed record DeviceIdentity(string Label, string Name, string? AdminUrl, bool IsNas);
+
+    private static readonly (string Marker, string Brand)[] NasBrands =
+    {
+        ("synology", "Synology"), ("diskstation", "Synology"), ("rackstation", "Synology"), ("qnap", "QNAP"),
+        ("truenas", "TrueNAS"), ("freenas", "TrueNAS"), ("ixsystems", "TrueNAS"), ("unraid", "Unraid"), ("asustor", "Asustor"),
+        ("terramaster", "TerraMaster"), ("readynas", "Netgear ReadyNAS"), ("wdmycloud", "WD My Cloud"), ("mycloud", "WD My Cloud"),
+        ("linkstation", "Buffalo"), ("terastation", "Buffalo"), ("openmediavault", "OpenMediaVault"), ("ugreen", "UGREEN"), ("drobo", "Drobo")
+    };
+
+    // Network-card makers used only by NAS brands (first three bytes of the MAC address).
+    private static readonly (string Prefix, string Brand)[] NasMacPrefixes =
+    {
+        ("00-11-32", "Synology"), ("90-09-D0", "Synology"), ("00-08-9B", "QNAP"), ("24-5E-BE", "QNAP"),
+        ("00-90-A9", "Western Digital"), ("00-14-EE", "Western Digital")
+    };
+
+    // Models Bonjour uses only to pick an icon on Macs; Samba-based NAS boxes announce these, so they mean "file server".
+    private static readonly string[] ServerIconModels = { "Xserve", "RackMac", "MacPro", "MacSamba", "TimeCapsule", "PowerMac" };
+
+    private static async Task<DeviceIdentity> IdentifyAsync(string address, MdnsDevice? announced, string? mac, CancellationToken cancellationToken)
+    {
+        int[] ports = { 5000, 5001, 8080, 443, 80, 2049, 548, 3389 };
+        bool[] results = await Task.WhenAll(ports.Select(port => IsPortOpenAsync(address, port, 700, cancellationToken)));
+        HashSet<int> open = ports.Where((_, index) => results[index]).ToHashSet();
+
+        string announcedText = announced is null
+            ? string.Empty
+            : string.Join(" ", new[] { announced.HostName }.Concat(announced.InstanceNames).Concat(announced.Txt.Values));
+        string haystack = announcedText.ToLowerInvariant();
+        string? brand = NasBrands.FirstOrDefault(entry => haystack.Contains(entry.Marker, StringComparison.Ordinal)).Brand;
+        string macPrefix = (mac ?? string.Empty).ToUpperInvariant().Replace(':', '-');
+        brand ??= NasMacPrefixes.FirstOrDefault(entry => macPrefix.StartsWith(entry.Prefix, StringComparison.Ordinal)).Brand;
+
+        string model = announced?.Txt.TryGetValue("model", out string? announcedModel) == true ? announcedModel.Trim() : string.Empty;
+        bool serverIcon = ServerIconModels.Any(hint => model.StartsWith(hint, StringComparison.OrdinalIgnoreCase));
+        if (serverIcon || model.Length > 40)
+        {
+            model = string.Empty;
+        }
+
+        bool fileServices = announced?.Services.Any(service =>
+            service.StartsWith("_afpovertcp.", StringComparison.OrdinalIgnoreCase)
+            || service.StartsWith("_nfs.", StringComparison.OrdinalIgnoreCase)
+            || service.StartsWith("_adisk.", StringComparison.OrdinalIgnoreCase)) == true;
+        bool isNas = brand is not null || serverIcon || fileServices
+            || open.Contains(5000) || open.Contains(5001) || open.Contains(2049) || open.Contains(548);
+        string name = announced?.HostName ?? string.Empty;
+
+        if (!isNas)
+        {
+            bool windows = open.Contains(3389)
+                || System.Text.RegularExpressions.Regex.IsMatch(name, "^(DESKTOP|LAPTOP)-", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return new DeviceIdentity(windows ? "Windows PC" : string.Empty, name, null, false);
+        }
+
+        string? adminUrl = brand switch
+        {
+            "Synology" when open.Contains(5001) => $"https://{address}:5001",
+            "Synology" when open.Contains(5000) => $"http://{address}:5000",
+            "QNAP" when open.Contains(443) => $"https://{address}",
+            "QNAP" when open.Contains(8080) => $"http://{address}:8080",
+            _ when open.Contains(5001) => $"https://{address}:5001",
+            _ when open.Contains(5000) => $"http://{address}:5000",
+            _ when open.Contains(443) => $"https://{address}",
+            _ when open.Contains(80) => $"http://{address}",
+            _ when open.Contains(8080) => $"http://{address}:8080",
+            _ => null
+        };
+
+        string label = string.Join(" ", new[] { "NAS •", brand ?? string.Empty, model }.Where(part => part.Length > 0));
+        return new DeviceIdentity(label == "NAS •" ? "NAS" : label, name, adminUrl, true);
+    }
     private static async Task<string> ResolveHostAsync(string address, CancellationToken cancellationToken)
     {
         try

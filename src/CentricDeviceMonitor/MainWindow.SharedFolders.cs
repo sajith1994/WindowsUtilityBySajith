@@ -4,7 +4,7 @@ using WpfMessageBox = System.Windows.MessageBox;
 
 namespace CentricDeviceMonitor;
 
-/// <summary>Network Diagnostics: folders shared from this PC and shares on the local network.</summary>
+/// <summary>Network Center: folders shared from this PC and shares on the local network.</summary>
 public partial class MainWindow
 {
     private readonly SharedFoldersService _sharedFoldersService = new();
@@ -157,10 +157,12 @@ public partial class MainWindow
             IReadOnlyList<NetworkShareInfo> shares = await _sharedFoldersService.ScanNetworkSharesAsync();
             NetworkSharesList.ItemsSource = shares;
             int pcs = shares.Select(share => share.Address).Distinct().Count();
-            NetworkSharesHeaderText.Text = $"Shared on the network ({shares.Count(share => !share.NeedsSignIn)} shares on {pcs} PCs)";
-            NetworkSharesEmptyText.Text = $"No PCs with file sharing answered on this subnet. Last scan {DateTime.Now:t}.";
+            int nas = shares.Where(share => share.IsNas).Select(share => share.Address).Distinct().Count();
+            string nasText = nas > 0 ? $", {nas} NAS" : string.Empty;
+            NetworkSharesHeaderText.Text = $"Shared on the network ({shares.Count(share => !share.NeedsSignIn && share.ShareName.Length > 0)} shares on {pcs} devices{nasText})";
+            NetworkSharesEmptyText.Text = $"No PCs or NAS boxes with shared folders answered on this PC's networks. Last scan {DateTime.Now:t}. A NAS on a different network (VLAN) or with file sharing turned off cannot be found from here.";
             NetworkSharesEmptyText.Visibility = shares.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            StatusText.Text = $"Network share scan finished: {shares.Count(share => !share.NeedsSignIn)} shares on {pcs} PCs.";
+            StatusText.Text = $"Network share scan finished: {pcs} devices with shared folders{nasText}.";
         }
         catch (Exception exception)
         {
@@ -191,6 +193,22 @@ public partial class MainWindow
         catch (Exception exception)
         {
             WpfMessageBox.Show(this, exception.Message, "Open shared folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>Opens a NAS's web admin page (DSM, QTS, TrueNAS and so on) in the default browser.</summary>
+    private void OpenNasAdminButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string url } && Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) && uri.Scheme is "http" or "https")
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+            }
+            catch (Exception exception)
+            {
+                WpfMessageBox.Show(this, exception.Message, "Open web admin", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
     }
 
