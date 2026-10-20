@@ -107,10 +107,52 @@ public sealed class RemotePcView : INotifyPropertyChanged
         ? $"{FormatGb(stats.TotalMemoryBytes - Math.Min(stats.AvailableMemoryBytes, stats.TotalMemoryBytes))} of {FormatGb(stats.TotalMemoryBytes)} used"
         : string.Empty;
 
-    public IReadOnlyList<RemoteDiskView> Disks => Stats?.Disks.Select(disk => new RemoteDiskView(disk)).ToList() ?? new List<RemoteDiskView>();
+    public IReadOnlyList<RemoteDiskView> Disks => Stats?.Disks
+        .Select(disk => new RemoteDiskView(disk, Stats.DiskActivity.FirstOrDefault(activity =>
+            activity.Letters.Split(' ').Contains(disk.Name, StringComparer.OrdinalIgnoreCase))))
+        .ToList() ?? new List<RemoteDiskView>();
 
+    public bool HasNetworkActivity => Stats?.NetworkActivity.Count > 0;
+
+    /// <summary>Total receive and send rate over all connected adapters.</summary>
+    public string NetworkText => Stats is { NetworkActivity.Count: > 0 } stats
+        ? $"↓ {ActivityMonitor.FormatBitsPerSecond(stats.NetworkActivity.Sum(adapter => adapter.ReceiveBitsPerSec))}   ↑ {ActivityMonitor.FormatBitsPerSecond(stats.NetworkActivity.Sum(adapter => adapter.SendBitsPerSec))}"
+        : string.Empty;
+
+    public string NetworkDetail => Stats is { NetworkActivity.Count: > 0 } stats
+        ? string.Join("  •  ", stats.NetworkActivity.Select(adapter => adapter.LinkBitsPerSec > 0
+            ? $"{adapter.Name} ({ActivityMonitor.FormatBitsPerSecond(adapter.LinkBitsPerSec)} link)"
+            : adapter.Name))
+        : string.Empty;
+
+    /// <summary>The PC's Windows Utility version is older than this PC's.</summary>
+    public bool IsOutdated => IsOutdatedFor(Stats);
+
+    private static bool IsOutdatedFor(RemoteStatsPayload? stats) =>
+        stats is not null && Version.TryParse(stats.AppVersion, out Version? theirs) && theirs < UpdateService.GetCurrentVersion();
+
+    public bool IsUpdating => !string.IsNullOrEmpty(Stats?.UpdateStatus) && !Stats!.UpdateStatus.StartsWith("Update failed", StringComparison.Ordinal);
+
+    /// <summary>Update can be asked for: online, older than this PC and not already updating.</summary>
+    public bool CanUpdate => _result?.State == RemoteStatsState.Online && IsOutdated && !IsUpdating && !_updateRequested;
+
+    public string UpdateText => !string.IsNullOrEmpty(Stats?.UpdateStatus)
+        ? Stats!.UpdateStatus
+        : _updateRequested ? "Update requested..."
+        : IsOutdated ? $"Windows Utility {Stats!.AppVersion} (this PC has {UpdateService.GetCurrentVersion().ToString(3)})" : string.Empty;
+
+    public bool HasUpdateText => UpdateText.Length > 0;
+
+    private bool _updateRequested;
+
+    /// <summary>Set while a request is on its way; cleared when the PC reports progress or a newer version.</summary>
+    public void MarkUpdateRequested(bool requested)
+    {
+        _updateRequested = requested;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+    }
     public string UpdatedText => _result?.State == RemoteStatsState.Online
-        ? $"Updated {DateTime.Now:HH:mm:ss}"
+        ? $"Updated {DateTime.Now:HH:mm:ss}  •  v{Stats?.AppVersion}"
         : _lastSeen is DateTime seen ? $"Last seen {seen:dd/MM HH:mm}" : string.Empty;
 
     public void Update(RemoteStatsResult result)
@@ -119,6 +161,10 @@ public sealed class RemotePcView : INotifyPropertyChanged
         if (result.State == RemoteStatsState.Online)
         {
             _lastSeen = DateTime.Now;
+            if (_updateRequested && (!string.IsNullOrEmpty(result.Stats?.UpdateStatus) || !IsOutdatedFor(result.Stats)))
+            {
+                _updateRequested = false;
+            }
         }
 
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
@@ -151,8 +197,13 @@ public sealed class RemotePcView : INotifyPropertyChanged
 
 public sealed class RemoteDiskView
 {
-    public RemoteDiskView(RemoteDiskInfo disk)
+    public RemoteDiskView(RemoteDiskInfo disk, DiskActivityInfo? activity = null)
     {
+        HasActivity = activity is not null;
+        ActivePercent = activity?.ActivePercent ?? 0;
+        ActivityText = activity is null
+            ? string.Empty
+            : $"Active {activity.ActivePercent:0}%  •  read {ActivityMonitor.FormatBytesPerSecond(activity.ReadBytesPerSec)}  •  write {ActivityMonitor.FormatBytesPerSecond(activity.WriteBytesPerSec)}";
         double used = disk.TotalBytes > 0 ? 100.0 * (disk.TotalBytes - disk.FreeBytes) / disk.TotalBytes : 0;
         UsedPercent = Math.Clamp(used, 0, 100);
         Name = string.IsNullOrWhiteSpace(disk.Label) ? disk.Name : $"{disk.Name} {disk.Label}";
@@ -162,6 +213,9 @@ public sealed class RemoteDiskView
     }
 
     public string Name { get; }
+    public bool HasActivity { get; }
+    public double ActivePercent { get; }
+    public string ActivityText { get; }
     public double UsedPercent { get; }
     public string PercentText { get; }
     public string Detail { get; }

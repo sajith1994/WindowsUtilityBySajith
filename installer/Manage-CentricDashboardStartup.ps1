@@ -65,7 +65,32 @@ if ([string]::IsNullOrWhiteSpace($ApplicationExe) -or -not (Test-Path $Applicati
     throw "The dashboard executable was not found: $ApplicationExe"
 }
 
-$user = Get-InteractiveUser
+$isSystem = [Security.Principal.WindowsIdentity]::GetCurrent().IsSystem
+$taskExists = $false
+& schtasks.exe /Query /TN $taskName 2>$null | Out-Null
+if ($LASTEXITCODE -eq 0) { $taskExists = $true }
+
+try {
+    $user = Get-InteractiveUser
+}
+catch {
+    $user = $null
+}
+
+# Run by the background service for an update started from another PC, with nobody signed in: the existing
+# startup task already points at the same path, so keep it rather than recreate it for the SYSTEM account.
+if ($isSystem -and ($null -eq $user -or $user -match '\$$' -or $user -match '^NT AUTHORITY\\')) {
+    if ($taskExists) {
+        exit 0
+    }
+
+    throw "No signed-in user was found to set up the dashboard startup task."
+}
+
+if ($null -eq $user) {
+    throw "The interactive Windows account could not be determined."
+}
+
 $taskCommand = '"' + $ApplicationExe + '" --startup'
 
 Remove-LegacyRunEntry

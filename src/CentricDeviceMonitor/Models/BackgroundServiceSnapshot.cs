@@ -102,6 +102,10 @@ public sealed class BackgroundServiceSnapshot
     /// <summary>Remote monitoring endpoint state, e.g. "Sharing on port 47810" or why it could not start.</summary>
     public string RemoteSharingStatus { get; set; } = "Off";
 
+    public List<DiskActivityInfo> DiskActivity { get; set; } = new();
+
+    public List<NetworkActivityInfo> NetworkActivity { get; set; } = new();
+
     /// <summary>PCs that have read this PC's stats with the current pairing code.</summary>
     public List<RemoteViewerInfo> RemoteViewers { get; set; } = new();
 

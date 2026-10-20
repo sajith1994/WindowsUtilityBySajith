@@ -22,6 +22,7 @@ internal sealed class MonitoringEngine : IDisposable
     private readonly SystemPowerService _systemPowerService = new();
     private readonly NetworkDeviceService _networkService = new();
     private readonly HardwareMonitorService _hardwareMonitor = new();
+    private readonly ActivityMonitor _activityMonitor = new();
     private readonly Dictionary<Guid, DeviceRuntimeStatus> _deviceStatuses = new();
     private readonly Dictionary<Guid, DeviceIncidentTracker> _deviceIncidentTrackers = new();
     private readonly List<CpuTemperatureLogEntry> _cpuLogs = new();
@@ -874,6 +875,7 @@ internal sealed class MonitoringEngine : IDisposable
         }
 
         int deviceCount = knownDeviceCount ?? (await _deviceStorage.LoadAsync()).Count;
+        ActivitySample activity = _activityMonitor.Sample();
         BackgroundServiceSnapshot snapshot = new()
         {
             ServiceStartedAt = _serviceStartedAt,
@@ -928,6 +930,8 @@ internal sealed class MonitoringEngine : IDisposable
             RemoteSharingActive = _remoteServer.IsActive,
             RemoteSharingStatus = _remoteServer.Status,
             RemoteViewers = _remoteServer.Viewers,
+            DiskActivity = activity.Disks,
+            NetworkActivity = activity.Adapters,
             Devices = statuses
         };
 
@@ -1077,5 +1081,6 @@ internal sealed class MonitoringEngine : IDisposable
         }
 
         _hardwareMonitor.Dispose();
+        _activityMonitor.Dispose();
     }
 }

@@ -50,12 +50,27 @@ public partial class MainWindow
             }
         }
 
+        // A tile the saved layout does not know goes right after the tile it follows in the built-in layout
+        // (new Disk and Network activity tiles appear next to Memory, not at the bottom of the page).
+        string? previousId = null;
         foreach (DashboardTileLayout entry in _defaultDashboardLayout)
         {
             if (tiles.Remove(entry.Id, out DashboardTile? tile))
             {
-                ordered.Add(tile);
+                int after = previousId is null
+                    ? -1
+                    : ordered.FindIndex(candidate => string.Equals(candidate.TileId, previousId, StringComparison.OrdinalIgnoreCase));
+                if (previousId is not null && after >= 0)
+                {
+                    ordered.Insert(after + 1, tile);
+                }
+                else
+                {
+                    ordered.Add(tile);
+                }
             }
+
+            previousId = entry.Id;
         }
 
         DashboardTilesPanel.Children.Clear();

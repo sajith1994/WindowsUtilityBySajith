@@ -493,6 +493,60 @@
                                 </StackPanel>
                             </Border>
                             </controls:DashboardTile>
+                            <controls:DashboardTile TileId="diskactivity" Title="Disk activity" Span="2">
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xEDA2;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Disk activity" Style="{StaticResource InfoLabelStyle}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="DiskActivityHeadlineText" Text="--%" FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
+                                    <TextBlock x:Name="DiskActivitySummaryText" Text="Measuring disk activity..." Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" />
+                                    <ItemsControl x:Name="DiskActivityList" Margin="0,8,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="0,0,0,6">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                        <ProgressBar Grid.Column="1" Value="{Binding ActivePercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding PercentText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                            </controls:DashboardTile>
+
+                            <controls:DashboardTile TileId="netactivity" Title="Network activity" Span="2">
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE839;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                        <TextBlock Text="Network activity" Style="{StaticResource InfoLabelStyle}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="NetworkActivityHeadlineText" Text="--" FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
+                                    <TextBlock x:Name="NetworkActivitySummaryText" Text="Measuring network activity..." Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" />
+                                    <ItemsControl x:Name="NetworkActivityList" Margin="0,8,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="0,0,0,6">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Rates}" FontSize="12" FontWeight="SemiBold" Margin="10,0,0,0" />
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                            </controls:DashboardTile>
 
                             <controls:DashboardTile TileId="spooler" Title="Print Spooler &amp; printers" Span="2">
                             <Border Style="{StaticResource MetricCardStyle}">
@@ -1533,7 +1587,8 @@
                                         <TextBlock x:Name="RemotePcsCountText" Text="" Style="{StaticResource InfoLabelStyle}" Margin="10,1,0,0" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <Button x:Name="FindRemotePcsButton" Content="Find PCs" Tag="&#xE721;" Style="{StaticResource IconCompactButton}" Click="FindRemotePcsButton_Click" Margin="0,0,8,0"
+                                        <Button x:Name="UpdateAllRemotePcsButton" Content="Update all" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="UpdateAllRemotePcsButton_Click" Margin="0,0,8,0"
+                                                ToolTip="Ask every monitored PC with an older Windows Utility to update itself to the latest release." />                                        <Button x:Name="FindRemotePcsButton" Content="Find PCs" Tag="&#xE721;" Style="{StaticResource IconCompactButton}" Click="FindRemotePcsButton_Click" Margin="0,0,8,0"
                                                 ToolTip="Search this network for PCs running Windows Utility with sharing turned on." />
                                         <Button Content="Add PC" Tag="&#xE710;" Style="{StaticResource IconCompactPrimaryButton}" Click="AddRemotePcButton_Click" Margin="0"
                                                 ToolTip="Add a PC by name or IP address and its pairing code." />
@@ -1649,7 +1704,7 @@
                                                             <TextBlock Text="CPU" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
                                                             <ProgressBar Grid.Column="1" Value="{Binding CpuPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
                                                             <TextBlock Grid.Column="2" Text="{Binding CpuText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                                                        </Grid>
+                                                        </Grid>                                                        <TextBlock Text="{Binding CpuModel}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
                                                         <Grid Margin="0,6,0,0">
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                                             <TextBlock Text="Temp" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
@@ -1673,7 +1728,22 @@
                                                             <TextBlock Grid.Column="2" Text="{Binding RamText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                                         </Grid>
                                                         <TextBlock Text="{Binding RamDetail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="44,1,0,0" />
-                                                        <ItemsControl ItemsSource="{Binding Disks}" Margin="0,4,0,0">
+                                                        <StackPanel Margin="0,6,0,0">
+                                                            <StackPanel.Style>
+                                                                <Style TargetType="StackPanel">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasNetworkActivity}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </StackPanel.Style>
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                                <TextBlock Text="Net" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding NetworkText}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                            </Grid>
+                                                            <TextBlock Text="{Binding NetworkDetail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
+                                                        </StackPanel>                                                        <ItemsControl ItemsSource="{Binding Disks}" Margin="0,4,0,0">
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
                                                                     <StackPanel Margin="0,4,0,0">
@@ -1692,15 +1762,41 @@
                                                                             </TextBlock>
                                                                         </Grid>
                                                                         <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="44,1,0,0" />
-                                                                    </StackPanel>
+                                                                        <TextBlock Text="{Binding ActivityText}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding HasActivity}" Value="False"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>                                                                    </StackPanel>
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>
                                                         </ItemsControl>
                                                     </StackPanel>
 
-                                                    <TextBlock Text="{Binding UpdatedText}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="0,10,0,0" />
+                                                    <TextBlock Text="{Binding UpdateText}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="0,10,0,0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasUpdateText}" Value="False"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>                                                    <TextBlock Text="{Binding UpdatedText}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="0,10,0,0" />
                                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
-                                                        <Button Content="Speed test" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="SpeedTestRemotePcButton_Click"
+                                                        <Button Content="Update" Tag="{Binding}" Click="UpdateRemotePcButton_Click" Margin="0,0,6,0"
+                                                                ToolTip="That PC downloads the latest official release, checks it and installs it silently.">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource HeaderMiniButton}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding CanUpdate}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>                                                        <Button Content="Speed test" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="SpeedTestRemotePcButton_Click"
                                                                 ToolTip="Local network speed between this PC and that PC, and that PC's internet speed." />
                                                         <Button Content="Edit" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="EditRemotePcButton_Click" Margin="6,0,0,0" />
                                                         <Button Content="Remove" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="RemoveRemotePcButton_Click" Margin="6,0,0,0" />

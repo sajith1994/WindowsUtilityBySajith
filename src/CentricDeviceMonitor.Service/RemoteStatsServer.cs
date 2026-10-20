@@ -160,8 +160,8 @@ internal sealed class RemoteStatsServer : IDisposable
         {
             string path = context.Request.Url?.AbsolutePath ?? string.Empty;
             string method = context.Request.HttpMethod;
-            bool isUpload = path.Equals(RemoteMonitoringProtocol.SpeedUploadPath, StringComparison.OrdinalIgnoreCase);
-            if (!string.Equals(method, isUpload ? "POST" : "GET", StringComparison.OrdinalIgnoreCase))
+            bool isPost = RemoteMonitoringProtocol.PostPaths.Any(post => post.Equals(path, StringComparison.OrdinalIgnoreCase));
+            if (!string.Equals(method, isPost ? "POST" : "GET", StringComparison.OrdinalIgnoreCase))
             {
                 Respond(context, 405, new { error = "method" });
                 return;
@@ -219,6 +219,9 @@ internal sealed class RemoteStatsServer : IDisposable
                     break;
                 case RemoteMonitoringProtocol.InternetSpeedPath:
                     await RunInternetSpeedTestAsync(context);
+                    break;
+                case RemoteMonitoringProtocol.UpdatePath:
+                    Respond(context, 200, await _updater.StartAsync(caller));
                     break;
             }
         }
@@ -307,6 +310,7 @@ internal sealed class RemoteStatsServer : IDisposable
     });
 
     private readonly SemaphoreSlim _internetTestGate = new(1, 1);
+    private readonly RemoteUpdater _updater = new();
     private RemoteStatsPayload BuildPayload()
     {
         BackgroundServiceSnapshot? snapshot = _snapshotProvider();
@@ -336,6 +340,9 @@ internal sealed class RemoteStatsServer : IDisposable
             payload.AvailableMemoryBytes = snapshot.AvailablePhysicalMemoryBytes;
             payload.NetworkConnected = snapshot.NetworkConnected;
             payload.NetworkSummary = snapshot.NetworkSummary;
+            payload.DiskActivity = snapshot.DiskActivity;
+            payload.UpdateStatus = _updater.Status;
+            payload.NetworkActivity = snapshot.NetworkActivity;
         }
 
         HashSet<string>? partitionDrives = GetPartitionBackedDrives();

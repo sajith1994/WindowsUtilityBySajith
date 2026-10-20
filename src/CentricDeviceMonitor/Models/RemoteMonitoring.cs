@@ -26,7 +26,14 @@ public static class RemoteMonitoringProtocol
     public const string InternetSpeedPath = "/wu/v1/speed/internet";
 
     /// <summary>Paths that need a signed request.</summary>
-    public static readonly string[] SignedPaths = { StatsPath, SpeedDownloadPath, SpeedUploadPath, InternetSpeedPath };
+    /// <summary>POST: the monitored PC updates itself to the latest official release (downloaded and verified by it).</summary>
+    public const string UpdatePath = "/wu/v1/update";
+
+    /// <summary>Paths that need a signed request.</summary>
+    public static readonly string[] SignedPaths = { StatsPath, SpeedDownloadPath, SpeedUploadPath, InternetSpeedPath, UpdatePath };
+
+    /// <summary>Paths that take POST instead of GET.</summary>
+    public static readonly string[] PostPaths = { SpeedUploadPath, UpdatePath };
     public const string TimeHeader = "X-WU-Time";
     public const string SignatureHeader = "X-WU-Signature";
     public const string FirewallRuleName = "Windows Utility remote monitoring";
@@ -131,6 +138,15 @@ public sealed class RemoteStatsPayload
     public string NetworkSummary { get; set; } = string.Empty;
 
     public List<RemoteDiskInfo> Disks { get; set; } = new();
+
+    /// <summary>Progress of an update started from another PC ("Downloading 2.0.68...", "Update failed: ..."); empty otherwise.</summary>
+    public string UpdateStatus { get; set; } = string.Empty;
+
+    /// <summary>Live disk activity (empty from PCs on 2.0.66 or older).</summary>
+    public List<DiskActivityInfo> DiskActivity { get; set; } = new();
+
+    /// <summary>Live network activity per connected adapter (empty from PCs on 2.0.66 or older).</summary>
+    public List<NetworkActivityInfo> NetworkActivity { get; set; } = new();
 }
 
 public sealed class RemoteDiskInfo
@@ -140,6 +156,40 @@ public sealed class RemoteDiskInfo
     public string Format { get; set; } = string.Empty;
     public long TotalBytes { get; set; }
     public long FreeBytes { get; set; }
+}
+
+/// <summary>One physical disk's activity: active time and transfer rates (as Task Manager shows them).</summary>
+public sealed class DiskActivityInfo
+{
+    /// <summary>"Disk 0 (C:)".</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Drive letters on the disk, "C:" or "D: E:".</summary>
+    public string Letters { get; set; } = string.Empty;
+
+    public double ActivePercent { get; set; }
+    public double ReadBytesPerSec { get; set; }
+    public double WriteBytesPerSec { get; set; }
+}
+
+/// <summary>One connected network adapter's receive and send rates.</summary>
+public sealed class NetworkActivityInfo
+{
+    public string Name { get; set; } = string.Empty;
+    public string Kind { get; set; } = string.Empty;
+    public double ReceiveBitsPerSec { get; set; }
+    public double SendBitsPerSec { get; set; }
+    public double LinkBitsPerSec { get; set; }
+}
+
+/// <summary>Answer to an update request.</summary>
+public sealed class RemoteUpdateResult
+{
+    /// <summary>UpToDate, Started, Busy or Failed.</summary>
+    public string Status { get; set; } = string.Empty;
+    public string CurrentVersion { get; set; } = string.Empty;
+    public string LatestVersion { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
 }
 
 /// <summary>What the monitored PC received during a LAN upload test.</summary>

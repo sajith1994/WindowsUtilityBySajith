@@ -1,6 +1,6 @@
 ﻿#define MyAppName "Windows Utility"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.66"
+#define MyAppVersion "2.0.67"
 #endif
 #define MyAppExeName "WindowsUtilityBySajith.exe"
 #define MyLegacyAppExeName "CentricDeviceMonitor.exe"
@@ -75,6 +75,9 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Fil
 ; when the update finishes. Setup already runs elevated as the same user, so start the dashboard directly rather
 ; than through the startup task, which may not exist if dashboard startup was turned off.
 Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Check: IsRelaunchRequested; Flags: nowait
+; Update started from another PC (the background service runs this installer as SYSTEM): reopen the dashboard for
+; the signed-in user through its startup task, only if it was open before.
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricDashboardStartup.ps1"" -Action Run"; Check: IsRemoteRelaunchRequested; Flags: runhidden nowait
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/c taskkill /IM {#MyTrayExeName} /F >nul 2>&1"; Flags: runhidden waituntilterminated
@@ -84,10 +87,39 @@ Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=
 
 [Code]
 
+function IsRemoteUpdate(): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/REMOTEUPDATE') = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+function IsRemoteRelaunchRequested(): Boolean;
+var
+  Marker: String;
+begin
+  Marker := ExpandConstant('{commonappdata}\CentricDeviceMonitor\remote-update-relaunch.flag');
+  Result := IsRemoteUpdate() and FileExists(Marker);
+  if Result then
+    DeleteFile(Marker);
+end;
+
 function IsRelaunchRequested(): Boolean;
 var
   I: Integer;
 begin
+  { Never start the dashboard directly when the background service (SYSTEM) runs the update: it would open in
+    the invisible SYSTEM session. IsRemoteRelaunchRequested reopens it for the signed-in user instead. }
+  Result := False;
+  if IsRemoteUpdate() then
+    Exit;
+
   { The app also writes this marker before starting a self-update, in case the switch is lost. }
   Result := FileExists(ExpandConstant('{commonappdata}\CentricDeviceMonitor\update-relaunch.flag'));
   if Result then

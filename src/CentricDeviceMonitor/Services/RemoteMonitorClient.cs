@@ -191,6 +191,24 @@ public sealed class RemoteMonitorClient
             ?? new RemoteInternetSpeedResult { Error = "That PC sent an empty answer." };
     }
 
+    /// <summary>Asks the PC to update itself to the latest official release.</summary>
+    public async Task<RemoteUpdateResult> RequestUpdateAsync(RemotePcEntry pc, CancellationToken cancellationToken = default)
+    {
+        await EnsureClockAsync(pc, cancellationToken);
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(45));
+        using HttpRequestMessage request = Signed(HttpMethod.Post, pc, RemoteMonitoringProtocol.UpdatePath, string.Empty);
+        request.Content = new ByteArrayContent(Array.Empty<byte>());
+        using HttpResponseMessage response = await LongHttp.SendAsync(request, timeout.Token);
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+        {
+            throw new InvalidOperationException("That PC runs an older Windows Utility that cannot be updated from here yet. Update it once on that PC (or let its automatic updates do it); from 2.0.67 on it can be updated remotely.");
+        }
+
+        ThrowIfFailed(response);
+        return JsonSerializer.Deserialize<RemoteUpdateResult>(await response.Content.ReadAsStringAsync(timeout.Token), JsonOptions)
+            ?? new RemoteUpdateResult { Status = "Failed", Message = "That PC sent an empty answer." };
+    }
     private async Task EnsureClockAsync(RemotePcEntry pc, CancellationToken cancellationToken)
     {
         if (!_clockOffsets.ContainsKey(Key(pc.Host, pc.Port)) && await HelloAsync(pc.Host, pc.Port, cancellationToken) is null)

@@ -716,6 +716,90 @@ public partial class MainWindow
         }
     }
 
+    // ---- Updating monitored PCs -------------------------------------------------------------------------
+
+    private async void UpdateRemotePcButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: RemotePcView view })
+        {
+            await RequestRemoteUpdatesAsync(new[] { view });
+        }
+    }
+
+    private async void UpdateAllRemotePcsButton_Click(object sender, RoutedEventArgs e)
+    {
+        List<RemotePcView> outdated = _remotePcViews.Where(view => view.CanUpdate).ToList();
+        if (outdated.Count == 0)
+        {
+            int offline = _remotePcViews.Count(view => !view.HasStats);
+            WpfMessageBox.Show(this,
+                $"Every monitored PC that is online already has Windows Utility {UpdateService.GetCurrentVersion().ToString(3)} or newer (or is updating)."
+                + (offline > 0 ? $"\n\n{offline} PC{(offline == 1 ? " is" : "s are")} offline and can be updated once back online." : string.Empty),
+                "Update all", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        await RequestRemoteUpdatesAsync(outdated);
+    }
+
+    /// <summary>
+    /// Asks each PC to update itself. Each PC checks the official release, downloads and verifies the installer and
+    /// installs it silently; its tile shows the progress and then the new version.
+    /// </summary>
+    private async Task RequestRemoteUpdatesAsync(IReadOnlyList<RemotePcView> views)
+    {
+        string names = string.Join("\n", views.Select(view => $"•  {view.Title} ({view.Stats?.AppVersion})"));
+        if (WpfMessageBox.Show(this,
+                $"Update Windows Utility on {(views.Count == 1 ? "this PC" : $"these {views.Count} PCs")} to the latest release?\n\n{names}\n\n"
+                + "Each PC downloads the official installer, checks it and installs it silently. Windows Utility closes on that PC for about a minute "
+                + "and reopens for the signed-in user if it was open. Nothing else on the PC is changed.",
+                "Update monitored PCs", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        foreach (RemotePcView view in views)
+        {
+            view.MarkUpdateRequested(true);
+        }
+
+        (RemotePcView View, RemoteUpdateResult? Result, string? Error)[] results = await Task.WhenAll(views.Select(async view =>
+        {
+            try
+            {
+                return (view, await _remoteMonitorClient.RequestUpdateAsync(view.Entry), (string?)null);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or System.Net.Http.HttpRequestException or TaskCanceledException)
+            {
+                return (view, (RemoteUpdateResult?)null, exception is TaskCanceledException ? "No answer in time." : exception.Message);
+            }
+        }));
+
+        List<string> problems = new();
+        int started = 0;
+        foreach ((RemotePcView view, RemoteUpdateResult? result, string? error) in results)
+        {
+            if (result?.Status is "Started" or "Busy")
+            {
+                started++;
+                continue;
+            }
+
+            view.MarkUpdateRequested(false);
+            problems.Add($"{view.Title}: {(result?.Status == "UpToDate" ? $"already up to date ({result.CurrentVersion})" : error ?? result?.Message ?? "no answer")}");
+        }
+
+        ApplicationLogService.WriteMessage("Network PCs", $"Update requested on {views.Count} PC(s): {started} started. {string.Join(" | ", problems)}");
+        StatusText.Text = $"Update started on {started} of {views.Count} PC{(views.Count == 1 ? "" : "s")}. Their tiles show the progress.";
+        if (problems.Count > 0)
+        {
+            WpfMessageBox.Show(this,
+                (started > 0 ? $"Update started on {started} PC{(started == 1 ? "" : "s")}.\n\n" : string.Empty) + "Not started:\n" + string.Join("\n", problems),
+                "Update monitored PCs", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        await PollRemotePcsAsync();
+    }
     private void SpeedTestRemotePcButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: RemotePcView view })

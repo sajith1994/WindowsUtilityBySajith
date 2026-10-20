@@ -260,6 +260,24 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.67] - 2026-10-20
+
+### Added
+- **Disk activity and Network activity tiles on System Stats**, next to Memory (also on dashboards with a saved
+  custom layout): each physical disk's active time with read and write rates, and each connected adapter's
+  receive and send rate with its link speed, refreshed every 3 seconds, like Task Manager's Performance page.
+- **Network PCs tiles show live usage, not only free space:** the processor model under CPU, the network receive
+  and send rate with each adapter's link speed, and each drive's active time with read and write rates. The
+  monitored PC needs 2.0.67 for the new readings; older PCs simply show the rest.
+- **Update monitored PCs from this PC:** an **Update** button on each tile whose Windows Utility is older than this
+  PC's, and **Update all** in the Monitored PCs header. Each PC checks the official release itself, downloads the
+  installer from GitHub, verifies its SHA-256 and installs it silently through its background service, even when
+  nobody is signed in; Windows Utility closes there for about a minute and reopens for the signed-in user if it was
+  open. Tiles show the progress (downloading, installing, or why it failed) and each PC's version. PCs need 2.0.67
+  or later to be updated this way (update older PCs once on the PC, or let their automatic updates do it).
+### Changed
+- Tiles added in a new version now appear next to the tile they follow in the built-in layout instead of at the
+  bottom of a customised dashboard.
 ## [2.0.66] - 2026-10-20
 
 ### Fixed

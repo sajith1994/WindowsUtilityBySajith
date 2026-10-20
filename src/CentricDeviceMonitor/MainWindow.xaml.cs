@@ -135,6 +135,7 @@ public partial class MainWindow : Window
             await RefreshGpuPowerAsync();
             await RefreshCpuTemperatureAsync();
             RefreshSystemResourceUsage();
+            RefreshActivityTiles();
         };
 
         _serviceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };

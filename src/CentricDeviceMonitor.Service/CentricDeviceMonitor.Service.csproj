@@ -40,6 +40,9 @@
     <Compile Include="..\CentricDeviceMonitor\Services\NetworkDeviceService.cs" Link="Services\NetworkDeviceService.cs" />
     <Compile Include="..\CentricDeviceMonitor\Services\SystemHealthLogService.cs" Link="Services\SystemHealthLogService.cs" />
     <Compile Include="..\CentricDeviceMonitor\Services\SystemResourceMonitorService.cs" Link="Services\SystemResourceMonitorService.cs" />
+    <Compile Include="..\CentricDeviceMonitor\Services\ActivityMonitor.cs" Link="Services\ActivityMonitor.cs" />
+    <Compile Include="..\CentricDeviceMonitor\Services\UpdateService.cs" Link="Services\UpdateService.cs" />
+    <Compile Include="..\CentricDeviceMonitor\Services\ApplicationLogService.cs" Link="Services\ApplicationLogService.cs" />
     <Compile Include="..\CentricDeviceMonitor\Services\SystemPowerService.cs" Link="Services\SystemPowerService.cs" />
     <Compile Include="..\CentricDeviceMonitor\Services\SharedDataPaths.cs" Link="Services\SharedDataPaths.cs" />
   </ItemGroup>
