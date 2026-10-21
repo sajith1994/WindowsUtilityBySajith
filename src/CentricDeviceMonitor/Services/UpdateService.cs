@@ -80,8 +80,8 @@ public sealed record UpdateCheckResult(
 /// </summary>
 public static class UpdateService
 {
-    // Public releases-only repository. update.json is attached to every release, and GitHub's
-    // "latest" alias always resolves to the newest one.
+    // Public repository. update.json is attached to every release, and GitHub's "latest" alias
+    // resolves to the newest one.
     public const string ManifestUrl =
         "https://github.com/sajith1994/WindowsUtilityBySajith/releases/latest/download/update.json";
 
@@ -128,7 +128,10 @@ public static class UpdateService
             using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(20));
 
-            using HttpResponseMessage response = await Http.GetAsync(ManifestUrl, HttpCompletionOption.ResponseContentRead, timeout.Token);
+            // GitHub caches the "latest" redirect for the bare URL (seen still pointing at the previous release
+            // 20 minutes after publishing, despite no-cache). A unique query string gets a fresh redirect.
+            string url = $"{ManifestUrl}?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+            using HttpResponseMessage response = await Http.GetAsync(url, HttpCompletionOption.ResponseContentRead, timeout.Token);
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 // No release has been published yet, so nothing can be newer than this build.

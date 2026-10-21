@@ -260,6 +260,12 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.76] - 2026-10-21
+
+### Fixed
+- **Check for updates could say "You're up to date" after a new release.** GitHub kept sending the previous release's
+  update file for a while after publishing. Every check now asks GitHub for a fresh answer, so a new release is
+  found straight away, also when a monitored PC is updated from its tile.
 ## [2.0.75] - 2026-10-21
 
 ### Added
