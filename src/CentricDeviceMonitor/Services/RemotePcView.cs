@@ -161,6 +161,14 @@ public sealed class RemotePcView : INotifyPropertyChanged
 
     /// <summary>Battery worn below 60% of its design capacity.</summary>
     public bool BatteryWorn => Stats?.BatteryHealthPercent is < 60;
+    // ---- Problems from the event logs ----
+
+    public bool HasProblems => Stats?.Problems?.HasAny == true;
+
+    /// <summary>Blue screens, unexpected shutdowns, disk or hardware errors (red); otherwise app crashes only (amber).</summary>
+    public bool ProblemsSerious => Stats?.Problems?.HasSerious == true;
+
+    public string ProblemsText => Stats?.Problems is { HasAny: true } problems ? problems.Describe() : string.Empty;
     // ---- Security (Windows Update, antivirus, firewall) ----
 
     public const int UpdatesStaleDays = 30;

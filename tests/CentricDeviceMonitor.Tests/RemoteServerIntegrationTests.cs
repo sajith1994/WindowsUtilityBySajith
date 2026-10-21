@@ -101,6 +101,16 @@ public sealed class RemoteServerIntegrationTests : IDisposable
         Assert.Empty(viewers);
     }
 
+    [Fact]
+    public async Task Details_ReturnProgramsSessionsAndProblems()
+    {
+        RemotePcDetails details = await new RemoteMonitorClient().GetDetailsAsync(Entry());
+        Assert.Equal(Environment.MachineName, details.MachineName);
+        Assert.NotEmpty(details.TopByMemory);
+        Assert.True(details.LastBootUtc < DateTime.UtcNow);
+        Assert.NotNull(details.Last7Days);
+        Assert.NotNull(details.Last30Days);
+    }
     public void Dispose()
     {
         ((IDisposable)_server).Dispose();

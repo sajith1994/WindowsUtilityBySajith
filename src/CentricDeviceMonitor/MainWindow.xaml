@@ -1825,7 +1825,29 @@
                                                                 <ProgressBar Grid.Column="1" Value="{Binding BatteryPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
                                                                 <TextBlock Grid.Column="2" Text="{Binding BatteryText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                                             </Grid>
-                                                            <TextBlock Text="{Binding BatteryDetail}" FontSize="11" TextWrapping="Wrap" Margin="44,1,0,0">
+                                                        <Grid Margin="0,6,0,0">
+                                                            <Grid.Style>
+                                                                <Style TargetType="Grid">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasProblems}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Grid.Style>
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Problems" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
+                                                            <TextBlock Grid.Column="1" FontSize="11" TextWrapping="Wrap" ToolTip="Logged by Windows in the last 7 days. Details shows each one.">
+                                                                <Run Text="Last 7 days: " /><Run Text="{Binding ProblemsText, Mode=OneWay}" />
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding ProblemsSerious}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Grid>                                                            <TextBlock Text="{Binding BatteryDetail}" FontSize="11" TextWrapping="Wrap" Margin="44,1,0,0">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
                                                                         <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
@@ -1903,7 +1925,9 @@
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </Button.Style>
-                                                        </Button>                                                        <Button Content="Speed test" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="SpeedTestRemotePcButton_Click"
+                                                        </Button>                                                        <Button Content="Details" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="DetailsRemotePcButton_Click" Margin="0,0,6,0"
+                                                                ToolTip="What is using the PC now, who is signed in, last restart, and crashes and problems from the last 30 days." />
+                                                        <Button Content="Speed test" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="SpeedTestRemotePcButton_Click"
                                                                 ToolTip="Local network speed between this PC and that PC, and that PC's internet speed." />
                                                         <Button Content="Edit" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="EditRemotePcButton_Click" Margin="6,0,0,0" />
                                                         <Button Content="Remove" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="RemoveRemotePcButton_Click" Margin="6,0,0,0" />

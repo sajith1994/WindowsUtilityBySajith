@@ -50,6 +50,7 @@ public static class InventoryReportService
             ? Math.Max(0, (DateTime.UtcNow - updated).TotalDays).ToString("0", CultureInfo.InvariantCulture)
             : string.Empty),
         ("Firewall on", row => YesNo(row.Stats?.Security?.FirewallOn)),
+        ("Problems (7 days)", row => row.Stats?.Problems is { } problems ? (problems.HasAny ? problems.Describe() : "None") : string.Empty),
     };
 
     public static string BuildCsv(IEnumerable<RemotePcView> views)
@@ -140,6 +141,8 @@ public static class InventoryReportService
             "Antivirus on" when security?.AntivirusOn == false => "bad",
             "Real-time protection" when security?.RealTimeProtectionOn == false => "bad",
             "Firewall on" when security?.FirewallOn == false => "bad",
+            "Problems (7 days)" when stats?.Problems?.HasSerious == true => "bad",
+            "Problems (7 days)" when stats?.Problems?.HasAny == true => "warn",
             "Last Windows update" when security is not null && RemotePcView.UpdatesStale(security) => "warn",
             "Restart needed" when security?.RestartRequired == true => "warn",
             "Definitions (days old)" when security?.DefinitionsUpdatedUtc is DateTime updated && DateTime.UtcNow - updated > TimeSpan.FromDays(7) => "warn",

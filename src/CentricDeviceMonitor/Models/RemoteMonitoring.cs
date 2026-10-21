@@ -29,8 +29,11 @@ public static class RemoteMonitoringProtocol
     /// <summary>POST: the monitored PC updates itself to the latest official release (downloaded and verified by it).</summary>
     public const string UpdatePath = "/wu/v1/update";
 
+    /// <summary>GET: programs using the PC now, who is signed in, last restart and the last 30 days of problems.</summary>
+    public const string DetailsPath = "/wu/v1/details";
+
     /// <summary>Paths that need a signed request.</summary>
-    public static readonly string[] SignedPaths = { StatsPath, SpeedDownloadPath, SpeedUploadPath, InternetSpeedPath, UpdatePath };
+    public static readonly string[] SignedPaths = { StatsPath, SpeedDownloadPath, SpeedUploadPath, InternetSpeedPath, UpdatePath, DetailsPath };
 
     /// <summary>Paths that take POST instead of GET.</summary>
     public static readonly string[] PostPaths = { SpeedUploadPath, UpdatePath };
@@ -139,6 +142,9 @@ public sealed class RemoteStatsPayload
 
     public List<RemoteDiskInfo> Disks { get; set; } = new();
 
+    /// <summary>Problems logged in the last 7 days (null from PCs on 2.0.73 or older, or before the first check).</summary>
+    public RemoteProblemSummary? Problems { get; set; }
+
     /// <summary>Windows Update, antivirus and firewall state (null from PCs on 2.0.68 or older, or before the first check).</summary>
     public RemoteSecurityInfo? Security { get; set; }
 
@@ -197,6 +203,88 @@ public sealed class NetworkActivityInfo
     public double ReceiveBitsPerSec { get; set; }
     public double SendBitsPerSec { get; set; }
     public double LinkBitsPerSec { get; set; }
+}
+
+/// <summary>Counts of problems Windows logged on a monitored PC (from the System and Application event logs).</summary>
+public sealed class RemoteProblemSummary
+{
+    public int Days { get; set; }
+    public int BlueScreens { get; set; }
+    public int UnexpectedShutdowns { get; set; }
+    public int AppCrashes { get; set; }
+    public int AppFreezes { get; set; }
+    public int DiskErrors { get; set; }
+    public int HardwareErrors { get; set; }
+
+    /// <summary>Blue screens, unexpected shutdowns, disk or hardware errors: worth looking at soon.</summary>
+    public bool HasSerious => BlueScreens + UnexpectedShutdowns + DiskErrors + HardwareErrors > 0;
+
+    public bool HasAny => HasSerious || AppCrashes + AppFreezes > 0;
+
+    /// <summary>"1 blue screen • 3 app crashes"; empty when nothing was logged.</summary>
+    public string Describe()
+    {
+        List<string> parts = new();
+        void Add(int count, string one, string many)
+        {
+            if (count > 0)
+            {
+                parts.Add($"{count} {(count == 1 ? one : many)}");
+            }
+        }
+
+        Add(BlueScreens, "blue screen", "blue screens");
+        Add(UnexpectedShutdowns, "unexpected shutdown", "unexpected shutdowns");
+        Add(DiskErrors, "disk error", "disk errors");
+        Add(HardwareErrors, "hardware error", "hardware errors");
+        Add(AppCrashes, "app crash", "app crashes");
+        Add(AppFreezes, "app freeze", "app freezes");
+        return string.Join("  •  ", parts);
+    }
+}
+
+/// <summary>One problem from the event logs.</summary>
+public sealed class RemoteProblem
+{
+    public DateTime TimeUtc { get; set; }
+
+    /// <summary>BlueScreen, UnexpectedShutdown, AppCrash, AppFreeze, DiskError or HardwareError.</summary>
+    public string Kind { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+}
+
+/// <summary>A program (all its processes together) and what it uses right now.</summary>
+public sealed class RemoteProcessInfo
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int Count { get; set; }
+    public double CpuPercent { get; set; }
+    public long MemoryBytes { get; set; }
+}
+
+/// <summary>A signed-in Windows session.</summary>
+public sealed class RemoteSessionInfo
+{
+    public string User { get; set; } = string.Empty;
+
+    /// <summary>Active, Locked or Disconnected.</summary>
+    public string State { get; set; } = string.Empty;
+}
+
+/// <summary>Details of a monitored PC, fetched on demand for the Details window.</summary>
+public sealed class RemotePcDetails
+{
+    public string MachineName { get; set; } = string.Empty;
+    public DateTime LastBootUtc { get; set; }
+    public List<RemoteSessionInfo> Sessions { get; set; } = new();
+    public List<RemoteProcessInfo> TopByCpu { get; set; } = new();
+    public List<RemoteProcessInfo> TopByMemory { get; set; } = new();
+    public RemoteProblemSummary? Last7Days { get; set; }
+    public RemoteProblemSummary? Last30Days { get; set; }
+
+    /// <summary>Newest first, at most 100.</summary>
+    public List<RemoteProblem> Problems { get; set; } = new();
 }
 
 /// <summary>Windows Update, antivirus and firewall state of a monitored PC.</summary>

@@ -220,6 +220,9 @@ internal sealed class RemoteStatsServer : IDisposable
                 case RemoteMonitoringProtocol.InternetSpeedPath:
                     await RunInternetSpeedTestAsync(context);
                     break;
+                case RemoteMonitoringProtocol.DetailsPath:
+                    Respond(context, 200, await _details.GetAsync());
+                    break;
                 case RemoteMonitoringProtocol.UpdatePath:
                     Respond(context, 200, await _updater.StartAsync(caller));
                     break;
@@ -313,6 +316,7 @@ internal sealed class RemoteStatsServer : IDisposable
     private readonly RemoteUpdater _updater = new();
     private readonly DeviceDetailsProvider _deviceDetails = new();
     private readonly SecurityStatusProvider _security = new();
+    private readonly PcDetailsProvider _details = new();
     private RemoteStatsPayload BuildPayload()
     {
         BackgroundServiceSnapshot? snapshot = _snapshotProvider();
@@ -351,6 +355,7 @@ internal sealed class RemoteStatsServer : IDisposable
         {
             _deviceDetails.Fill(payload);
             payload.Security = _security.Current;
+            payload.Problems = _details.Summary;
         }
         catch (Exception exception)
         {

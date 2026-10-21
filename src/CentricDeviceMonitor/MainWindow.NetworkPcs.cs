@@ -842,6 +842,13 @@ public partial class MainWindow
 
         await PollRemotePcsAsync();
     }
+    private void DetailsRemotePcButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: RemotePcView view })
+        {
+            new RemotePcDetailsWindow(_remoteMonitorClient, view.Entry, view.Title) { Owner = this }.Show();
+        }
+    }
     private void SpeedTestRemotePcButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: RemotePcView view })

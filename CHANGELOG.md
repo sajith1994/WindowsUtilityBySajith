@@ -260,6 +260,19 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.74] - 2026-10-21
+
+### Added
+- **Details for each monitored PC** (Details on its Network PCs tile), for "this PC is slow" calls without remote
+  desktop:
+  - **Using the processor now** and **using the most memory:** the top programs, all processes of a program counted
+    together (for example Google Chrome x24), with their own names, refreshed every 10 seconds while open.
+  - **Who is signed in** and whether their screen is locked or the session disconnected, and the **last restart**.
+  - **Crashes and problems in the last 30 days** from the Windows event logs: blue screens (with the stop code),
+    unexpected shutdowns, app crashes and freezes (naming the app), disk and file-system errors and hardware errors.
+- **Problems line on the tiles:** "Last 7 days: 1 blue screen • 3 app crashes", red for blue screens, unexpected
+  shutdowns, disk or hardware errors and amber for app crashes. Also in the inventory report.
+- The monitored PC needs 2.0.74 for these (Update on its tile).
 ## [2.0.73] - 2026-10-21
 
 ### Changed (look and feel)

@@ -191,6 +191,23 @@ public sealed class RemoteMonitorClient
             ?? new RemoteInternetSpeedResult { Error = "That PC sent an empty answer." };
     }
 
+    /// <summary>Programs using the PC now, signed-in users, last restart and the last 30 days of problems.</summary>
+    public async Task<RemotePcDetails> GetDetailsAsync(RemotePcEntry pc, CancellationToken cancellationToken = default)
+    {
+        await EnsureClockAsync(pc, cancellationToken);
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using HttpRequestMessage request = Signed(HttpMethod.Get, pc, RemoteMonitoringProtocol.DetailsPath, string.Empty);
+        using HttpResponseMessage response = await LongHttp.SendAsync(request, timeout.Token);
+        if (response.StatusCode is HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException("That PC runs an older Windows Utility without the Details view. Update it to 2.0.74 or later (Update on its tile).");
+        }
+
+        ThrowIfFailed(response);
+        return JsonSerializer.Deserialize<RemotePcDetails>(await response.Content.ReadAsStringAsync(timeout.Token), JsonOptions)
+            ?? throw new InvalidOperationException("That PC sent an empty answer.");
+    }
     /// <summary>Asks the PC to update itself to the latest official release.</summary>
     public async Task<RemoteUpdateResult> RequestUpdateAsync(RemotePcEntry pc, CancellationToken cancellationToken = default)
     {
