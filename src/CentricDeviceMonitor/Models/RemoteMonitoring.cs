@@ -29,6 +29,14 @@ public static class RemoteMonitoringProtocol
     /// <summary>POST: the monitored PC updates itself to the latest official release (downloaded and verified by it).</summary>
     public const string UpdatePath = "/wu/v1/update";
 
+    /// <summary>
+    /// POST: run an action (restart, lock, message...) when the PC allows actions. The signature also covers the
+    /// request body, and each request id is accepted only once.
+    /// </summary>
+    public const string ActionPath = "/wu/v1/action";
+
+    /// <summary>What an action request signs: the path plus the SHA-256 of its body, so the body cannot be changed.</summary>
+    public static string ActionSignedText(byte[] body) => $"{ActionPath}\n{Convert.ToHexString(SHA256.HashData(body))}";
     /// <summary>GET: programs using the PC now, who is signed in, last restart and the last 30 days of problems.</summary>
     public const string DetailsPath = "/wu/v1/details";
 
@@ -36,7 +44,7 @@ public static class RemoteMonitoringProtocol
     public static readonly string[] SignedPaths = { StatsPath, SpeedDownloadPath, SpeedUploadPath, InternetSpeedPath, UpdatePath, DetailsPath };
 
     /// <summary>Paths that take POST instead of GET.</summary>
-    public static readonly string[] PostPaths = { SpeedUploadPath, UpdatePath };
+    public static readonly string[] PostPaths = { SpeedUploadPath, UpdatePath, ActionPath };
     public const string TimeHeader = "X-WU-Time";
     public const string SignatureHeader = "X-WU-Signature";
     public const string FirewallRuleName = "Windows Utility remote monitoring";
@@ -142,6 +150,11 @@ public sealed class RemoteStatsPayload
 
     public List<RemoteDiskInfo> Disks { get; set; } = new();
 
+    /// <summary>Whether this PC accepts actions (restart, lock, message...) from the PC monitoring it.</summary>
+    public bool ActionsAllowed { get; set; }
+
+    /// <summary>Signed-in users and whether each is active, locked or disconnected.</summary>
+    public List<RemoteSessionInfo> Sessions { get; set; } = new();
     /// <summary>Problems logged in the last 7 days (null from PCs on 2.0.73 or older, or before the first check).</summary>
     public RemoteProblemSummary? Problems { get; set; }
 
@@ -313,6 +326,39 @@ public sealed class RemoteSecurityInfo
 
     /// <summary>Profiles with the firewall off, e.g. "Public".</summary>
     public string FirewallOffProfiles { get; set; } = string.Empty;
+}
+/// <summary>An action for a monitored PC.</summary>
+public sealed class RemoteActionRequest
+{
+    /// <summary>message, lock, restart, shutdown, cancel-shutdown, clear-temp or update-scan.</summary>
+    public string Action { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public int DelayMinutes { get; set; }
+
+    /// <summary>Unique per request; the PC refuses a request id it has already seen.</summary>
+    public string RequestId { get; set; } = Guid.NewGuid().ToString("N");
+
+    /// <summary>Name of the PC that asked (for the log on both PCs).</summary>
+    public string RequestedBy { get; set; } = string.Empty;
+}
+
+public sealed class RemoteActionResult
+{
+    public bool Ok { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public static class RemoteActions
+{
+    public const string Message = "message";
+    public const string Lock = "lock";
+    public const string Restart = "restart";
+    public const string Shutdown = "shutdown";
+    public const string CancelShutdown = "cancel-shutdown";
+    public const string ClearTemp = "clear-temp";
+    public const string UpdateScan = "update-scan";
+
+    public static readonly string[] All = { Message, Lock, Restart, Shutdown, CancelShutdown, ClearTemp, UpdateScan };
 }
 /// <summary>Answer to an update request.</summary>
 public sealed class RemoteUpdateResult

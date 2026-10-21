@@ -169,6 +169,7 @@ internal sealed class MonitoringEngine : IDisposable
                 NormalizePowerSchedule(settings);
                 _lastSettings = settings;
                 _remoteServer.Apply(settings.RemoteSharingEnabled, settings.RemoteSharingPort, settings.RemoteSharingCode);
+                _remoteServer.ActionsEnabled = settings.RemoteSharingEnabled && settings.RemoteActionsEnabled;
 
                 if (monitoringEnabled != _lastMonitoringEnabled || intervalSeconds != _lastIntervalSeconds)
                 {
@@ -975,6 +976,7 @@ internal sealed class MonitoringEngine : IDisposable
                 await _settingsService.SaveAsync(settings);
                 _lastSettings = settings;
                 _remoteServer.Apply(settings.RemoteSharingEnabled, settings.RemoteSharingPort, settings.RemoteSharingCode);
+                _remoteServer.ActionsEnabled = settings.RemoteSharingEnabled && settings.RemoteActionsEnabled;
 
                 bool restart = string.Equals(settings.PowerScheduleAction, "Restart", StringComparison.OrdinalIgnoreCase);
                 string action = restart ? "restart" : "shutdown";
@@ -1000,6 +1002,7 @@ internal sealed class MonitoringEngine : IDisposable
                     await _settingsService.SaveAsync(settings);
                     _lastSettings = settings;
                 _remoteServer.Apply(settings.RemoteSharingEnabled, settings.RemoteSharingPort, settings.RemoteSharingCode);
+                _remoteServer.ActionsEnabled = settings.RemoteSharingEnabled && settings.RemoteActionsEnabled;
                     ServiceLog.WriteException("Power schedule", exception);
                 }
 

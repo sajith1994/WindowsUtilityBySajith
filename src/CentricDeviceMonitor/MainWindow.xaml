@@ -926,7 +926,8 @@
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
-                                                    </TextBlock>                                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" VerticalAlignment="Center">
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" VerticalAlignment="Center">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
@@ -938,7 +939,8 @@
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
-                                                    </TextBlock>                                                    </StackPanel>
+                                                    </TextBlock>
+                                                    </StackPanel>
 
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
@@ -1564,7 +1566,7 @@
                                               Checked="RemoteSharingToggle_Changed"
                                               Unchecked="RemoteSharingToggle_Changed"
                                               ToolTip="The background service answers with this PC's stats to PCs that have the pairing code. Nothing can be changed remotely." />
-                                <TextBlock Text="Other PCs can only read stats (CPU, temperature, memory, disks, uptime). Nothing on this PC can be changed or opened remotely, and only PCs with the pairing code can read anything. Windows Firewall allows the port from the local network on Private networks only."
+                                <TextBlock Text="Other PCs can only read stats (CPU, temperature, memory, disks, uptime), and only PCs with the pairing code can read anything. Nothing on this PC can be changed remotely unless you allow actions below. Windows Firewall allows the port from the local network on Private networks only."
                                            Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,0" />
 
                                 <Border x:Name="SharingDetailsPanel" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,12,0,0">
@@ -1598,6 +1600,13 @@
                                         <TextBlock Grid.Row="3" Grid.Column="1" x:Name="SharingNetworkText" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
                                     </Grid>
                                 </Border>
+                                <StackPanel x:Name="RemoteActionsPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <ToggleButton x:Name="RemoteActionsToggle" Content="Allow actions from the main PC" Style="{StaticResource ToggleSwitch}" FontSize="11"
+                                                  Checked="RemoteActionsToggle_Changed" Unchecked="RemoteActionsToggle_Changed"
+                                                  ToolTip="Lets the PC monitoring this one restart or shut it down, lock it, show a message, clear temporary files or start a Windows Update check." />
+                                    <TextBlock Text="Off by default. When on, the PC monitoring this one (with the pairing code) can restart or shut down this PC with a countdown, lock it, show a message, clear temporary files and start a Windows Update check. Each action is logged here."
+                                               Style="{StaticResource CardDescriptionStyle}" Margin="0,5,0,0" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -1613,8 +1622,10 @@
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                                         <Button Content="Export report" Tag="&#xE9F9;" Style="{StaticResource IconCompactButton}" Click="ExportInventoryReportButton_Click" Margin="0,0,8,0"
-                                                ToolTip="Save an inventory of every monitored PC: a printable report (save it as PDF from the browser) or a CSV file for Excel." />                                        <Button x:Name="UpdateAllRemotePcsButton" Content="Update all" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="UpdateAllRemotePcsButton_Click" Margin="0,0,8,0"
-                                                ToolTip="Ask every monitored PC with an older Windows Utility to update itself to the latest release." />                                        <Button x:Name="FindRemotePcsButton" Content="Find PCs" Tag="&#xE721;" Style="{StaticResource IconCompactButton}" Click="FindRemotePcsButton_Click" Margin="0,0,8,0"
+                                                ToolTip="Save an inventory of every monitored PC: a printable report (save it as PDF from the browser) or a CSV file for Excel." />
+                                        <Button x:Name="UpdateAllRemotePcsButton" Content="Update all" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="UpdateAllRemotePcsButton_Click" Margin="0,0,8,0"
+                                                ToolTip="Ask every monitored PC with an older Windows Utility to update itself to the latest release." />
+                                        <Button x:Name="FindRemotePcsButton" Content="Find PCs" Tag="&#xE721;" Style="{StaticResource IconCompactButton}" Click="FindRemotePcsButton_Click" Margin="0,0,8,0"
                                                 ToolTip="Search this network for PCs running Windows Utility with sharing turned on." />
                                         <Button Content="Add PC" Tag="&#xE710;" Style="{StaticResource IconCompactPrimaryButton}" Click="AddRemotePcButton_Click" Margin="0"
                                                 ToolTip="Add a PC by name or IP address and its pairing code." />
@@ -1681,6 +1692,15 @@
                                                         <StackPanel ToolTip="{Binding AddressToolTip}">
                                                             <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
                                                             <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding SessionsText}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding HasStats}" Value="False"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
                                                             <TextBlock Text="{Binding ModelText}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
@@ -1689,7 +1709,8 @@
                                                                         </Style.Triggers>
                                                                     </Style>
                                                                 </TextBlock.Style>
-                                                            </TextBlock>                                                        </StackPanel>
+                                                            </TextBlock>
+                                                        </StackPanel>
                                                         <Border Grid.Column="1" CornerRadius="9" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Top">
                                                             <Border.Style>
                                                                 <Style TargetType="Border">
@@ -1714,7 +1735,8 @@
                                                                         </Style.Triggers>
                                                                     </Style>
                                                                 </TextBlock.Style>
-                                                            </TextBlock>                                                            <TextBlock Text="{Binding StatusLabel}" FontSize="11" FontWeight="SemiBold">
+                                                            </TextBlock>
+                                                            <TextBlock Text="{Binding StatusLabel}" FontSize="11" FontWeight="SemiBold">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
                                                                         <Setter Property="Foreground" Value="White" />
@@ -1724,7 +1746,8 @@
                                                                         </Style.Triggers>
                                                                     </Style>
                                                                 </TextBlock.Style>
-                                                            </TextBlock>                                                            </StackPanel>
+                                                            </TextBlock>
+                                                            </StackPanel>
 
                                                         </Border>
                                                     </Grid>
@@ -1753,7 +1776,8 @@
                                                             <TextBlock Text="CPU" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
                                                             <ProgressBar Grid.Column="1" Value="{Binding CpuPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
                                                             <TextBlock Grid.Column="2" Text="{Binding CpuText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                                                        </Grid>                                                        <TextBlock Text="{Binding CpuModel}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding CpuModel}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
                                                         <Grid Margin="0,6,0,0">
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                                             <TextBlock Text="Temp" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
@@ -1810,7 +1834,8 @@
                                                                     </TextBlock.Style>
                                                                 </TextBlock>
                                                             </StackPanel>
-                                                        </Grid>                                                        <StackPanel Margin="0,6,0,0">
+                                                        </Grid>
+                                                        <StackPanel Margin="0,6,0,0">
                                                             <StackPanel.Style>
                                                                 <Style TargetType="StackPanel">
                                                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -1847,7 +1872,8 @@
                                                                     </Style>
                                                                 </TextBlock.Style>
                                                             </TextBlock>
-                                                        </Grid>                                                            <TextBlock Text="{Binding BatteryDetail}" FontSize="11" TextWrapping="Wrap" Margin="44,1,0,0">
+                                                        </Grid>
+                                                            <TextBlock Text="{Binding BatteryDetail}" FontSize="11" TextWrapping="Wrap" Margin="44,1,0,0">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
                                                                         <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
@@ -1857,7 +1883,8 @@
                                                                     </Style>
                                                                 </TextBlock.Style>
                                                             </TextBlock>
-                                                        </StackPanel>                                                        <StackPanel Margin="0,6,0,0">
+                                                        </StackPanel>
+                                                        <StackPanel Margin="0,6,0,0">
                                                             <StackPanel.Style>
                                                                 <Style TargetType="StackPanel">
                                                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -1872,7 +1899,8 @@
                                                                 <TextBlock Grid.Column="1" Text="{Binding NetworkText}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
                                                             </Grid>
                                                             <TextBlock Text="{Binding NetworkDetail}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
-                                                        </StackPanel>                                                        <ItemsControl ItemsSource="{Binding Disks}" Margin="0,4,0,0">
+                                                        </StackPanel>
+                                                        <ItemsControl ItemsSource="{Binding Disks}" Margin="0,4,0,0">
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
                                                                     <StackPanel Margin="0,4,0,0">
@@ -1899,7 +1927,8 @@
                                                                                     </Style.Triggers>
                                                                                 </Style>
                                                                             </TextBlock.Style>
-                                                                        </TextBlock>                                                                    </StackPanel>
+                                                                        </TextBlock>
+                                                                    </StackPanel>
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>
                                                         </ItemsControl>
@@ -1913,9 +1942,11 @@
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
-                                                    </TextBlock>                                                    <TextBlock Text="{Binding UpdatedText}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" Margin="0,10,0,0" />
-                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
-                                                        <Button Content="Update" Tag="{Binding}" Click="UpdateRemotePcButton_Click" Margin="0,0,6,0"
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding UpdatedText}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" Margin="0,10,0,0" />
+                                                    <!-- Wraps to a second line on narrow tiles instead of clipping the first buttons. -->
+                                                    <WrapPanel HorizontalAlignment="Right" Margin="0,0,-6,0">
+                                                        <Button Content="Update" Tag="{Binding}" Click="UpdateRemotePcButton_Click" Margin="0,6,6,0"
                                                                 ToolTip="That PC downloads the latest official release, checks it and installs it silently.">
                                                             <Button.Style>
                                                                 <Style TargetType="Button" BasedOn="{StaticResource HeaderMiniButton}">
@@ -1925,13 +1956,25 @@
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </Button.Style>
-                                                        </Button>                                                        <Button Content="Details" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="DetailsRemotePcButton_Click" Margin="0,0,6,0"
+                                                        </Button>
+                                                        <Button Content="Actions" Tag="{Binding}" Click="ActionsRemotePcButton_Click" Margin="0,6,6,0"
+                                                                ToolTip="Message, restart or shut down, lock, clear temporary files or check for Windows updates on that PC.">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource HeaderMiniButton}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding ActionsAllowed}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
+                                                        <Button Content="Details" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="DetailsRemotePcButton_Click" Margin="0,6,6,0"
                                                                 ToolTip="What is using the PC now, who is signed in, last restart, and crashes and problems from the last 30 days." />
-                                                        <Button Content="Speed test" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="SpeedTestRemotePcButton_Click"
+                                                        <Button Content="Speed test" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="SpeedTestRemotePcButton_Click" Margin="0,6,6,0"
                                                                 ToolTip="Local network speed between this PC and that PC, and that PC's internet speed." />
-                                                        <Button Content="Edit" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="EditRemotePcButton_Click" Margin="6,0,0,0" />
-                                                        <Button Content="Remove" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="RemoveRemotePcButton_Click" Margin="6,0,0,0" />
-                                                    </StackPanel>
+                                                        <Button Content="Edit" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="EditRemotePcButton_Click" Margin="0,6,6,0" />
+                                                        <Button Content="Remove" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="RemoveRemotePcButton_Click" Margin="0,6,6,0" />
+                                                    </WrapPanel>
                                                 </StackPanel>
                                             </Border>
                                         </DataTemplate>

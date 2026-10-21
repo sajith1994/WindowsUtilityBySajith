@@ -161,6 +161,23 @@ public sealed class RemotePcView : INotifyPropertyChanged
 
     /// <summary>Battery worn below 60% of its design capacity.</summary>
     public bool BatteryWorn => Stats?.BatteryHealthPercent is < 60;
+    // ---- Signed-in users and actions ----
+
+    /// <summary>The PC accepts actions (restart, lock, message...) from this PC.</summary>
+    public bool ActionsAllowed => IsOnline && Stats?.ActionsAllowed == true;
+
+    public bool HasSessions => Stats?.Sessions.Count > 0;
+
+    /// <summary>"Signed in: OFFICE\maria (locked)" or "Nobody signed in".</summary>
+    public string SessionsText => Stats is null
+        ? string.Empty
+        : Stats.Sessions.Count == 0
+            ? "Nobody signed in"
+            : "Signed in: " + string.Join(", ", Stats.Sessions.Select(session => $"{session.User} ({session.State.ToLowerInvariant()})"));
+
+    /// <summary>Someone is actively using the PC (restart and shutdown warn about it).</summary>
+    public bool SomeoneActive => Stats?.Sessions.Any(session => session.State == "Active") == true;
+
     // ---- Problems from the event logs ----
 
     public bool HasProblems => Stats?.Problems?.HasAny == true;

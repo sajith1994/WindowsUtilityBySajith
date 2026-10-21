@@ -42,6 +42,7 @@ public partial class MainWindow
     {
         _loadingRemoteSharing = true;
         RemoteSharingToggle.IsChecked = _appSettings.RemoteSharingEnabled;
+        RemoteActionsToggle.IsChecked = _appSettings.RemoteActionsEnabled;
         _loadingRemoteSharing = false;
 
         _sharingCodeUnlocked = false;
@@ -200,6 +201,7 @@ public partial class MainWindow
     {
         bool enabled = _appSettings.RemoteSharingEnabled;
         SharingDetailsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        RemoteActionsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
 
         bool hidden = IsSharingCodeHidden;
         SharingCodeLockedPanel.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed;
@@ -841,6 +843,37 @@ public partial class MainWindow
         }
 
         await PollRemotePcsAsync();
+    }
+    private void ActionsRemotePcButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: RemotePcView view })
+        {
+            new RemoteActionsWindow(_remoteMonitorClient, view) { Owner = this }.Show();
+        }
+    }
+
+    private async void RemoteActionsToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingRemoteSharing)
+        {
+            return;
+        }
+
+        bool enable = RemoteActionsToggle.IsChecked == true;
+        if (enable && WpfMessageBox.Show(this,
+                "Allow the PC monitoring this one to restart or shut down this PC, lock it, show messages, clear temporary files and start Windows Update checks?\n\nOnly a PC with the pairing code can do this, every action is confirmed on that PC and logged here, and you can turn this off at any time.",
+                "Allow actions", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            _loadingRemoteSharing = true;
+            RemoteActionsToggle.IsChecked = false;
+            _loadingRemoteSharing = false;
+            return;
+        }
+
+        _appSettings.RemoteActionsEnabled = enable;
+        await SaveRemoteSettingsAsync();
+        ApplicationLogService.WriteMessage("Network PCs", enable ? "Actions from the main PC allowed." : "Actions from the main PC turned off.");
+        StatusText.Text = enable ? "This PC now accepts actions from the PC monitoring it." : "This PC no longer accepts actions.";
     }
     private void DetailsRemotePcButton_Click(object sender, RoutedEventArgs e)
     {

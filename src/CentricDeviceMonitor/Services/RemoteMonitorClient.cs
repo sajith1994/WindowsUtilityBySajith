@@ -191,6 +191,32 @@ public sealed class RemoteMonitorClient
             ?? new RemoteInternetSpeedResult { Error = "That PC sent an empty answer." };
     }
 
+    /// <summary>Runs an action on the PC (it must allow actions). The signature covers the whole request.</summary>
+    public async Task<RemoteActionResult> RunActionAsync(RemotePcEntry pc, RemoteActionRequest action, CancellationToken cancellationToken = default)
+    {
+        await EnsureClockAsync(pc, cancellationToken);
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(action);
+        long time = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + _clockOffsets.GetValueOrDefault(Key(pc.Host, pc.Port));
+        using HttpRequestMessage request = new(HttpMethod.Post, BuildUri(pc.Host, pc.Port, RemoteMonitoringProtocol.ActionPath));
+        request.Headers.Add(RemoteMonitoringProtocol.TimeHeader, time.ToString());
+        request.Headers.Add(RemoteMonitoringProtocol.SignatureHeader, RemoteMonitoringProtocol.Sign(pc.PairingCode, time, RemoteMonitoringProtocol.ActionSignedText(body)));
+        request.Content = new ByteArrayContent(body);
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(3));
+        using HttpResponseMessage response = await LongHttp.SendAsync(request, timeout.Token);
+        string text = await response.Content.ReadAsStringAsync(timeout.Token);
+        switch (response.StatusCode)
+        {
+            case HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed:
+                throw new InvalidOperationException("That PC runs an older Windows Utility without actions. Update it to 2.0.75 or later (Update on its tile).");
+            case HttpStatusCode.Forbidden or HttpStatusCode.Conflict or HttpStatusCode.BadRequest or HttpStatusCode.OK:
+                return JsonSerializer.Deserialize<RemoteActionResult>(text, JsonOptions)
+                    ?? new RemoteActionResult { Ok = false, Message = "That PC sent an empty answer." };
+            default:
+                ThrowIfFailed(response);
+                return new RemoteActionResult { Ok = false, Message = $"That PC answered with HTTP {(int)response.StatusCode}." };
+        }
+    }
     /// <summary>Programs using the PC now, signed-in users, last restart and the last 30 days of problems.</summary>
     public async Task<RemotePcDetails> GetDetailsAsync(RemotePcEntry pc, CancellationToken cancellationToken = default)
     {

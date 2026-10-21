@@ -8,6 +8,8 @@ using CentricDeviceMonitor.Models;
 using CentricDeviceMonitor.Services;
 using Xunit;
 using ServiceSnapshot = service::CentricDeviceMonitor.Models.BackgroundServiceSnapshot;
+using ServiceActionRequest = service::CentricDeviceMonitor.Models.RemoteActionRequest;
+using ServiceActionResult = service::CentricDeviceMonitor.Models.RemoteActionResult;
 
 namespace CentricDeviceMonitor.Tests;
 
@@ -22,13 +24,14 @@ public sealed class RemoteServerIntegrationTests : IDisposable
     private readonly string _viewersFile = Path.Combine(Path.GetTempPath(), $"wu-viewers-{Guid.NewGuid():N}.json");
     private readonly object _server;
     private readonly Type _serverType;
+    private readonly List<string> _actionsRun = new();
 
     public RemoteServerIntegrationTests()
     {
         _serverType = typeof(ServiceSnapshot).Assembly.GetType("CentricDeviceMonitor.ServiceHost.RemoteStatsServer")!;
         Func<ServiceSnapshot?> snapshot = () => new ServiceSnapshot { UpdatedAt = DateTime.Now, CpuUsagePercent = 12, RamUsagePercent = 34, CpuModel = "Test CPU" };
         _server = Activator.CreateInstance(_serverType, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null,
-            new object[] { snapshot, "localhost", _viewersFile }, null)!;
+            new object?[] { snapshot, "localhost", _viewersFile, (Func<ServiceActionRequest, Task<ServiceActionResult>>)FakeAction }, null)!;
         Apply(enabled: true, Code);
     }
 
@@ -111,6 +114,83 @@ public sealed class RemoteServerIntegrationTests : IDisposable
         Assert.NotNull(details.Last7Days);
         Assert.NotNull(details.Last30Days);
     }
+    /// <summary>Stand-in for the real actions: records them instead of restarting or messaging this PC.</summary>
+    private Task<ServiceActionResult> FakeAction(ServiceActionRequest request)
+    {
+        lock (_actionsRun)
+        {
+            _actionsRun.Add(request.Action);
+        }
+
+        return Task.FromResult(new ServiceActionResult { Ok = true, Message = $"fake {request.Action}" });
+    }
+
+    private void AllowActions(bool allowed) => _serverType.GetProperty("ActionsEnabled")!.SetValue(_server, allowed);
+
+    [Fact]
+    public async Task Actions_AreRefusedUntilThePcAllowsThem()
+    {
+        RemoteActionResult result = await new RemoteMonitorClient().RunActionAsync(Entry(), new RemoteActionRequest { Action = RemoteActions.Lock });
+        Assert.False(result.Ok);
+        Assert.Contains("does not allow actions", result.Message);
+        Assert.Empty(_actionsRun);
+    }
+
+    [Fact]
+    public async Task AnAllowedAction_ReachesThePc()
+    {
+        AllowActions(true);
+        RemoteActionResult result = await new RemoteMonitorClient().RunActionAsync(Entry(), new RemoteActionRequest { Action = RemoteActions.Message, Message = "Hello" });
+        Assert.True(result.Ok);
+        Assert.Equal(new[] { RemoteActions.Message }, _actionsRun);
+    }
+
+    [Fact]
+    public async Task ARepeatedRequest_IsRefused()
+    {
+        AllowActions(true);
+        RemoteActionRequest request = new() { Action = RemoteActions.Lock };
+        RemoteMonitorClient client = new();
+        Assert.True((await client.RunActionAsync(Entry(), request)).Ok);
+        RemoteActionResult again = await client.RunActionAsync(Entry(), request);
+        Assert.False(again.Ok);
+        Assert.Single(_actionsRun);
+    }
+
+    [Fact]
+    public async Task ARequestChangedAfterSigning_IsRefused()
+    {
+        AllowActions(true);
+        RemoteMonitorClient client = new();
+        await client.HelloAsync("localhost", _port);
+        byte[] signedBody = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new RemoteActionRequest { Action = RemoteActions.Message, Message = "Hello" });
+        byte[] sentBody = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new RemoteActionRequest { Action = RemoteActions.Shutdown });
+        long time = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        using HttpClient http = new();
+        using HttpRequestMessage request = new(HttpMethod.Post, $"http://localhost:{_port}{RemoteMonitoringProtocol.ActionPath}") { Content = new ByteArrayContent(sentBody) };
+        request.Headers.Add(RemoteMonitoringProtocol.TimeHeader, time.ToString());
+        request.Headers.Add(RemoteMonitoringProtocol.SignatureHeader, RemoteMonitoringProtocol.Sign(Code, time, RemoteMonitoringProtocol.ActionSignedText(signedBody)));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.SendAsync(request)).StatusCode);
+        Assert.Empty(_actionsRun);
+    }
+
+    [Fact]
+    public async Task AnUnknownAction_IsRejected()
+    {
+        AllowActions(true);
+        RemoteActionResult result = await new RemoteMonitorClient().RunActionAsync(Entry(), new RemoteActionRequest { Action = "format-c" });
+        Assert.False(result.Ok);
+        Assert.Empty(_actionsRun);
+    }
+
+    [Fact]
+    public async Task Stats_ReportWhetherActionsAreAllowed()
+    {
+        Assert.False((await new RemoteMonitorClient().GetStatsAsync("localhost", _port, Code)).Stats!.ActionsAllowed);
+        AllowActions(true);
+        Assert.True((await new RemoteMonitorClient().GetStatsAsync("localhost", _port, Code)).Stats!.ActionsAllowed);
+    }
+
     public void Dispose()
     {
         ((IDisposable)_server).Dispose();

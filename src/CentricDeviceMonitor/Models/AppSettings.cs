@@ -71,6 +71,9 @@ public sealed class AppSettings
 
     public int RemoteSharingPort { get; set; } = RemoteMonitoringProtocol.DefaultPort;
 
+    /// <summary>Accept actions (restart, shut down, lock, message, clear temp, Windows Update scan) from the PC monitoring this one.</summary>
+    public bool RemoteActionsEnabled { get; set; }
+
     /// <summary>Set once another PC has connected with the code: the code is then hidden until re-entered.</summary>
     public bool RemoteSharingCodeLocked { get; set; }
 

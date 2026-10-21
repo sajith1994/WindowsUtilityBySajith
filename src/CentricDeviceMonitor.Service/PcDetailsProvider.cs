@@ -304,7 +304,7 @@ internal sealed class PcDetailsProvider
 
     // ---- Signed-in users --------------------------------------------------------------------------------------
 
-    private static List<RemoteSessionInfo> ReadSessions()
+    internal static List<RemoteSessionInfo> ReadSessions()
     {
         List<RemoteSessionInfo> sessions = new();
         if (!WTSEnumerateSessions(IntPtr.Zero, 0, 1, out IntPtr buffer, out int count))

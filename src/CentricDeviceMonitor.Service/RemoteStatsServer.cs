@@ -46,11 +46,14 @@ internal sealed class RemoteStatsServer : IDisposable
 
     /// <param name="listenHost">"+" (all addresses) in the service; tests use "localhost", which needs no administrator rights.</param>
     /// <param name="viewersFilePath">Where viewers are saved; tests use a temporary file.</param>
-    public RemoteStatsServer(Func<BackgroundServiceSnapshot?> snapshotProvider, string listenHost = "+", string? viewersFilePath = null)
+    /// <param name="actionRunner">Carries out actions; tests pass a stand-in so nothing is restarted or shown.</param>
+    public RemoteStatsServer(Func<BackgroundServiceSnapshot?> snapshotProvider, string listenHost = "+", string? viewersFilePath = null,
+        Func<RemoteActionRequest, Task<RemoteActionResult>>? actionRunner = null)
     {
         _snapshotProvider = snapshotProvider;
         _listenHost = listenHost;
         _viewersFilePath = viewersFilePath ?? SharedDataPaths.RemoteViewersFilePath;
+        _actionRunner = actionRunner ?? RemoteActionExecutor.RunAsync;
     }
 
     /// <summary>PCs that have read stats with the current code, most recent first.</summary>
@@ -178,6 +181,11 @@ internal sealed class RemoteStatsServer : IDisposable
                 return;
             }
 
+            if (path.Equals(RemoteMonitoringProtocol.ActionPath, StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleActionAsync(context);
+                return;
+            }
             string? signedPath = RemoteMonitoringProtocol.SignedPaths.FirstOrDefault(known => known.Equals(path, StringComparison.OrdinalIgnoreCase));
             if (signedPath is null)
             {
@@ -245,6 +253,86 @@ internal sealed class RemoteStatsServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Runs an action from the monitoring PC. The signature covers the body (so it cannot be changed), each request
+    /// id is accepted once (so a recorded request cannot be replayed), and nothing runs unless this PC allows actions.
+    /// </summary>
+    private async Task HandleActionAsync(HttpListenerContext context)
+    {
+        string caller = context.Request.RemoteEndPoint?.Address.ToString() ?? "unknown";
+        if (IsBlocked(caller))
+        {
+            Respond(context, 429, new { error = "too-many-attempts" });
+            return;
+        }
+
+        using MemoryStream body = new();
+        byte[] buffer = new byte[4096];
+        int read;
+        while ((read = await context.Request.InputStream.ReadAsync(buffer)) > 0)
+        {
+            body.Write(buffer, 0, read);
+            if (body.Length > 16 * 1024)
+            {
+                Respond(context, 413, new { error = "too-large" });
+                return;
+            }
+        }
+
+        byte[] bytes = body.ToArray();
+        if (!RemoteMonitoringProtocol.Verify(
+                _code,
+                context.Request.Headers[RemoteMonitoringProtocol.TimeHeader],
+                context.Request.Headers[RemoteMonitoringProtocol.SignatureHeader],
+                RemoteMonitoringProtocol.ActionSignedText(bytes),
+                DateTimeOffset.UtcNow))
+        {
+            RecordFailure(caller);
+            Respond(context, 401, new { error = "unauthorized" });
+            return;
+        }
+
+        _failures.TryRemove(caller, out _);
+        if (!ActionsEnabled)
+        {
+            Respond(context, 403, new RemoteActionResult { Ok = false, Message = "This PC does not allow actions from the main PC. Turn on \"Allow actions from the main PC\" on it first." });
+            return;
+        }
+
+        RemoteActionRequest? request;
+        try
+        {
+            request = JsonSerializer.Deserialize<RemoteActionRequest>(bytes, ActionJsonOptions);
+        }
+        catch (JsonException)
+        {
+            request = null;
+        }
+
+        if (request is null || !RemoteActions.All.Contains(request.Action) || string.IsNullOrWhiteSpace(request.RequestId))
+        {
+            Respond(context, 400, new RemoteActionResult { Ok = false, Message = "The action request was not understood." });
+            return;
+        }
+
+        foreach (KeyValuePair<string, DateTime> old in _usedRequestIds.Where(entry => DateTime.UtcNow - entry.Value > TimeSpan.FromMinutes(15)).ToList())
+        {
+            _usedRequestIds.TryRemove(old.Key, out _);
+        }
+
+        if (!_usedRequestIds.TryAdd(request.RequestId, DateTime.UtcNow))
+        {
+            Respond(context, 409, new RemoteActionResult { Ok = false, Message = "This request was already carried out (a repeated request is refused)." });
+            return;
+        }
+
+        RemoteActionResult result = await _actionRunner(request);
+        ServiceLog.Write("Remote action",
+            $"{request.Action} requested by {request.RequestedBy} ({caller}){(request.Action == RemoteActions.Message ? $": \"{request.Message}\"" : string.Empty)} -> {(result.Ok ? "done" : "failed")}: {result.Message}");
+        Respond(context, 200, result);
+    }
+
+    private static readonly JsonSerializerOptions ActionJsonOptions = new() { PropertyNameCaseInsensitive = true };
     /// <summary>Streams test data until the requested size is sent or the other PC stops reading (it times itself).</summary>
     private static async Task SendSpeedTestDataAsync(HttpListenerContext context)
     {
@@ -317,7 +405,11 @@ internal sealed class RemoteStatsServer : IDisposable
     private readonly DeviceDetailsProvider _deviceDetails = new();
     private readonly SecurityStatusProvider _security = new();
     private readonly PcDetailsProvider _details = new();
-    private RemoteStatsPayload BuildPayload()
+    private readonly Func<RemoteActionRequest, Task<RemoteActionResult>> _actionRunner;
+    private readonly ConcurrentDictionary<string, DateTime> _usedRequestIds = new();
+
+    /// <summary>"Allow actions from the main PC" on this PC (set from the settings on every monitoring pass).</summary>
+    public bool ActionsEnabled { get; set; }    private RemoteStatsPayload BuildPayload()
     {
         BackgroundServiceSnapshot? snapshot = _snapshotProvider();
         RemoteStatsPayload payload = new()
@@ -356,6 +448,8 @@ internal sealed class RemoteStatsServer : IDisposable
             _deviceDetails.Fill(payload);
             payload.Security = _security.Current;
             payload.Problems = _details.Summary;
+            payload.ActionsAllowed = ActionsEnabled;
+            payload.Sessions = PcDetailsProvider.ReadSessions();
         }
         catch (Exception exception)
         {

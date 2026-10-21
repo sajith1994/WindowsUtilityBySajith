@@ -260,6 +260,28 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.75] - 2026-10-21
+
+### Added
+- **Actions on monitored PCs** (Actions on a Network PCs tile), so small jobs no longer need a visit or remote desktop:
+  - **Send a message** that pops up on the screen of everyone signed in.
+  - **Restart or shut down** after 1, 5 or 15 minutes (or now). The signed-in user sees a Windows countdown with the
+    message and can save their work; **Cancel scheduled restart** stops it until the last moment.
+  - **Lock the screen**, **clear temporary files** older than a day (reports how much space was freed; files in use
+    are left alone) and **check for Windows updates** now.
+- **Off by default on every PC:** the monitored PC must turn on the new "Allow actions from the main PC" switch under
+  This PC on its Network PCs page; the Actions button only appears for PCs that allow it.
+- Every action is confirmed first, naming the PC. Restart and shut down warn when someone is using the PC.
+- Actions are logged on both PCs, with the PC that asked.
+- Tiles show who is signed in ("Signed in: OFFICE\maria (active)").
+
+### Security
+- Actions use the same pairing code. Each request is signed over its full content, so it cannot be changed on the way.
+  Each request is accepted only once, so a recorded request cannot be replayed.
+- The monitored PC needs 2.0.75 for actions (Update on its tile).
+
+### Fixed
+- Tile buttons wrap onto a second line on narrow tiles instead of cutting off the first buttons.
 ## [2.0.74] - 2026-10-21
 
 ### Added
@@ -273,6 +295,7 @@
 - **Problems line on the tiles:** "Last 7 days: 1 blue screen • 3 app crashes", red for blue screens, unexpected
   shutdowns, disk or hardware errors and amber for app crashes. Also in the inventory report.
 - The monitored PC needs 2.0.74 for these (Update on its tile).
+
 ## [2.0.73] - 2026-10-21
 
 ### Changed (look and feel)
