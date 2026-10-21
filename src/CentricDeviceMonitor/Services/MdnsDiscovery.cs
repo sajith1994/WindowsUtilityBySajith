@@ -163,7 +163,7 @@ public static class MdnsDiscovery
         return packet.ToArray();
     }
 
-    private static void Parse(byte[] data, MdnsDevice device)
+    internal static void Parse(byte[] data, MdnsDevice device)
     {
         if (data.Length < 12)
         {

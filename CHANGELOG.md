@@ -260,6 +260,16 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.71] - 2026-10-20
+
+### Added (development)
+- **Automated tests** (`tests/CentricDeviceMonitor.Tests`, 50 tests): the pairing-code protocol (signatures, typing
+  differences, clock window, tampering), problem notifications (timing, escalation, offline and back, security),
+  Network PCs tile states, the inventory report (CSV escaping and formula safety, HTML encoding, offline PCs),
+  mDNS answer parsing, activity formatting, and the real background-service endpoint with the dashboard client over
+  localhost (right and wrong codes, unsigned requests, code changes, sharing off, LAN speed test, viewer list).
+- **GitHub build check:** every push builds the dashboard, service and tray companion on Windows and runs the tests.
+- `publish-update.ps1` runs the tests before building an installer and stops if any fail.
 ## [2.0.70] - 2026-10-20
 
 ### Added

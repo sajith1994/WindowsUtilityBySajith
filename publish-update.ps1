@@ -7,6 +7,7 @@
   .\publish-update.ps1 -Notes "Fixed X. Added Y."            # build + create dist\installer\update.json
   .\publish-update.ps1 -Notes "Fixed X." -Upload             # ...and publish the GitHub release
   .\publish-update.ps1 -Upload -SkipBuild                    # re-publish an installer that is already built
+  .\publish-update.ps1 -SkipTests                            # build without running the tests first (not recommended)
 
 .NOTES
   Uploading needs the GitHub CLI (https://cli.github.com) signed in with: gh auth login
@@ -16,7 +17,8 @@ param(
     [string]$Repo = "sajith1994/WindowsUtilityBySajith",
     [string]$Notes = "",
     [switch]$Upload,
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$SkipTests
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +30,13 @@ if ($propsText -notmatch "<AppVersion>([^<]+)</AppVersion>") {
 }
 $version = $Matches[1].Trim()
 Write-Host "Publishing version $version" -ForegroundColor Cyan
+
+if (-not $SkipBuild -and -not $SkipTests) {
+    # A release is only built when every test passes.
+    Write-Host "Running tests..." -ForegroundColor Cyan
+    & dotnet test (Join-Path $root "tests\CentricDeviceMonitor.Tests\CentricDeviceMonitor.Tests.csproj") -c Release --nologo
+    if ($LASTEXITCODE -ne 0) { throw "Tests failed; no installer was built. Fix the failures (or use -SkipTests)." }
+}
 
 if (-not $SkipBuild) {
     & (Join-Path $root "build-release.ps1") -CreateInstaller

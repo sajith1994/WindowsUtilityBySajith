@@ -18,6 +18,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CentricDeviceMonitor.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.7-pre708" />
     <PackageReference Include="System.Management" Version="10.0.9" />
     <PackageReference Include="Hwinfo.SharedMemory.Net" Version="2.1.0" />
@@ -27,6 +31,7 @@
     <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
     <PackageReference Include="Vortice.D3DCompiler" Version="3.6.2" />
   </ItemGroup>
+
   <ItemGroup>
     <Resource Include="Assets\app-logo.png" />
     <Resource Include="Assets\app-artwork.jpg" />
