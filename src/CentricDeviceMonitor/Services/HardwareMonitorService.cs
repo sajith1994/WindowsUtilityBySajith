@@ -114,6 +114,29 @@ public sealed class HardwareMonitorService : IDisposable
 {
     private static readonly TimeSpan FallbackCacheDuration = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// Each reading (CPU temperature, fans, GPU load, power...) used to re-read every chip through the sensor driver,
+    /// so one 3-second refresh polled the same hardware about eight times. A chip is now re-read at most once per
+    /// 0.8 seconds and the readings in between use those fresh values; the thermal test's 1-second sampling still
+    /// gets a new reading every time.
+    /// </summary>
+    private const long MinimumUpdateIntervalMs = 800;
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IHardware, System.Runtime.CompilerServices.StrongBox<long>> LastHardwareUpdate = new();
+
+    private static void UpdateThrottled(IHardware hardware)
+    {
+        System.Runtime.CompilerServices.StrongBox<long> last = LastHardwareUpdate.GetOrCreateValue(hardware);
+        long now = Environment.TickCount64;
+        if (last.Value != 0 && now - Interlocked.Read(ref last.Value) < MinimumUpdateIntervalMs)
+        {
+            return;
+        }
+
+        hardware.Update();
+        Interlocked.Exchange(ref last.Value, now);
+    }
+
     private readonly object _syncRoot = new();
     private Computer? _computer;
     private string _openError = string.Empty;
@@ -584,7 +607,7 @@ public sealed class HardwareMonitorService : IDisposable
     {
         try
         {
-            hardware.Update();
+            UpdateThrottled(hardware);
         }
         catch
         {
@@ -626,7 +649,7 @@ public sealed class HardwareMonitorService : IDisposable
     {
         try
         {
-            hardware.Update();
+            UpdateThrottled(hardware);
         }
         catch
         {
@@ -673,7 +696,7 @@ public sealed class HardwareMonitorService : IDisposable
     {
         try
         {
-            hardware.Update();
+            UpdateThrottled(hardware);
         }
         catch
         {
@@ -1198,7 +1221,7 @@ public sealed class HardwareMonitorService : IDisposable
     {
         try
         {
-            hardware.Update();
+            UpdateThrottled(hardware);
         }
         catch
         {
@@ -1294,7 +1317,7 @@ public sealed class HardwareMonitorService : IDisposable
     {
         try
         {
-            hardware.Update();
+            UpdateThrottled(hardware);
         }
         catch
         {
@@ -1359,7 +1382,7 @@ public sealed class HardwareMonitorService : IDisposable
     {
         try
         {
-            hardware.Update();
+            UpdateThrottled(hardware);
         }
         catch
         {
@@ -1454,7 +1477,7 @@ public sealed class HardwareMonitorService : IDisposable
     {
         try
         {
-            hardware.Update();
+            UpdateThrottled(hardware);
         }
         catch
         {
@@ -1502,7 +1525,7 @@ public sealed class HardwareMonitorService : IDisposable
     {
         try
         {
-            hardware.Update();
+            UpdateThrottled(hardware);
         }
         catch
         {

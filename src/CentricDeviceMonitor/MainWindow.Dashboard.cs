@@ -212,6 +212,7 @@ public partial class MainWindow
         widget.Closed += (_, _) =>
         {
             _desktopWidgets.Remove(widget);
+            UpdateRefreshMode();
             if (widget.RemovedByUser)
             {
                 ScheduleLayoutSave();
@@ -220,6 +221,7 @@ public partial class MainWindow
 
         _desktopWidgets.Add(widget);
         widget.Show();
+        UpdateRefreshMode();
     }
 
     /// <summary>Re-creates the widgets that were on the desktop last time, once the tiles have a size.</summary>

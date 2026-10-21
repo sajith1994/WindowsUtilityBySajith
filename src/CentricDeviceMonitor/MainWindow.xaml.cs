@@ -129,6 +129,12 @@ public partial class MainWindow : Window
         _hardwareTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         _hardwareTimer.Tick += async (_, _) =>
         {
+            if (_lightRefresh)
+            {
+                await RefreshWhileHiddenAsync();
+                return;
+            }
+
             // Read package power before other LibreHardwareMonitor calls so the power
             // sensor uses the full interval since the previous hardware refresh.
             await RefreshCpuPackagePowerAsync();
@@ -164,6 +170,8 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
         System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
+        IsVisibleChanged += (_, _) => UpdateRefreshMode();
+        StateChanged += (_, _) => UpdateRefreshMode();
         Closed += (_, _) => System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
         InitializeTrayIcon();
         WpfApplication.Current.SessionEnding += (_, _) => _allowApplicationExit = true;

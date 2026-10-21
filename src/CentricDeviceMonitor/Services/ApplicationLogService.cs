@@ -32,6 +32,25 @@ public static class ApplicationLogService
         WriteLine(area, details.ToString().TrimEnd());
     }
 
+    /// <summary>Above 2 MB the log becomes application.1.log (replacing the previous one), so logs stay under ~4 MB.</summary>
+    internal const long MaximumLogBytes = 2 * 1024 * 1024;
+
+    internal static void RotateIfLarge(string path)
+    {
+        try
+        {
+            FileInfo file = new(path);
+            if (file.Exists && file.Length > MaximumLogBytes)
+            {
+                File.Move(path, Path.ChangeExtension(path, ".1.log"), overwrite: true);
+            }
+        }
+        catch (IOException)
+        {
+            // Another process has the file open; try again on the next write.
+        }
+    }
+
     private static void WriteLine(string area, string details)
     {
         try
@@ -39,6 +58,7 @@ public static class ApplicationLogService
             lock (SyncRoot)
             {
                 Directory.CreateDirectory(LogDirectory);
+                RotateIfLarge(LogFilePath);
                 string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{area}] {details}{Environment.NewLine}";
                 File.AppendAllText(LogFilePath, line, Encoding.UTF8);
             }

@@ -260,6 +260,18 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.72] - 2026-10-21
+
+### Changed (lighter, nothing removed)
+- **Far less work while the dashboard is hidden:** when it is minimised or closed to the notification area and no
+  desktop widget is pinned, the 3-second refresh of sensors, tiles and graphs pauses. A 15-second check keeps the
+  CPU temperature alert working (from the background service's reading), Network PCs notifications keep their own
+  schedule, and everything refreshes the moment the window is shown again.
+- **Sensors are read once instead of repeatedly:** each reading (CPU temperature, fans, GPU load, power) used to make
+  the sensor library re-read every chip, about eight times per 3-second refresh. A chip is now re-read at most once
+  per 0.8 seconds and the other readings reuse those values. Lower CPU use in both the dashboard and the background
+  service; one refresh took about 2.5x less time in testing.
+- **Logs no longer grow forever:** the application and service logs roll over at 2 MB (one previous copy is kept).
 ## [2.0.71] - 2026-10-20
 
 ### Added (development)

@@ -15,6 +15,7 @@ internal static class ServiceLog
             lock (SyncRoot)
             {
                 SharedDataPaths.EnsureDirectories();
+                ApplicationLogService.RotateIfLarge(SharedDataPaths.ServiceLogFilePath);
                 string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{area}] {message}{Environment.NewLine}";
                 File.AppendAllText(SharedDataPaths.ServiceLogFilePath, line, Encoding.UTF8);
             }
