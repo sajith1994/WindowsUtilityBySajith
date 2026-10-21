@@ -42,7 +42,7 @@
                 <TextBlock x:Name="ConnectedVolumesText"
                            Text="Detecting connected storage volumes..."
                            Foreground="{DynamicResource MutedTextBrush}"
-                           FontSize="9"
+                           FontSize="10.5"
                            HorizontalAlignment="Right"
                            Margin="0,5,0,0" />
             </StackPanel>
@@ -62,7 +62,7 @@
                     <TextBlock Text="Wear = manufacturer's estimated wear limit consumed; some SSDs/HDDs do not report SMART lifetime counters."
                                HorizontalAlignment="Right"
                                Foreground="{DynamicResource MutedTextBrush}"
-                               FontSize="10"
+                               FontSize="11"
                                VerticalAlignment="Center" />
                 </Grid>
 
@@ -100,7 +100,7 @@
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="Sequential storage benchmark (SEQ1M Q8T1)" FontSize="15" FontWeight="SemiBold" />
                         <TextBlock Text="Creates a temporary test file, measures sequential write/read throughput and removes the file after every pass. Uses 1 MiB transfers at queue depth 8 on a single thread and bypasses the Windows cache, matching CrystalDiskMark's default sequential test. Results are MiB/s; CrystalDiskMark reports MB/s, so its figures read about 5% higher."
-                                   Foreground="{DynamicResource MutedTextBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,1,0,8" />
+                                   Foreground="{DynamicResource MutedTextBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,1,0,8" />
                         <WrapPanel>
                             <TextBlock Text="Volume" VerticalAlignment="Center" Margin="0,0,5,0" />
                             <ComboBox x:Name="VolumeComboBox" Width="240" DisplayMemberPath="DisplayName" Margin="0,0,10,0" />
@@ -128,7 +128,7 @@
                             </ComboBox>
                         </WrapPanel>
                         <ProgressBar x:Name="BenchmarkProgressBar" Minimum="0" Maximum="100" Height="7" Margin="0,9,0,4" />
-                        <TextBlock x:Name="BenchmarkStatusText" Text="Ready." Foreground="{DynamicResource MutedTextBrush}" FontSize="10" />
+                        <TextBlock x:Name="BenchmarkStatusText" Text="Ready." Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
                         <WrapPanel Margin="0,6,0,0">
                             <TextBlock Text="Latest write:" FontWeight="SemiBold" />
                             <TextBlock x:Name="WriteSpeedText" Text="-- MB/s" Margin="5,0,18,0" />
@@ -159,7 +159,7 @@
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="Real-capacity verification" FontSize="15" FontWeight="SemiBold" />
                         <TextBlock Text="Writes unique data into FREE SPACE, then reads every block back. This can detect counterfeit/overstated flash storage. Use an empty/non-critical drive for a full test because counterfeit wraparound can corrupt existing data."
-                                   Foreground="{DynamicResource MutedTextBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,1,0,7" />
+                                   Foreground="{DynamicResource MutedTextBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,1,0,7" />
                         <WrapPanel>
                             <TextBlock Text="Volume" VerticalAlignment="Center" Margin="0,0,5,0" />
                             <ComboBox x:Name="CapacityVolumeComboBox" Width="240" DisplayMemberPath="DisplayName" Margin="0,0,10,0" SelectionChanged="CapacityVolumeComboBox_SelectionChanged" />
@@ -173,9 +173,9 @@
                                 <ComboBoxItem Content="All safe free space" Tag="ALL" />
                             </ComboBox>
                         </WrapPanel>
-                        <TextBlock x:Name="CapacitySafetyText" Text="Select a volume to see the maximum safe test size." Foreground="{DynamicResource MutedTextBrush}" FontSize="10" Margin="0,6,0,0" />
+                        <TextBlock x:Name="CapacitySafetyText" Text="Select a volume to see the maximum safe test size." Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="0,6,0,0" />
                         <ProgressBar x:Name="CapacityProgressBar" Minimum="0" Maximum="100" Height="7" Margin="0,8,0,4" />
-                        <TextBlock x:Name="CapacityStatusText" Text="Ready." Foreground="{DynamicResource MutedTextBrush}" FontSize="10" />
+                        <TextBlock x:Name="CapacityStatusText" Text="Ready." Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
 
                         <Grid Margin="0,7,0,0">
                             <Grid.ColumnDefinitions>
@@ -189,7 +189,7 @@
                                     <Grid Margin="0,0,0,5">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                         <StackPanel>
-                                            <TextBlock Text="STEP 1" Foreground="{DynamicResource PrimaryBrush}" FontSize="9" FontWeight="SemiBold" />
+                                            <TextBlock Text="STEP 1" Foreground="{DynamicResource PrimaryBrush}" FontSize="10.5" FontWeight="SemiBold" />
                                             <TextBlock Text="Copying test data to drive" FontSize="13" FontWeight="SemiBold" />
                                         </StackPanel>
                                         <TextBlock Grid.Column="1" x:Name="WriteStepStatusText" Text="Waiting" Foreground="{DynamicResource MutedTextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -198,12 +198,12 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-                                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,7,5"><TextBlock Text="Current write" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="WriteCurrentSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,7,5"><TextBlock Text="Average write" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="WriteAverageSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,5"><TextBlock Text="Top write" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="WriteFastestSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,7,0"><TextBlock Text="Elapsed" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="WriteElapsedText" Text="00:00:00" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,7,0"><TextBlock Text="Estimated left" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="WriteEtaText" Text="--:--:--" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="2"><TextBlock Text="Written" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="WriteProgressText" Text="0 B / 0 B" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,7,5"><TextBlock Text="Current write" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="WriteCurrentSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,7,5"><TextBlock Text="Average write" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="WriteAverageSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,5"><TextBlock Text="Top write" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="WriteFastestSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,7,0"><TextBlock Text="Elapsed" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="WriteElapsedText" Text="00:00:00" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,7,0"><TextBlock Text="Estimated left" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="WriteEtaText" Text="--:--:--" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="2"><TextBlock Text="Written" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="WriteProgressText" Text="0 B / 0 B" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/></StackPanel>
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -213,7 +213,7 @@
                                     <Grid Margin="0,0,0,5">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                         <StackPanel>
-                                            <TextBlock Text="STEP 2" Foreground="{DynamicResource PrimaryBrush}" FontSize="9" FontWeight="SemiBold" />
+                                            <TextBlock Text="STEP 2" Foreground="{DynamicResource PrimaryBrush}" FontSize="10.5" FontWeight="SemiBold" />
                                             <TextBlock Text="Verifying copied data" FontSize="13" FontWeight="SemiBold" />
                                         </StackPanel>
                                         <TextBlock Grid.Column="1" x:Name="VerifyStepStatusText" Text="Waiting for step 1" Foreground="{DynamicResource MutedTextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -222,12 +222,12 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-                                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,7,5"><TextBlock Text="Current read" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="VerifyCurrentSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,7,5"><TextBlock Text="Average read" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="VerifyAverageSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,5"><TextBlock Text="Top read" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="VerifyFastestSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,7,0"><TextBlock Text="Elapsed" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="VerifyElapsedText" Text="00:00:00" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,7,0"><TextBlock Text="Estimated left" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="VerifyEtaText" Text="--:--:--" FontWeight="SemiBold"/></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="2"><TextBlock Text="Verified" Foreground="{DynamicResource MutedTextBrush}" FontSize="9"/><TextBlock x:Name="VerifyProgressText" Text="0 B / 0 B" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/></StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,7,5"><TextBlock Text="Current read" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="VerifyCurrentSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,7,5"><TextBlock Text="Average read" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="VerifyAverageSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,5"><TextBlock Text="Top read" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="VerifyFastestSpeedText" Text="-- MB/s" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,7,0"><TextBlock Text="Elapsed" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="VerifyElapsedText" Text="00:00:00" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,7,0"><TextBlock Text="Estimated left" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="VerifyEtaText" Text="--:--:--" FontWeight="SemiBold"/></StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="2"><TextBlock Text="Verified" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5"/><TextBlock x:Name="VerifyProgressText" Text="0 B / 0 B" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/></StackPanel>
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -235,8 +235,8 @@
 
                         <Grid Margin="0,5,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock x:Name="CapacityOverallPercentText" Text="Overall progress 0.0%" Foreground="{DynamicResource MutedTextBrush}" FontSize="9" />
-                            <TextBlock Grid.Column="1" x:Name="CapacityTotalElapsedText" Text="Total elapsed 00:00:00" Foreground="{DynamicResource MutedTextBrush}" FontSize="9" />
+                            <TextBlock x:Name="CapacityOverallPercentText" Text="Overall progress 0.0%" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5" />
+                            <TextBlock Grid.Column="1" x:Name="CapacityTotalElapsedText" Text="Total elapsed 00:00:00" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5" />
                         </Grid>
 
                         <TextBlock x:Name="CapacityResultText" Text="" FontWeight="SemiBold" Margin="0,5,0,0" TextWrapping="Wrap" />
@@ -253,7 +253,7 @@
 
         <Grid Grid.Row="3" Margin="0,10,0,0">
             <TextBlock Text="Capacity verification can write a large amount of data and may take hours. It keeps a safety reserve and deletes its test files afterward."
-                       Foreground="{DynamicResource MutedTextBrush}" FontSize="9" VerticalAlignment="Center" />
+                       Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5" VerticalAlignment="Center" />
             <Button Content="Close" HorizontalAlignment="Right" Margin="0" Click="CloseButton_Click" />
         </Grid>
     </Grid>

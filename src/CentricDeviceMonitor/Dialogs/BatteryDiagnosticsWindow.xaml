@@ -36,7 +36,7 @@
                 </StackPanel>
                 <TextBlock Text="Battery capacity, health, charge, estimated runtime, cycle count and hardware identity reported by Windows. Remaining runtime is an estimate and changes with workload."
                            Foreground="{DynamicResource MutedTextBrush}"
-                           FontSize="10"
+                           FontSize="11"
                            TextWrapping="Wrap"
                            Margin="0,3,0,0" />
             </StackPanel>
@@ -49,30 +49,30 @@
         <UniformGrid Grid.Row="1" Columns="4" Margin="0,12,0,10">
             <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10" Margin="0,0,6,0">
                 <StackPanel>
-                    <TextBlock Text="Charge remaining" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" />
+                    <TextBlock Text="Charge remaining" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
                     <TextBlock x:Name="ChargeRemainingText" Text="--" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock x:Name="CurrentCapacityText" Text="Current capacity: --" Foreground="{DynamicResource MutedTextBrush}" FontSize="9" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="CurrentCapacityText" Text="Current capacity: --" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </Border>
             <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10" Margin="2,0,4,0">
                 <StackPanel>
-                    <TextBlock Text="Battery health" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" />
+                    <TextBlock Text="Battery health" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
                     <TextBlock x:Name="BatteryHealthText" Text="--" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock x:Name="CapacityComparisonText" Text="Full charge / design: --" Foreground="{DynamicResource MutedTextBrush}" FontSize="9" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="CapacityComparisonText" Text="Full charge / design: --" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </Border>
             <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10" Margin="4,0,2,0">
                 <StackPanel>
-                    <TextBlock Text="Remaining runtime" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" />
+                    <TextBlock Text="Remaining runtime" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
                     <TextBlock x:Name="RemainingRuntimeText" Text="--" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock x:Name="BatteryStateText" Text="State: --" Foreground="{DynamicResource MutedTextBrush}" FontSize="9" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="BatteryStateText" Text="State: --" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </Border>
             <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10" Margin="6,0,0,0">
                 <StackPanel>
-                    <TextBlock Text="Battery identity" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" />
+                    <TextBlock Text="Battery identity" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
                     <TextBlock x:Name="BatteryModelText" Text="--" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
-                    <TextBlock x:Name="BatteryManufacturerText" Text="--" Foreground="{DynamicResource MutedTextBrush}" FontSize="9" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                    <TextBlock x:Name="BatteryManufacturerText" Text="--" Foreground="{DynamicResource MutedTextBrush}" FontSize="10.5" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
                 </StackPanel>
             </Border>
         </UniformGrid>
@@ -85,7 +85,7 @@
                 </Grid.RowDefinitions>
                 <Grid>
                     <TextBlock Text="Detected batteries" FontSize="14" FontWeight="SemiBold" />
-                    <TextBlock x:Name="StatusText" Text="Reading battery telemetry..." HorizontalAlignment="Right" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" />
+                    <TextBlock x:Name="StatusText" Text="Reading battery telemetry..." HorizontalAlignment="Right" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
                 </Grid>
                 <DataGrid Grid.Row="1" x:Name="BatteryGrid" Margin="0,7,0,0" SelectionChanged="BatteryGrid_SelectionChanged">
                     <DataGrid.Columns>
@@ -111,7 +111,7 @@
         <Grid Grid.Row="3" Margin="0,10,0,0">
             <TextBlock Text="Health = current full-charge capacity ÷ original designed capacity. When firmware/WMI hides static values, Windows Utility supplements them from the built-in Windows powercfg battery-report XML. Unsupported values remain Not reported."
                        Foreground="{DynamicResource MutedTextBrush}"
-                       FontSize="9"
+                       FontSize="10.5"
                        TextWrapping="Wrap"
                        VerticalAlignment="Center"
                        Margin="0,0,90,0" />

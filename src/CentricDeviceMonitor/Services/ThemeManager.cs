@@ -117,9 +117,14 @@ public static class ThemeManager
     {
         ResourceDictionary resources = WpfApplication.Current.Resources;
 
-        SetBrush(resources, "PrimaryBrush", "#007AFF");
-        SetBrush(resources, "PrimaryHoverBrush", dark ? "#0A84FF" : "#0067D8");
-        SetBrush(resources, "PrimaryPressedBrush", dark ? "#006CD8" : "#0057B8");
+        WpfColor primary = UseWindowsAccent && TryReadWindowsAccent(out WpfColor accent)
+            ? ReadableAccent(accent)
+            : (WpfColor)WpfColorConverter.ConvertFromString("#007AFF");
+        SetBrush(resources, "PrimaryBrush", primary);
+        SetBrush(resources, "PrimaryHoverBrush", dark ? Blend(primary, Colors.White, 0.14) : Blend(primary, Colors.Black, 0.12));
+        SetBrush(resources, "PrimaryPressedBrush", Blend(primary, Colors.Black, 0.24));
+        SetBrush(resources, "ScrollThumbBrush", dark ? "#55FFFFFF" : "#40000000");
+        SetBrush(resources, "ScrollThumbHoverBrush", dark ? "#99FFFFFF" : "#77000000");
         SetBrush(resources, "SuccessBrush", dark ? "#30D158" : "#34C759");
         SetBrush(resources, "WarningBrush", dark ? "#FFD60A" : "#FF9F0A");
         SetBrush(resources, "DangerBrush", dark ? "#FF453A" : "#FF3B30");
@@ -133,7 +138,7 @@ public static class ThemeManager
             SetBrush(resources, "SidebarBrush", "#252527");
             SetBrush(resources, "SecondarySurfaceBrush", "#3A3A3C");
             SetBrush(resources, "HoverBrush", "#14FFFFFF");
-            SetBrush(resources, "SelectedBrush", "#33007AFF");
+            SetBrush(resources, "SelectedBrush", WpfColor.FromArgb(0x33, primary.R, primary.G, primary.B));
             SetBrush(resources, "BorderBrush", "#14FFFFFF");
             SetBrush(resources, "TextBrush", "#F5F5F7");
             SetBrush(resources, "MutedTextBrush", "#AEAEB2");
@@ -150,7 +155,7 @@ public static class ThemeManager
             SetBrush(resources, "SidebarBrush", "#EBEBF0");
             SetBrush(resources, "SecondarySurfaceBrush", "#F5F5F7");
             SetBrush(resources, "HoverBrush", "#0D000000");
-            SetBrush(resources, "SelectedBrush", "#14007AFF");
+            SetBrush(resources, "SelectedBrush", WpfColor.FromArgb(0x14, primary.R, primary.G, primary.B));
             SetBrush(resources, "BorderBrush", "#0F000000");
             SetBrush(resources, "TextBrush", "#1D1D1F");
             SetBrush(resources, "MutedTextBrush", "#6E6E73");
@@ -160,6 +165,77 @@ public static class ThemeManager
         }
     }
 
+    /// <summary>Use the Windows accent colour (Settings > Personalization > Colors) instead of the app's blue.</summary>
+    public static bool UseWindowsAccent { get; set; } = true;
+
+    /// <summary>The accent colour Windows uses for title bars and Start (DWM, stored as 0xAABBGGRR).</summary>
+    private static bool TryReadWindowsAccent(out WpfColor color)
+    {
+        color = default;
+        try
+        {
+            using RegistryKey? dwm = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM", writable: false);
+            if (dwm?.GetValue("AccentColor") is int value)
+            {
+                uint abgr = unchecked((uint)value);
+                color = WpfColor.FromRgb((byte)(abgr & 0xFF), (byte)(abgr >> 8 & 0xFF), (byte)(abgr >> 16 & 0xFF));
+                return true;
+            }
+        }
+        catch
+        {
+            // Registry not readable: keep the app's own blue.
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Keeps white button text readable on the accent (contrast of at least 4.5:1) and the accent visible as text on
+    /// dark pages: very light accents are darkened and very dark ones lightened.
+    /// </summary>
+    internal static WpfColor ReadableAccent(WpfColor accent)
+    {
+        WpfColor color = accent;
+        for (int step = 0; step < 20 && Luminance(color) > 0.1833; step++) // white text contrast >= 4.5:1
+        {
+            color = Blend(color, Colors.Black, 0.08);
+        }
+
+        for (int step = 0; step < 20 && Luminance(color) < 0.07; step++)
+        {
+            color = Blend(color, Colors.White, 0.08);
+        }
+
+        return color;
+    }
+
+    internal static double Luminance(WpfColor color)
+    {
+        static double Channel(byte value)
+        {
+            double c = value / 255.0;
+            return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+        }
+
+        return 0.2126 * Channel(color.R) + 0.7152 * Channel(color.G) + 0.0722 * Channel(color.B);
+    }
+
+    private static WpfColor Blend(WpfColor from, WpfColor to, double amount) => WpfColor.FromRgb(
+        (byte)Math.Round(from.R + (to.R - from.R) * amount),
+        (byte)Math.Round(from.G + (to.G - from.G) * amount),
+        (byte)Math.Round(from.B + (to.B - from.B) * amount));
+
+    private static void SetBrush(ResourceDictionary resources, string key, WpfColor color)
+    {
+        if (resources[key] is SolidColorBrush existingBrush && !existingBrush.IsFrozen)
+        {
+            existingBrush.Color = color;
+            return;
+        }
+
+        resources[key] = new SolidColorBrush(color);
+    }
     private static void SetBrush(ResourceDictionary resources, string key, string colorValue)
     {
         WpfColor color = (WpfColor)WpfColorConverter.ConvertFromString(colorValue);

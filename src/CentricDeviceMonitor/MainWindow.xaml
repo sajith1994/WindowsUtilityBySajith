@@ -37,9 +37,9 @@
 
         <Style x:Key="CardDescriptionStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="LineHeight" Value="17" />
+            <Setter Property="LineHeight" Value="18" />
         </Style>
 
         <Style x:Key="SectionEyebrowStyle" TargetType="TextBlock">
@@ -65,22 +65,23 @@
 
         <Style x:Key="InfoLabelStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="InfoValueStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
+        <!-- Small text-only button: same size and look as the compact buttons so all small buttons match. -->
         <Style x:Key="HeaderMiniButton" TargetType="Button" BasedOn="{StaticResource CompactButton}">
-            <Setter Property="Padding" Value="7,3" />
-            <Setter Property="MinHeight" Value="25" />
-            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="FontSize" Value="11" />
             <Setter Property="Margin" Value="0,0,4,0" />
         </Style>
 
@@ -158,7 +159,7 @@
 
                 <TextBlock Grid.Row="1"
                            Text="TOOLS"
-                           FontSize="9"
+                           FontSize="11"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource TertiaryTextBrush}"
                            Margin="12,0,0,5" />
@@ -257,7 +258,7 @@
                         <TextBlock x:Name="HeaderSubtitleText"
                                    Text="Live health, hardware inventory and monitoring overview"
                                    Foreground="{DynamicResource MutedTextBrush}"
-                                   FontSize="10"
+                                   FontSize="11"
                                    Margin="0,2,0,0"
                                    TextTrimming="CharacterEllipsis" />
                     </StackPanel>
@@ -400,7 +401,7 @@
                                                     <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,6,0"
                                                             VerticalAlignment="Center" Background="{Binding StatusBrush}" />
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" />
-                                                    <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="9" Opacity="0.5"
+                                                    <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
                                                                VerticalAlignment="Center" Margin="5,1,0,0" />
                                                 </StackPanel>
                                                 <TextBlock Text="{Binding Headline}" FontSize="12" Margin="14,1,0,0" TextWrapping="Wrap" />
@@ -422,7 +423,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE957;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
                                         <TextBlock Text="Processor" Style="{StaticResource InfoLabelStyle}" />
-                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" Opacity="0.5"
+                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
                                                    VerticalAlignment="Center" Margin="6,0,0,0" />
                                     </StackPanel>
                                     <TextBlock x:Name="CpuTemperatureText" Text="Checking..." FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
@@ -454,7 +455,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE7F8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
                                         <TextBlock Text="Graphics" Style="{StaticResource InfoLabelStyle}" />
-                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" Opacity="0.5"
+                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
                                                    VerticalAlignment="Center" Margin="6,0,0,0" />
                                     </StackPanel>
                                     <TextBlock x:Name="GpuTemperatureText" Text="Temperature: Checking..." FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
@@ -484,7 +485,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE7F1;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
                                         <TextBlock Text="Memory" Style="{StaticResource InfoLabelStyle}" />
-                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10" Opacity="0.5"
+                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
                                                    VerticalAlignment="Center" Margin="6,0,0,0" />
                                     </StackPanel>
                                     <TextBlock x:Name="RamUsageText" Text="--%" FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
@@ -512,7 +513,7 @@
                                                         <ProgressBar Grid.Column="1" Value="{Binding ActivePercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
                                                         <TextBlock Grid.Column="2" Text="{Binding PercentText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                                     </Grid>
-                                                    <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -539,7 +540,7 @@
                                                         <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" />
                                                         <TextBlock Grid.Column="1" Text="{Binding Rates}" FontSize="12" FontWeight="SemiBold" Margin="10,0,0,0" />
                                                     </Grid>
-                                                    <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -659,6 +660,15 @@
                                                   Checked="DesktopNotificationsToggle_Changed"
                                                   Unchecked="DesktopNotificationsToggle_Changed" />
                                     <TextBlock Text="Turns off balloon alerts from the dashboard, including the CPU temperature alert. The sound alert is controlled separately under CPU Sensor and Alerts."
+                                               Style="{StaticResource CardDescriptionStyle}"
+                                               TextWrapping="Wrap" Margin="0,5,0,8" />
+                                    <ToggleButton x:Name="WindowsAccentToggle"
+                                                  Content="Use the Windows accent colour"
+                                                  Style="{StaticResource ToggleSwitch}"
+                                                  FontSize="11"
+                                                  Checked="WindowsAccentToggle_Changed"
+                                                  Unchecked="WindowsAccentToggle_Changed" />
+                                    <TextBlock Text="Buttons, links and highlights follow the colour chosen in Windows Settings > Personalization > Colors. Off uses the app's own blue."
                                                Style="{StaticResource CardDescriptionStyle}"
                                                TextWrapping="Wrap" Margin="0,5,0,8" />
                                     <TextBlock x:Name="BackgroundServiceControlHelpText"
@@ -899,10 +909,24 @@
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="1.1*" />
                                         <DataGridTextColumn Header="IP address" Binding="{Binding IpAddress}" Width="1*" />
-                                        <DataGridTemplateColumn Header="Status" Width="90">
+                                        <DataGridTemplateColumn Header="Status" Width="112">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="&#xE9CE;" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Online"><Setter Property="Text" Value="&#xE73E;" /><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Offline"><Setter Property="Text" Value="&#xE711;" /><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Text" Value="&#xE7BA;" /><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Checking"><Setter Property="Text" Value="&#xE895;" /><Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>                                                    <TextBlock Text="{Binding Status}" FontWeight="SemiBold" VerticalAlignment="Center">
                                                         <TextBlock.Style>
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
@@ -914,7 +938,8 @@
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
-                                                    </TextBlock>
+                                                    </TextBlock>                                                    </StackPanel>
+
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
@@ -962,7 +987,7 @@
                                                                             </Style.Triggers>
                                                                         </Style>
                                                                     </Border.Style>
-                                                                    <TextBlock Text="Internet" FontSize="10" FontWeight="SemiBold" Foreground="White" />
+                                                                    <TextBlock Text="Internet" FontSize="11" FontWeight="SemiBold" Foreground="White" />
                                                                 </Border>
                                                             </StackPanel>
                                                             <TextBlock Text="{Binding LinkDisplay}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
@@ -1676,7 +1701,20 @@
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </Border.Style>
-                                                            <TextBlock Text="{Binding StatusLabel}" FontSize="10" FontWeight="SemiBold">
+                                                            <StackPanel Orientation="Horizontal">
+                                                            <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Text" Value="&#xE895;" />
+                                                                        <Setter Property="Foreground" Value="White" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding StatusKind}" Value="Online"><Setter Property="Text" Value="&#xE73E;" /></DataTrigger>
+                                                                            <DataTrigger Binding="{Binding StatusKind}" Value="Warning"><Setter Property="Text" Value="&#xE7BA;" /><Setter Property="Foreground" Value="#1F1F1F" /></DataTrigger>
+                                                                            <DataTrigger Binding="{Binding StatusKind}" Value="Offline"><Setter Property="Text" Value="&#xE711;" /></DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>                                                            <TextBlock Text="{Binding StatusLabel}" FontSize="11" FontWeight="SemiBold">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
                                                                         <Setter Property="Foreground" Value="White" />
@@ -1686,7 +1724,8 @@
                                                                         </Style.Triggers>
                                                                     </Style>
                                                                 </TextBlock.Style>
-                                                            </TextBlock>
+                                                            </TextBlock>                                                            </StackPanel>
+
                                                         </Border>
                                                     </Grid>
 
@@ -1714,7 +1753,7 @@
                                                             <TextBlock Text="CPU" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
                                                             <ProgressBar Grid.Column="1" Value="{Binding CpuPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
                                                             <TextBlock Grid.Column="2" Text="{Binding CpuText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                                                        </Grid>                                                        <TextBlock Text="{Binding CpuModel}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
+                                                        </Grid>                                                        <TextBlock Text="{Binding CpuModel}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
                                                         <Grid Margin="0,6,0,0">
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                                             <TextBlock Text="Temp" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
@@ -1730,14 +1769,14 @@
                                                                 </Run>
                                                             </TextBlock>
                                                         </Grid>
-                                                        <TextBlock Text="{Binding TemperatureDetail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
+                                                        <TextBlock Text="{Binding TemperatureDetail}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
                                                         <Grid Margin="0,6,0,0" ToolTip="{Binding RamDetail}">
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions>
                                                             <TextBlock Text="RAM" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
                                                             <ProgressBar Grid.Column="1" Value="{Binding RamPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
                                                             <TextBlock Grid.Column="2" Text="{Binding RamText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                                         </Grid>
-                                                        <TextBlock Text="{Binding RamDetail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="44,1,0,0" />
+                                                        <TextBlock Text="{Binding RamDetail}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" Margin="44,1,0,0" />
                                                         <Grid Margin="0,6,0,0">
                                                             <Grid.Style>
                                                                 <Style TargetType="Grid">
@@ -1786,7 +1825,7 @@
                                                                 <ProgressBar Grid.Column="1" Value="{Binding BatteryPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
                                                                 <TextBlock Grid.Column="2" Text="{Binding BatteryText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                                             </Grid>
-                                                            <TextBlock Text="{Binding BatteryDetail}" FontSize="10" TextWrapping="Wrap" Margin="44,1,0,0">
+                                                            <TextBlock Text="{Binding BatteryDetail}" FontSize="11" TextWrapping="Wrap" Margin="44,1,0,0">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
                                                                         <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
@@ -1810,7 +1849,7 @@
                                                                 <TextBlock Text="Net" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
                                                                 <TextBlock Grid.Column="1" Text="{Binding NetworkText}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
                                                             </Grid>
-                                                            <TextBlock Text="{Binding NetworkDetail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
+                                                            <TextBlock Text="{Binding NetworkDetail}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0" />
                                                         </StackPanel>                                                        <ItemsControl ItemsSource="{Binding Disks}" Margin="0,4,0,0">
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
@@ -1829,8 +1868,8 @@
                                                                                 </TextBlock.Style>
                                                                             </TextBlock>
                                                                         </Grid>
-                                                                        <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="44,1,0,0" />
-                                                                        <TextBlock Text="{Binding ActivityText}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0">
+                                                                        <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" Margin="44,1,0,0" />
+                                                                        <TextBlock Text="{Binding ActivityText}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="44,1,0,0">
                                                                             <TextBlock.Style>
                                                                                 <Style TargetType="TextBlock">
                                                                                     <Style.Triggers>
@@ -1852,7 +1891,7 @@
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
-                                                    </TextBlock>                                                    <TextBlock Text="{Binding UpdatedText}" FontSize="10" Foreground="{DynamicResource MutedTextBrush}" Margin="0,10,0,0" />
+                                                    </TextBlock>                                                    <TextBlock Text="{Binding UpdatedText}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" Margin="0,10,0,0" />
                                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
                                                         <Button Content="Update" Tag="{Binding}" Click="UpdateRemotePcButton_Click" Margin="0,0,6,0"
                                                                 ToolTip="That PC downloads the latest official release, checks it and installs it silently.">
@@ -1886,7 +1925,7 @@
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="0,1,0,0"
                     Padding="16,6">
-                <TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" />
+                <TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource MutedTextBrush}" FontSize="11" />
             </Border>
         </Grid>
 

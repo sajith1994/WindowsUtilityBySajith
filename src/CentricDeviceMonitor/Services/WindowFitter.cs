@@ -35,6 +35,11 @@ public static class WindowFitter
             window.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextBrush");
         }
 
+        if (window.ReadLocalValue(System.Windows.Controls.Control.FontFamilyProperty) == DependencyProperty.UnsetValue)
+        {
+            window.SetResourceReference(System.Windows.Controls.Control.FontFamilyProperty, "AppFontFamily");
+        }
+
         if (window.ReadLocalValue(System.Windows.Controls.Control.BackgroundProperty) == DependencyProperty.UnsetValue
             && !window.AllowsTransparency)
         {

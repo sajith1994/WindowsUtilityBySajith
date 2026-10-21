@@ -200,8 +200,10 @@ public partial class MainWindow : Window
         _loadingSettings = true;
         TrayIconToggle.IsChecked = _appSettings.TrayIconEnabled;
         DesktopNotificationsToggle.IsChecked = _appSettings.DesktopNotificationsEnabled;
+        WindowsAccentToggle.IsChecked = _appSettings.UseWindowsAccentColor;
         ApplyTrayIconVisibility();
         _appSettings.UiThemePreference = ThemeManager.NormalizePreference(_appSettings.UiThemePreference);
+        ThemeManager.UseWindowsAccent = _appSettings.UseWindowsAccentColor;
         _appliedDarkTheme = ThemeManager.Apply(_appSettings.UiThemePreference);
         SelectThemePreference(_appSettings.UiThemePreference);
         StartupCheckBox.IsChecked = _startupService.IsEnabled();
@@ -373,6 +375,7 @@ public partial class MainWindow : Window
         }
 
         _appSettings.UiThemePreference = ThemeManager.NormalizePreference(preference);
+        ThemeManager.UseWindowsAccent = _appSettings.UseWindowsAccentColor;
         _appliedDarkTheme = ThemeManager.Apply(_appSettings.UiThemePreference);
         await RefreshCpuTemperatureAsync();
         RefreshSystemResourceUsage();
@@ -393,6 +396,26 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void WindowsAccentToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingSettings || !IsLoaded)
+        {
+            return;
+        }
+
+        _appSettings.UseWindowsAccentColor = WindowsAccentToggle.IsChecked == true;
+        ThemeManager.UseWindowsAccent = _appSettings.UseWindowsAccentColor;
+        _appliedDarkTheme = ThemeManager.Apply(_appSettings.UiThemePreference);
+        StatusText.Text = _appSettings.UseWindowsAccentColor ? "Using the Windows accent colour." : "Using the app's own blue.";
+        try
+        {
+            await _settingsService.SaveAsync(_appSettings);
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException("Save accent colour setting", exception);
+        }
+    }
     private void SelectThemePreference(string preference)
     {
         string normalized = ThemeManager.NormalizePreference(preference);

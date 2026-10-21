@@ -5,6 +5,9 @@ public sealed class AppSettings
     // UI theme: System follows the current Windows app theme; Light/Dark are explicit overrides.
     public string UiThemePreference { get; set; } = "System";
 
+    /// <summary>Buttons, links and highlights use the Windows accent colour instead of the app's blue.</summary>
+    public bool UseWindowsAccentColor { get; set; } = true;
+
     public bool AutomaticMonitoringEnabled { get; set; } = true;
 
     /// <summary>Shows the notification-area icon for this dashboard process.</summary>

@@ -157,7 +157,7 @@
                                     <Viewport3D x:Name="GpuLoadViewport" />
                                     <StackPanel x:Name="GpuPreviewPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16">
                                         <TextBlock Text="&#xE7F8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28" Foreground="#FF4AA3FF" HorizontalAlignment="Center" />
-                                        <TextBlock Text="Shows the render workload when it is the GPU load in use." Foreground="#FFAEB7C8" FontSize="10" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" />
+                                        <TextBlock Text="Shows the render workload when it is the GPU load in use." Foreground="#FFAEB7C8" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" />
                                     </StackPanel>
                                 </Grid>
                             </Border>

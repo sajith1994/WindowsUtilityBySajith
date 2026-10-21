@@ -260,6 +260,22 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.73] - 2026-10-21
+
+### Changed (look and feel)
+- **Windows accent colour:** buttons, links and highlights follow the colour chosen in Windows Settings >
+  Personalization > Colors (adjusted when needed so white button text stays readable). A new "Use the Windows accent
+  colour" switch next to the other dashboard settings goes back to the app's own blue.
+- **Windows 11 font:** every window now uses Segoe UI Variable, Windows 11's own font (Windows 10 uses Segoe UI). The
+  "Inter" font named before was never installed with the app, so text looked different from PC to PC.
+- **Larger small text:** descriptions, labels and values are 12 px instead of 11, the smallest text and buttons are
+  11 px instead of 9-10, and tab labels are slightly larger.
+- **Scrollbars** are thin and rounded and follow the theme (they stayed bright grey in dark mode).
+- **Tables:** taller rows, padded cells, no zebra stripes or column separators, and clearer headers.
+- **Status icons alongside colours:** Network PCs status badges and the managed devices list show ✓ Online,
+  ⚠ warnings, ✕ Offline and ↻ Checking, readable without relying on colour.
+- **One small-button style:** the small text buttons now have the same size, padding and font as the other compact
+  buttons.
 ## [2.0.72] - 2026-10-21
 
 ### Changed (lighter, nothing removed)

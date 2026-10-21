@@ -28,7 +28,11 @@
         <SolidColorBrush x:Key="SuccessBrush" Color="#34C759" />
         <SolidColorBrush x:Key="WarningBrush" Color="#FF9F0A" />
         <SolidColorBrush x:Key="DangerBrush" Color="#FF3B30" />
+        <SolidColorBrush x:Key="ScrollThumbBrush" Color="#40000000" />
+        <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#70000000" />
 
+        <!-- Windows 11's own UI font; Windows 10 falls back to Segoe UI. ("Inter" was never installed with the app.) -->
+        <FontFamily x:Key="AppFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
         <DropShadowEffect x:Key="AppleCardShadow"
                           BlurRadius="16"
                           Direction="270"
@@ -63,9 +67,9 @@
 
         <Style x:Key="CardDescriptionStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="LineHeight" Value="17" />
+            <Setter Property="LineHeight" Value="18" />
         </Style>
 
         <Style x:Key="SectionEyebrowStyle" TargetType="TextBlock">
@@ -90,13 +94,13 @@
 
         <Style x:Key="InfoLabelStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <Style x:Key="InfoValueStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -111,14 +115,14 @@
 
         <Style x:Key="ShortcutHelpStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
-            <Setter Property="FontSize" Value="9.5" />
+            <Setter Property="FontSize" Value="11" />
             <Setter Property="TextWrapping" Value="Wrap" />
-            <Setter Property="LineHeight" Value="13" />
+            <Setter Property="LineHeight" Value="15" />
             <Setter Property="Margin" Value="4,4,8,0" />
         </Style>
 
         <Style TargetType="Window">
-            <Setter Property="FontFamily" Value="Inter, Segoe UI" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Background" Value="{DynamicResource PageBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
@@ -666,6 +670,16 @@
         <Style TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="5,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter VerticalAlignment="Center" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridRow}}" />
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
@@ -709,7 +723,7 @@
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="12,6" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -742,7 +756,9 @@
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="SeparatorVisibility" Value="Collapsed" />
         </Style>
 
         <Style TargetType="DataGridRow">
@@ -767,7 +783,84 @@
             <Setter Property="GridLinesVisibility" Value="Horizontal" />
             <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="RowBackground" Value="{DynamicResource CardBrush}" />
-            <Setter Property="AlternatingRowBackground" Value="{DynamicResource SecondarySurfaceBrush}" />
+            <Setter Property="AlternatingRowBackground" Value="{DynamicResource CardBrush}" />
+            <Setter Property="RowHeight" Value="32" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="VerticalGridLinesBrush" Value="Transparent" />
+        </Style>
+
+        <!-- Thin, rounded, theme-aware scrollbars (the Windows default stays bright grey in dark mode). -->
+        <Style x:Key="ScrollPageButton" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ScrollThumb" TargetType="Thumb">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="Bar" CornerRadius="4" Background="{DynamicResource ScrollThumbBrush}" />
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bar" Property="Background" Value="{DynamicResource ScrollThumbHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="Bar" Property="Background" Value="{DynamicResource ScrollThumbHoverBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Width" Value="12" />
+            <Setter Property="MinWidth" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="{TemplateBinding Background}">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True" Margin="3,2">
+                                <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Style="{StaticResource ScrollPageButton}" /></Track.DecreaseRepeatButton>
+                                <Track.Thumb><Thumb Style="{StaticResource ScrollThumb}" MinHeight="24" /></Track.Thumb>
+                                <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Style="{StaticResource ScrollPageButton}" /></Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto" />
+                    <Setter Property="MinWidth" Value="0" />
+                    <Setter Property="Height" Value="12" />
+                    <Setter Property="MinHeight" Value="12" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Grid Background="{TemplateBinding Background}">
+                                    <Track x:Name="PART_Track" IsDirectionReversed="False" Margin="2,3">
+                                        <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageLeftCommand" Style="{StaticResource ScrollPageButton}" /></Track.DecreaseRepeatButton>
+                                        <Track.Thumb><Thumb Style="{StaticResource ScrollThumb}" MinWidth="24" /></Track.Thumb>
+                                        <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageRightCommand" Style="{StaticResource ScrollPageButton}" /></Track.IncreaseRepeatButton>
+                                    </Track>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
         </Style>
     </Application.Resources>
 </Application>
