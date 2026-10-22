@@ -16,6 +16,7 @@ public static class InventoryReportService
     private static readonly (string Header, Func<Row, string> Value)[] Columns =
     {
         ("PC", row => row.View.Title),
+        ("Group", row => row.View.Group),
         ("Status", row => row.Online ? "Online" : "Offline"),
         ("Last seen", row => row.Online ? "Now" : row.View.LastSeen?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "Never this session"),
         ("Address", row => row.View.Entry.Host),
@@ -51,6 +52,9 @@ public static class InventoryReportService
             : string.Empty),
         ("Firewall on", row => YesNo(row.Stats?.Security?.FirewallOn)),
         ("Problems (7 days)", row => row.Stats?.Problems is { } problems ? (problems.HasAny ? problems.Describe() : "None") : string.Empty),
+        ("System Protection", row => YesNo(row.Stats?.Recovery?.SystemProtectionOn)),
+        ("Last restore point", row => row.Stats?.Recovery?.LastRestorePointUtc?.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty),
+        ("Wake-on-LAN", row => YesNo(row.View.Entry.WakeOnLanEnabled)),
     };
 
     public static string BuildCsv(IEnumerable<RemotePcView> views)
@@ -128,7 +132,8 @@ public static class InventoryReportService
 
     private static IEnumerable<Row> Rows(IEnumerable<RemotePcView> views) =>
         views.Select(view => new Row(view, view.IsOnline ? view.Stats : view.LastKnownStats, view.IsOnline))
-            .OrderBy(row => row.View.Title, StringComparer.CurrentCultureIgnoreCase);
+            .OrderBy(row => row.View.Group, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(row => row.View.Title, StringComparer.CurrentCultureIgnoreCase);
 
     /// <summary>Cell colour for problems: red for protection off, amber for things to look at soon.</summary>
     private static string Highlight(string header, Row row)
@@ -148,6 +153,8 @@ public static class InventoryReportService
             "Definitions (days old)" when security?.DefinitionsUpdatedUtc is DateTime updated && DateTime.UtcNow - updated > TimeSpan.FromDays(7) => "warn",
             "Lowest free %" when stats?.Disks.Any(disk => disk.TotalBytes > 0 && disk.FreeBytes < disk.TotalBytes * 0.10) == true => "warn",
             "Battery health %" when stats?.BatteryHealthPercent is < 60 => "warn",
+            "System Protection" when stats?.Recovery?.SystemProtectionOn == false => "warn",
+            "Last restore point" when stats?.Recovery is { } recovery && RemotePcView.RecoveryStale(recovery) => "warn",
             "CPU temp °C" when stats is { CpuTemperatureIsCpuSpecific: true, CpuTemperatureCelsius: double temperature } && temperature >= stats.CpuTemperatureAlertThresholdCelsius => "bad",
             "RAM used %" when stats?.RamUsagePercent >= 95 => "warn",
             "Windows Utility" when stats is not null && Version.TryParse(stats.AppVersion, out Version? version) && version < UpdateService.GetCurrentVersion() => "warn",
@@ -167,6 +174,8 @@ public static class InventoryReportService
     private static string Gb(long bytes) => RemotePcView.FormatGb(bytes);
 
     private static string Encode(string text) => WebUtility.HtmlEncode(text);
+
+    public static string CsvField(string value) => Csv(value);
 
     /// <summary>Quoted when needed; a leading =, +, - or @ is escaped so Excel never treats a value as a formula.</summary>
     private static string Csv(string value)

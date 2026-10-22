@@ -74,6 +74,9 @@ public sealed class AppSettings
     /// <summary>Accept actions (restart, shut down, lock, message, clear temp, Windows Update scan) from the PC monitoring this one.</summary>
     public bool RemoteActionsEnabled { get; set; }
 
+    /// <summary>Also accept PCs on a Tailscale VPN (any network), not only the local subnet on private networks.</summary>
+    public bool RemoteSharingAllowVpn { get; set; }
+
     /// <summary>Set once another PC has connected with the code: the code is then hidden until re-entered.</summary>
     public bool RemoteSharingCodeLocked { get; set; }
 
@@ -96,6 +99,21 @@ public sealed class AppSettings
 
     /// <summary>PCs monitored from this PC (Network PCs page).</summary>
     public List<RemotePcEntry> RemotePcs { get; set; } = new();
+
+    /// <summary>One notification each morning summing up the monitored PCs' last 24 hours.</summary>
+    public bool DailySummaryEnabled { get; set; } = true;
+
+    /// <summary>Hour (local, 0-23) of the daily summary.</summary>
+    public int DailySummaryHour { get; set; } = 8;
+
+    /// <summary>yyyy-MM-dd of the last summary shown, so it appears once a day.</summary>
+    public string DailySummaryLastDate { get; set; } = string.Empty;
+
+    /// <summary>Read-only page of the monitored PCs for a phone on the same network (served by the background service).</summary>
+    public bool PhoneViewEnabled { get; set; }
+
+    /// <summary>Secret part of the phone page link; a new key makes old links stop working.</summary>
+    public string PhoneViewKey { get; set; } = string.Empty;
 }
 
 public sealed class DashboardTileLayout

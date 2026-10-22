@@ -15,6 +15,8 @@ public sealed class DeviceEntry : INotifyPropertyChanged
     private DateTime? _lastChecked;
     private string _lastError = string.Empty;
     private bool _isChecking;
+    private bool _powerSaving;
+    private string _lastKnownMacAddress = string.Empty;
 
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -29,6 +31,33 @@ public sealed class DeviceEntry : INotifyPropertyChanged
         get => _ipAddress;
         set => SetField(ref _ipAddress, value);
     }
+
+    /// <summary>
+    /// Phone, tablet or laptop that dozes on Wi-Fi: shown as Asleep instead of Offline when it stops answering, and no
+    /// outage is logged for it.
+    /// </summary>
+    public bool PowerSaving
+    {
+        get => _powerSaving;
+        set => SetField(ref _powerSaving, value);
+    }
+
+    /// <summary>Last real adapter address seen (kept by the background service), used to wake the device.</summary>
+    [JsonIgnore]
+    public string LastKnownMacAddress
+    {
+        get => _lastKnownMacAddress;
+        set
+        {
+            if (SetField(ref _lastKnownMacAddress, value))
+            {
+                OnPropertyChanged(nameof(CanWake));
+            }
+        }
+    }
+
+    [JsonIgnore]
+    public bool CanWake => _lastKnownMacAddress.Length > 0 && _status is "Offline" or "Asleep" or "Error";
 
     [JsonIgnore]
     public string Hostname
@@ -48,7 +77,13 @@ public sealed class DeviceEntry : INotifyPropertyChanged
     public string Status
     {
         get => _status;
-        set => SetField(ref _status, value);
+        set
+        {
+            if (SetField(ref _status, value))
+            {
+                OnPropertyChanged(nameof(CanWake));
+            }
+        }
     }
 
     [JsonIgnore]

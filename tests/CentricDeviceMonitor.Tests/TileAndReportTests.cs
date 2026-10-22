@@ -109,7 +109,7 @@ public class TileAndReportTests
     {
         string csv = InventoryReportService.BuildCsv(new[] { View("NB-002", online: false) });
         string row = csv.Split(Environment.NewLine)[1];
-        Assert.StartsWith("NB-002,Offline,", row);
+        Assert.StartsWith("NB-002,,Offline,", row);
         Assert.Contains("C: 100 GB free of 200 GB", row);
     }
 

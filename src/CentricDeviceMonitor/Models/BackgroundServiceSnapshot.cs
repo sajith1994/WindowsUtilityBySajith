@@ -109,6 +109,9 @@ public sealed class BackgroundServiceSnapshot
     /// <summary>PCs that have read this PC's stats with the current pairing code.</summary>
     public List<RemoteViewerInfo> RemoteViewers { get; set; } = new();
 
+    /// <summary>Phone page state, e.g. "Phone page on port 47810" or why it is not available.</summary>
+    public string PhoneViewStatus { get; set; } = "Off";
+
     public List<DeviceRuntimeStatus> Devices { get; set; } = new();
 }
 
@@ -127,4 +130,7 @@ public sealed class DeviceRuntimeStatus
     public DateTime? LastChecked { get; set; }
 
     public string LastError { get; set; } = string.Empty;
+
+    /// <summary>Last real adapter address seen for the device, kept while it is offline (for Wake-on-LAN).</summary>
+    public string LastKnownMacAddress { get; set; } = string.Empty;
 }

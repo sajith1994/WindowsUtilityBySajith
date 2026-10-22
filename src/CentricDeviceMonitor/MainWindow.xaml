@@ -566,7 +566,11 @@
                                     <Grid Margin="0,14,0,4">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="InstalledPrintersHeaderText" Text="Installed printers" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                        <Button Grid.Column="1" Content="Devices &amp; Printers" Style="{StaticResource HeaderMiniButton}" Click="OpenDevicesAndPrintersButton_Click" Margin="0" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <Button Content="Ink &amp; toner" Style="{StaticResource HeaderMiniButton}" Click="PrinterSuppliesButton_Click" Margin="0,0,6,0"
+                                                    ToolTip="Toner and ink levels of the network printers (installed or found by Scan network)." />
+                                            <Button Content="Devices &amp; Printers" Style="{StaticResource HeaderMiniButton}" Click="OpenDevicesAndPrintersButton_Click" Margin="0" />
+                                        </StackPanel>
                                     </Grid>
                                     <ScrollViewer MaxHeight="118" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <ItemsControl x:Name="InstalledPrintersList">
@@ -921,6 +925,7 @@
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding Status}" Value="Online"><Setter Property="Text" Value="&#xE73E;" /><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" /></DataTrigger>
                                                                     <DataTrigger Binding="{Binding Status}" Value="Offline"><Setter Property="Text" Value="&#xE711;" /><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Asleep"><Setter Property="Text" Value="&#xE708;" /><Setter Property="Foreground" Value="{DynamicResource WarningBrush}" /></DataTrigger>
                                                                     <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Text" Value="&#xE7BA;" /><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
                                                                     <DataTrigger Binding="{Binding Status}" Value="Checking"><Setter Property="Text" Value="&#xE895;" /><Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" /></DataTrigger>
                                                                 </Style.Triggers>
@@ -934,6 +939,7 @@
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding Status}" Value="Online"><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" /></DataTrigger>
                                                                     <DataTrigger Binding="{Binding Status}" Value="Offline"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Asleep"><Setter Property="Foreground" Value="{DynamicResource WarningBrush}" /></DataTrigger>
                                                                     <DataTrigger Binding="{Binding Status}" Value="Error"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
                                                                     <DataTrigger Binding="{Binding Status}" Value="Checking"><Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" /></DataTrigger>
                                                                 </Style.Triggers>
@@ -948,6 +954,23 @@
                                         <DataGridTextColumn Header="Response" Binding="{Binding ResponseDisplay}" Width="85" />
                                         <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="1.25*" />
                                         <DataGridTextColumn Header="Last checked" Binding="{Binding LastCheckedDisplay}" Width="150" />
+                                        <DataGridTemplateColumn Header="" Width="70">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="Wake" Tag="{Binding}" Click="WakeDeviceButton_Click" Padding="8,2" VerticalAlignment="Center"
+                                                            ToolTip="Send a Wake-on-LAN signal to the address this device had when it was last online (works for PCs, NAS boxes and some printers; not for phones).">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource HeaderMiniButton}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding CanWake}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </StackPanel>
@@ -1603,9 +1626,15 @@
                                 <StackPanel x:Name="RemoteActionsPanel" Visibility="Collapsed" Margin="0,12,0,0">
                                     <ToggleButton x:Name="RemoteActionsToggle" Content="Allow actions from the main PC" Style="{StaticResource ToggleSwitch}" FontSize="11"
                                                   Checked="RemoteActionsToggle_Changed" Unchecked="RemoteActionsToggle_Changed"
-                                                  ToolTip="Lets the PC monitoring this one restart or shut it down, lock it, show a message, clear temporary files or start a Windows Update check." />
-                                    <TextBlock Text="Off by default. When on, the PC monitoring this one (with the pairing code) can restart or shut down this PC with a countdown, lock it, show a message, clear temporary files and start a Windows Update check. Each action is logged here."
+                                                  ToolTip="Lets the PC monitoring this one restart or shut it down, lock it, show a message, clear temporary files, start a Windows Update check or create a restore point." />
+                                    <TextBlock Text="Off by default. When on, the PC monitoring this one (with the pairing code) can restart or shut down this PC with a countdown, lock it, show a message, clear temporary files, start a Windows Update check and create a restore point. Each action is logged here."
                                                Style="{StaticResource CardDescriptionStyle}" Margin="0,5,0,0" />
+                                </StackPanel>
+                                <StackPanel x:Name="RemoteVpnPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <ToggleButton x:Name="RemoteVpnToggle" Content="Also allow PCs on my VPN (Tailscale)" Style="{StaticResource ToggleSwitch}" FontSize="11"
+                                                  Checked="RemoteVpnToggle_Changed" Unchecked="RemoteVpnToggle_Changed"
+                                                  ToolTip="For a main PC at another site or at home. Opens the port to Tailscale addresses only, on any network." />
+                                    <TextBlock x:Name="RemoteVpnText" Style="{StaticResource CardDescriptionStyle}" Margin="0,5,0,0" />
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -1621,6 +1650,8 @@
                                         <TextBlock x:Name="RemotePcsCountText" Text="" Style="{StaticResource InfoLabelStyle}" Margin="10,1,0,0" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Content="Software" Tag="&#xE71D;" Style="{StaticResource IconCompactButton}" Click="AllSoftwareButton_Click" Margin="0,0,8,0"
+                                                ToolTip="Search the programs installed on every monitored PC, for example to find which PCs have AnyDesk or an old Chrome." />
                                         <Button Content="Export report" Tag="&#xE9F9;" Style="{StaticResource IconCompactButton}" Click="ExportInventoryReportButton_Click" Margin="0,0,8,0"
                                                 ToolTip="Save an inventory of every monitored PC: a printable report (save it as PDF from the browser) or a CSV file for Excel." />
                                         <Button x:Name="UpdateAllRemotePcsButton" Content="Update all" Tag="&#xE777;" Style="{StaticResource IconCompactButton}" Click="UpdateAllRemotePcsButton_Click" Margin="0,0,8,0"
@@ -1648,6 +1679,39 @@
                                         </WrapPanel>
                                         <TextBlock x:Name="RemoteAlertsNoteText" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
                                         <TextBlock x:Name="RecentRemoteAlertsText" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed" />
+                                        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,10,0,0">
+                                            <StackPanel>
+                                                <WrapPanel>
+                                                    <ToggleButton x:Name="DailySummaryToggle" Content="Daily summary each morning at" Style="{StaticResource ToggleSwitch}" FontSize="11" VerticalAlignment="Center"
+                                                                  Checked="DailySummarySetting_Changed" Unchecked="DailySummarySetting_Changed"
+                                                                  ToolTip="One notification a day about what needs attention, what happened in the last 24 hours and printers low on ink or toner." />
+                                                    <ComboBox x:Name="DailySummaryHourComboBox" Width="96" Margin="10,0,0,0" VerticalAlignment="Center" SelectionChanged="DailySummarySetting_Changed" />
+                                                    <Button Content="Show summary now" Style="{StaticResource HeaderMiniButton}" Click="ShowDailySummaryButton_Click" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                                </WrapPanel>
+                                                <TextBlock x:Name="DailySummaryNoteText" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <ToggleButton x:Name="PhoneViewToggle" Content="Phone view: see these PCs on a phone on the same Wi-Fi" Style="{StaticResource ToggleSwitch}" FontSize="11"
+                                                      Checked="PhoneViewToggle_Changed" Unchecked="PhoneViewToggle_Changed"
+                                                      ToolTip="A read-only page of these tiles, served by this PC's background service. Only phones with the link can open it." />
+                                        <StackPanel x:Name="PhoneViewDetailsPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBox x:Name="PhoneViewLinkBox" IsReadOnly="True" Height="32" Padding="8,2" FontFamily="Consolas" FontSize="13" VerticalContentAlignment="Center"
+                                                         ToolTip="Open this link in the phone's browser (it must be on the same network as this PC)." />
+                                                <Button Grid.Column="1" Content="Copy link" Style="{StaticResource HeaderMiniButton}" Click="CopyPhoneLinkButton_Click" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                <Button Grid.Column="2" Content="Open here" Style="{StaticResource HeaderMiniButton}" Click="OpenPhoneLinkButton_Click" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                        ToolTip="Preview the phone page in this PC's browser." />
+                                                <Button Grid.Column="3" Content="New link" Style="{StaticResource HeaderMiniButton}" Click="NewPhoneLinkButton_Click" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                        ToolTip="Makes a new link; the old one stops working (for example if it was shared with someone by mistake)." />
+                                            </Grid>
+                                            <TextBlock x:Name="PhoneViewNoteText" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
 
@@ -1679,6 +1743,21 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Grid x:Name="RemotePcsFilterBar" Margin="0,0,0,12" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBox x:Name="RemotePcSearchBox" Height="34" Padding="8,2" VerticalContentAlignment="Center" TextChanged="RemotePcFilter_Changed"
+                                             ToolTip="Matches the name, address, group, model, processor, Windows version and signed-in users." />
+                                    <TextBlock x:Name="RemotePcSearchHint" Text="Search PCs (name, user, model...)" IsHitTestVisible="False" Foreground="{DynamicResource MutedTextBrush}"
+                                               FontSize="12" VerticalAlignment="Center" Margin="11,0,0,0" />
+                                    <ComboBox Grid.Column="1" x:Name="RemotePcGroupComboBox" Width="170" Margin="8,0,0,0" SelectionChanged="RemotePcFilter_Changed" ToolTip="Show one group" />
+                                    <ComboBox Grid.Column="2" x:Name="RemotePcSortComboBox" Width="160" Margin="8,0,0,0" SelectionChanged="RemotePcSort_Changed">
+                                        <ComboBoxItem Content="Sort by name" Tag="name" IsSelected="True" />
+                                        <ComboBoxItem Content="Problems first" Tag="problems" />
+                                        <ComboBoxItem Content="Sort by group" Tag="group" />
+                                    </ComboBox>
+                                </Grid>
+                                <TextBlock x:Name="RemotePcsNoMatchText" Text="No PC matches. Clear the search or pick All groups." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" Visibility="Collapsed" />
+
                                 <ItemsControl x:Name="RemotePcsList">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
@@ -1691,6 +1770,15 @@
                                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                                         <StackPanel ToolTip="{Binding AddressToolTip}">
                                                             <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding Group}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryBrush}" TextWrapping="Wrap">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding HasGroup}" Value="False"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
                                                             <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" />
                                                             <TextBlock Text="{Binding SessionsText}" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap">
                                                                 <TextBlock.Style>
@@ -1757,6 +1845,15 @@
                                                             <Style TargetType="TextBlock">
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding HasStats}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding WakeText}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource WarningBrush}" Margin="0,6,0,0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasWakeText}" Value="False"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </TextBlock.Style>
@@ -1835,6 +1932,51 @@
                                                                 </TextBlock>
                                                             </StackPanel>
                                                         </Grid>
+                                                        <Grid Margin="0,6,0,0">
+                                                            <Grid.Style>
+                                                                <Style TargetType="Grid">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasProblems}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Grid.Style>
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Issues" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
+                                                            <TextBlock Grid.Column="1" FontSize="11" TextWrapping="Wrap" ToolTip="Logged by Windows in the last 7 days. Details shows each one.">
+                                                                <Run Text="Last 7 days: " /><Run Text="{Binding ProblemsText, Mode=OneWay}" />
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding ProblemsSerious}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Grid>
+                                                        <Grid Margin="0,6,0,0">
+                                                            <Grid.Style>
+                                                                <Style TargetType="Grid">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasRecovery}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Grid.Style>
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="Restore" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding RecoveryText}" ToolTip="{Binding RecoveryToolTip}" FontSize="11" TextWrapping="Wrap">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding RecoveryNeedsAttention}" Value="True"><Setter Property="Foreground" Value="{DynamicResource WarningBrush}" /></DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Grid>
                                                         <StackPanel Margin="0,6,0,0">
                                                             <StackPanel.Style>
                                                                 <Style TargetType="StackPanel">
@@ -1850,29 +1992,6 @@
                                                                 <ProgressBar Grid.Column="1" Value="{Binding BatteryPercent, Mode=OneWay}" Maximum="100" Height="6" VerticalAlignment="Center" />
                                                                 <TextBlock Grid.Column="2" Text="{Binding BatteryText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                                             </Grid>
-                                                        <Grid Margin="0,6,0,0">
-                                                            <Grid.Style>
-                                                                <Style TargetType="Grid">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding HasProblems}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Grid.Style>
-                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                                            <TextBlock Text="Problems" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
-                                                            <TextBlock Grid.Column="1" FontSize="11" TextWrapping="Wrap" ToolTip="Logged by Windows in the last 7 days. Details shows each one.">
-                                                                <Run Text="Last 7 days: " /><Run Text="{Binding ProblemsText, Mode=OneWay}" />
-                                                                <TextBlock.Style>
-                                                                    <Style TargetType="TextBlock">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding ProblemsSerious}" Value="True"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </TextBlock.Style>
-                                                            </TextBlock>
-                                                        </Grid>
                                                             <TextBlock Text="{Binding BatteryDetail}" FontSize="11" TextWrapping="Wrap" Margin="44,1,0,0">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
@@ -1957,6 +2076,17 @@
                                                                 </Style>
                                                             </Button.Style>
                                                         </Button>
+                                                        <Button Content="Wake" Tag="{Binding}" Click="WakeRemotePcButton_Click" Margin="0,6,6,0"
+                                                                ToolTip="Send a Wake-on-LAN signal to start this PC from sleep or off. Needs a wired connection with Wake-on-LAN turned on.">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource HeaderMiniButton}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding CanWake}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
                                                         <Button Content="Actions" Tag="{Binding}" Click="ActionsRemotePcButton_Click" Margin="0,6,6,0"
                                                                 ToolTip="Message, restart or shut down, lock, clear temporary files or check for Windows updates on that PC.">
                                                             <Button.Style>
@@ -1970,10 +2100,20 @@
                                                         </Button>
                                                         <Button Content="Details" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="DetailsRemotePcButton_Click" Margin="0,6,6,0"
                                                                 ToolTip="What is using the PC now, who is signed in, last restart, and crashes and problems from the last 30 days." />
-                                                        <Button Content="Speed test" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="SpeedTestRemotePcButton_Click" Margin="0,6,6,0"
-                                                                ToolTip="Local network speed between this PC and that PC, and that PC's internet speed." />
-                                                        <Button Content="Edit" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="EditRemotePcButton_Click" Margin="0,6,6,0" />
-                                                        <Button Content="Remove" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="RemoveRemotePcButton_Click" Margin="0,6,6,0" />
+                                                        <Button Content="History" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="HistoryRemotePcButton_Click" Margin="0,6,6,0"
+                                                                ToolTip="Graphs of CPU, temperature, memory, disk and network over the last 24 hours or 7 days." />
+                                                        <Button Content="More" Style="{StaticResource HeaderMiniButton}" Tag="{Binding}" Click="MoreRemotePcButton_Click" Margin="0,6,6,0"
+                                                                ToolTip="Installed software, speed test, edit or remove">
+                                                            <Button.ContextMenu>
+                                                                <ContextMenu>
+                                                                    <MenuItem Header="Installed software" Tag="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Click="SoftwareRemotePcButton_Click" />
+                                                                    <MenuItem Header="Speed test" Tag="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Click="SpeedTestRemotePcButton_Click" />
+                                                                    <Separator />
+                                                                    <MenuItem Header="Edit" Tag="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Click="EditRemotePcButton_Click" />
+                                                                    <MenuItem Header="Remove" Tag="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Click="RemoveRemotePcButton_Click" />
+                                                                </ContextMenu>
+                                                            </Button.ContextMenu>
+                                                        </Button>
                                                     </WrapPanel>
                                                 </StackPanel>
                                             </Border>
@@ -2028,6 +2168,10 @@
                     <TextBox x:Name="DeviceEditorNameTextBox" MaxLength="80" />
                     <TextBlock Text="IPv4 address" FontWeight="SemiBold" FontSize="11" Margin="0,14,0,6" />
                     <TextBox x:Name="DeviceEditorIpTextBox" MaxLength="15" ToolTip="Example: 192.168.1.50" />
+                    <CheckBox x:Name="DeviceEditorPowerSavingCheck" Margin="0,12,0,0"
+                              ToolTip="Phones and tablets stop answering on Wi-Fi to save battery. They then show as Asleep (amber) instead of Offline, and no outage is logged.">
+                        <TextBlock Text="Phone, tablet or laptop that sleeps on Wi-Fi (show Asleep instead of Offline)" TextWrapping="Wrap" FontSize="11" />
+                    </CheckBox>
                     <TextBlock x:Name="DeviceEditorValidationText" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" MinHeight="20" Margin="0,7,0,0" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
                         <Button Content="Cancel" Tag="&#xE711;" Style="{StaticResource IconButton}" Width="92" Click="CancelDeviceEditorButton_Click" />

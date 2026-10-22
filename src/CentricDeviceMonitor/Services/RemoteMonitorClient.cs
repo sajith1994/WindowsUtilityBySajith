@@ -30,12 +30,17 @@ public sealed class RemoteMonitorClient
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(5) };
 
+    /// <summary>PCs reached over a VPN answer more slowly, so they get longer.</summary>
+    private static readonly HttpClient VpnHttp = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+    private static HttpClient HttpFor(string host) => VpnAddresses.IsVpnHost(host) ? VpnHttp : Http;
+
     /// <summary>Remote clock minus local clock, per host:port, in seconds.</summary>
     private readonly ConcurrentDictionary<string, long> _clockOffsets = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<RemoteHello?> HelloAsync(string host, int port, CancellationToken cancellationToken = default)
     {
-        using HttpResponseMessage response = await Http.GetAsync(BuildUri(host, port, RemoteMonitoringProtocol.HelloPath), cancellationToken);
+        using HttpResponseMessage response = await HttpFor(host).GetAsync(BuildUri(host, port, RemoteMonitoringProtocol.HelloPath), cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -65,7 +70,7 @@ public sealed class RemoteMonitorClient
                 using HttpRequestMessage request = new(HttpMethod.Get, BuildUri(host, port, RemoteMonitoringProtocol.StatsPath));
                 request.Headers.Add(RemoteMonitoringProtocol.TimeHeader, time.ToString());
                 request.Headers.Add(RemoteMonitoringProtocol.SignatureHeader, RemoteMonitoringProtocol.Sign(pairingCode, time, RemoteMonitoringProtocol.StatsPath));
-                using HttpResponseMessage response = await Http.SendAsync(request, cancellationToken);
+                using HttpResponseMessage response = await HttpFor(host).SendAsync(request, cancellationToken);
                 switch (response.StatusCode)
                 {
                     case HttpStatusCode.OK:
@@ -84,6 +89,9 @@ public sealed class RemoteMonitorClient
                         return new RemoteStatsResult(RemoteStatsState.WrongCode, null, "Too many wrong codes. That PC is ignoring this PC for a minute.");
                     case HttpStatusCode.NotFound:
                         return new RemoteStatsResult(RemoteStatsState.NotSharing, null, "Answered, but it does not support remote monitoring. Update Windows Utility on it.");
+                    case HttpStatusCode.Forbidden:
+                        // Its port is open for its phone page, but sharing its own stats is off.
+                        return new RemoteStatsResult(RemoteStatsState.NotSharing, null, "Answered, but it is not sharing its stats.");
                     default:
                         return new RemoteStatsResult(RemoteStatsState.Error, null, $"The PC answered with HTTP {(int)response.StatusCode}.");
                 }
@@ -234,6 +242,42 @@ public sealed class RemoteMonitorClient
         return JsonSerializer.Deserialize<RemotePcDetails>(await response.Content.ReadAsStringAsync(timeout.Token), JsonOptions)
             ?? throw new InvalidOperationException("That PC sent an empty answer.");
     }
+    /// <summary>The PC's recorded readings for the last day (5-minute points) or week (30-minute points).</summary>
+    public async Task<RemoteHistory> GetHistoryAsync(RemotePcEntry pc, int days, CancellationToken cancellationToken = default)
+    {
+        await EnsureClockAsync(pc, cancellationToken);
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using HttpRequestMessage request = Signed(HttpMethod.Get, pc, RemoteMonitoringProtocol.HistoryPath, $"?days={days}");
+        using HttpResponseMessage response = await LongHttp.SendAsync(request, timeout.Token);
+        if (response.StatusCode is HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException("That PC runs an older Windows Utility that does not record history. Update it to 2.0.77 or later (Update on its tile); it starts recording then.");
+        }
+
+        ThrowIfFailed(response);
+        return JsonSerializer.Deserialize<RemoteHistory>(await response.Content.ReadAsStringAsync(timeout.Token), JsonOptions)
+            ?? throw new InvalidOperationException("That PC sent an empty answer.");
+    }
+
+    /// <summary>Programs installed on the PC.</summary>
+    public async Task<RemoteSoftwareList> GetSoftwareAsync(RemotePcEntry pc, CancellationToken cancellationToken = default)
+    {
+        await EnsureClockAsync(pc, cancellationToken);
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(45));
+        using HttpRequestMessage request = Signed(HttpMethod.Get, pc, RemoteMonitoringProtocol.SoftwarePath, string.Empty);
+        using HttpResponseMessage response = await LongHttp.SendAsync(request, timeout.Token);
+        if (response.StatusCode is HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException("That PC runs an older Windows Utility without the software list. Update it to 2.0.77 or later (Update on its tile).");
+        }
+
+        ThrowIfFailed(response);
+        return JsonSerializer.Deserialize<RemoteSoftwareList>(await response.Content.ReadAsStringAsync(timeout.Token), JsonOptions)
+            ?? throw new InvalidOperationException("That PC sent an empty answer.");
+    }
+
     /// <summary>Asks the PC to update itself to the latest official release.</summary>
     public async Task<RemoteUpdateResult> RequestUpdateAsync(RemotePcEntry pc, CancellationToken cancellationToken = default)
     {
@@ -356,6 +400,116 @@ public sealed class RemoteMonitorClient
             });
 
         return found.OrderBy(pc => pc.Hello.MachineName, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    /// PCs on this PC's Tailscale network that answer as Windows Utility, read from "tailscale status --json". Empty
+    /// when Tailscale is not installed or not signed in.
+    /// </summary>
+    public async Task<IReadOnlyList<DiscoveredRemotePc>> DiscoverVpnAsync(int port, CancellationToken cancellationToken = default)
+    {
+        List<string> peers = await TailscalePeersAsync(cancellationToken);
+        ConcurrentBag<DiscoveredRemotePc> found = new();
+        await Parallel.ForEachAsync(peers, new ParallelOptions { MaxDegreeOfParallelism = 16, CancellationToken = cancellationToken },
+            async (address, token) =>
+            {
+                try
+                {
+                    if (await HelloAsync(address, port, token) is { } hello)
+                    {
+                        found.Add(new DiscoveredRemotePc(address, hello));
+                    }
+                }
+                catch (Exception) when (!token.IsCancellationRequested)
+                {
+                    // Not running Windows Utility with sharing (or VPN access) turned on.
+                }
+            });
+
+        return found.OrderBy(pc => pc.Hello.MachineName, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    /// <summary>The Tailscale CLI, when Tailscale is installed.</summary>
+    public static string? TailscaleExecutable()
+    {
+        foreach (Environment.SpecialFolder folder in new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86 })
+        {
+            string path = Path.Combine(Environment.GetFolderPath(folder), "Tailscale", "tailscale.exe");
+            if (File.Exists(path))
+            {
+                return path;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>IPv4 addresses of the online peers in "tailscale status --json".</summary>
+    private static async Task<List<string>> TailscalePeersAsync(CancellationToken cancellationToken)
+    {
+        if (TailscaleExecutable() is not { } executable)
+        {
+            return new List<string>();
+        }
+
+        try
+        {
+            using System.Diagnostics.Process process = new()
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo(executable, "status --json")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                }
+            };
+            process.Start();
+            Task<string> output = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(10));
+            await process.WaitForExitAsync(timeout.Token);
+            return ParseTailscalePeers(await output);
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            return new List<string>();
+        }
+    }
+
+    internal static List<string> ParseTailscalePeers(string json)
+    {
+        List<string> addresses = new();
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("Peer", out JsonElement peers) || peers.ValueKind != JsonValueKind.Object)
+            {
+                return addresses;
+            }
+
+            foreach (JsonProperty peer in peers.EnumerateObject())
+            {
+                if (peer.Value.TryGetProperty("Online", out JsonElement online) && online.ValueKind == JsonValueKind.False)
+                {
+                    continue;
+                }
+
+                if (peer.Value.TryGetProperty("TailscaleIPs", out JsonElement ips) && ips.ValueKind == JsonValueKind.Array)
+                {
+                    string? ipv4 = ips.EnumerateArray().Select(ip => ip.GetString()).FirstOrDefault(ip => ip is not null && ip.Contains('.'));
+                    if (ipv4 is not null)
+                    {
+                        addresses.Add(ipv4);
+                    }
+                }
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return addresses;
     }
 
     private static string Key(string host, int port) => $"{host}:{port}";

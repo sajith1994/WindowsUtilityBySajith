@@ -72,6 +72,14 @@ public sealed class LiveChart : FrameworkElement
     /// <summary>Raised when the user pins a point (time and the values of every visible series), or null when cleared.</summary>
     public event EventHandler<string?>? PointSelected;
 
+    /// <summary>Shown when there is nothing to plot yet.</summary>
+    public string EmptyText { get; set; } = "Collecting samples...";
+
+    /// <summary>Hours and days (history graphs) rather than seconds: point times also show the day.</summary>
+    private bool LongRange => _range > TimeSpan.FromHours(2);
+
+    private string PointTimeFormat => LongRange ? "ddd d MMM HH:mm" : "HH:mm:ss";
+
     public void SetData(IReadOnlyList<DateTime> times, IReadOnlyList<LiveChartSeries> series, TimeSpan range)
     {
         _times = times;
@@ -182,17 +190,17 @@ public sealed class LiveChart : FrameworkElement
         return nice * magnitude;
     }
 
-    private static TimeSpan NiceTimeStep(TimeSpan range)
+    internal static TimeSpan NiceTimeStep(TimeSpan range)
     {
-        foreach (int seconds in new[] { 5, 10, 15, 30, 60, 120, 300, 600 })
+        foreach (int seconds in new[] { 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400 })
         {
-            if (range.TotalSeconds / seconds <= 6)
+            if (range.TotalSeconds / seconds <= 7)
             {
                 return TimeSpan.FromSeconds(seconds);
             }
         }
 
-        return TimeSpan.FromMinutes(15);
+        return TimeSpan.FromDays(2);
     }
 
     private int NearestIndex(DateTime time)
@@ -233,7 +241,7 @@ public sealed class LiveChart : FrameworkElement
         List<LiveChartSeries> visible = Visible;
         if (visible.Count == 0 || _times.Count == 0)
         {
-            DrawText(context, _series.Any(series => series.HasData) ? "Select a reading above to plot it." : "Collecting samples...",
+            DrawText(context, _series.Any(series => series.HasData) ? "Select a reading above to plot it." : EmptyText,
                 new WpfPoint(ActualWidth / 2, ActualHeight / 2), muted, 13, dpi, TextAlignment.Center, centerVertically: true);
             return;
         }
@@ -244,7 +252,10 @@ public sealed class LiveChart : FrameworkElement
         // Shared time axis: vertical gridlines through every lane plus clock-time labels.
         TimeSpan step = NiceTimeStep(_range);
         DateTime tick = new(start.Ticks - start.Ticks % step.Ticks + step.Ticks, start.Kind);
-        string timeFormat = step.TotalSeconds < 60 ? "HH:mm:ss" : "HH:mm";
+        string timeFormat = step.TotalSeconds < 60 ? "HH:mm:ss"
+            : step.TotalDays >= 1 ? "ddd d"
+            : _range > TimeSpan.FromDays(1) ? "ddd HH:mm"
+            : "HH:mm";
         for (; tick <= end; tick += step)
         {
             double x = XFor(tick, plot, start, end);
@@ -426,7 +437,7 @@ public sealed class LiveChart : FrameworkElement
 
         List<(string Line, WpfBrush Brush)> lines = new()
         {
-            ((pinned ? "Pinned  " : string.Empty) + _times[index].ToString("HH:mm:ss", CultureInfo.CurrentCulture), muted)
+            ((pinned ? "Pinned  " : string.Empty) + _times[index].ToString(PointTimeFormat, CultureInfo.CurrentCulture), muted)
         };
         lines.AddRange(visible.Select(series => ($"{series.Name}: {series.Format(series.Values.ElementAtOrDefault(index))}", (WpfBrush)new SolidColorBrush(series.Color))));
 
@@ -507,7 +518,7 @@ public sealed class LiveChart : FrameworkElement
         }
 
         _pinned = _times[index];
-        PointSelected?.Invoke(this, $"{_times[index]:HH:mm:ss}   " + string.Join("   ",
+        PointSelected?.Invoke(this, _times[index].ToString(PointTimeFormat, CultureInfo.CurrentCulture) + "   " + string.Join("   ",
             Visible.Select(series => $"{series.Name} {series.Format(series.Values.ElementAtOrDefault(index))}")));
         InvalidateVisual();
     }

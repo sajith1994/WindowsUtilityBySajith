@@ -30,6 +30,9 @@ public static class SharedDataPaths
 
     public static string RemoteViewersFilePath => Path.Combine(ServiceDirectory, "remote-viewers.json");
 
+    /// <summary>Monitored PCs as the dashboard last saw them, served to phones by the service (written by the dashboard).</summary>
+    public static string PhoneViewDataFilePath => Path.Combine(RootDirectory, "phone-view.json");
+
     public static string DashboardTrayReadyFilePath => Path.Combine(ServiceDirectory, "dashboard-tray.ready");
 
     public static string PrivilegedCommandsDirectory => Path.Combine(ServiceDirectory, "commands");

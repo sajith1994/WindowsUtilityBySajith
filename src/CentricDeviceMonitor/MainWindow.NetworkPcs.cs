@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Threading;
 using CentricDeviceMonitor.Dialogs;
 using CentricDeviceMonitor.Models;
@@ -15,7 +16,7 @@ namespace CentricDeviceMonitor;
 
 /// <summary>
 /// Network PCs page: share this PC's stats with other PCs (served by the background service), and watch other PCs
-/// that share theirs as live tiles.
+/// that share theirs as live tiles, with groups, search, history, software, waking, a daily summary and a phone page.
 /// </summary>
 public partial class MainWindow
 {
@@ -24,6 +25,12 @@ public partial class MainWindow
     private readonly ConcurrentDictionary<string, string> _viewerNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly RemoteAlertTracker _remoteAlertTracker = new();
     private readonly List<RemoteAlert> _recentRemoteAlerts = new();
+    private readonly RemoteAlertLog _remoteAlertLog = new();
+    private bool _dailySummaryRunning;
+    private bool _remotePcsViewReady;
+
+    /// <summary>What clicking the last notification does (only for a minute after it was shown).</summary>
+    private (Action Action, DateTime ShownAt)? _balloonClick;
     private DispatcherTimer? _remotePcsTimer;
     private bool _remotePcsPageVisible;
     private bool _pollingRemotePcs;
@@ -53,9 +60,24 @@ public partial class MainWindow
         RemoteAlertMemoryCheck.IsChecked = _appSettings.RemoteAlertMemory;
         RemoteAlertOfflineCheck.IsChecked = _appSettings.RemoteAlertOffline;
         RemoteAlertSecurityCheck.IsChecked = _appSettings.RemoteAlertSecurity;
+        RemoteVpnToggle.IsChecked = _appSettings.RemoteSharingAllowVpn;
+        DailySummaryToggle.IsChecked = _appSettings.DailySummaryEnabled;
+        if (DailySummaryHourComboBox.Items.Count == 0)
+        {
+            for (int hour = 0; hour < 24; hour++)
+            {
+                DailySummaryHourComboBox.Items.Add(new System.Windows.Controls.ComboBoxItem { Content = $"{hour:00}:00", Tag = hour });
+            }
+        }
+
+        DailySummaryHourComboBox.SelectedIndex = Math.Clamp(_appSettings.DailySummaryHour, 0, 23);
+        PhoneViewToggle.IsChecked = _appSettings.PhoneViewEnabled;
         _loadingRemoteSharing = false;
         UpdateRemoteAlertPanel();
+        UpdateDailySummaryNote();
+        UpdatePhoneViewPanel();
         RemotePcsList.ItemsSource ??= _remotePcViews;
+        SetUpRemotePcsView();
         SyncRemotePcViews();
         UpdateSharingPanel(resetCodeBox: true);
         _ = RefreshSharingNetworkTextAsync();
@@ -81,7 +103,9 @@ public partial class MainWindow
     /// </summary>
     private void UpdateRemotePollingTimer()
     {
-        bool background = _appSettings.RemoteAlertsEnabled && _appSettings.RemotePcs.Count > 0;
+        // The daily summary and the phone page also need current readings when the page is closed.
+        bool background = _appSettings.RemotePcs.Count > 0
+            && (_appSettings.RemoteAlertsEnabled || _appSettings.DailySummaryEnabled || _appSettings.PhoneViewEnabled);
         if (!_remotePcsPageVisible && !background)
         {
             _remotePcsTimer?.Stop();
@@ -113,6 +137,8 @@ public partial class MainWindow
 
         RemotePcsCountText.Text = _remotePcViews.Count == 0 ? string.Empty : $"{_remotePcViews.Count} PC{(_remotePcViews.Count == 1 ? "" : "s")}";
         RemotePcsEmptyText.Visibility = _remotePcViews.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        RemotePcsFilterBar.Visibility = _remotePcViews.Count >= 2 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateGroupFilter();
     }
 
     private async Task PollRemotePcsAsync()
@@ -131,6 +157,7 @@ public partial class MainWindow
         _pollingRemotePcs = true;
         try
         {
+            bool wakeDetailsChanged = false;
             await Task.WhenAll(_remotePcViews.ToList().Select(async view =>
             {
                 RemotePcEntry entry = view.Entry;
@@ -138,6 +165,7 @@ public partial class MainWindow
                 if (ReferenceEquals(entry, view.Entry))
                 {
                     view.Update(result);
+                    wakeDetailsChanged |= view.RememberWakeDetails();
                     if (_appSettings.RemoteAlertsEnabled)
                     {
                         foreach (RemoteAlert alert in _remoteAlertTracker.Evaluate(entry, view.Title, result, _appSettings, DateTime.Now))
@@ -147,6 +175,21 @@ public partial class MainWindow
                     }
                 }
             }));
+
+            if (wakeDetailsChanged)
+            {
+                // Adapter addresses are kept so the PC can be woken when it is off (they change rarely).
+                await SaveRemoteSettingsAsync();
+            }
+
+            if (_appSettings.PhoneViewEnabled)
+            {
+                PhoneViewData data = PhoneViewService.Build(_remotePcViews, Environment.MachineName, DateTime.UtcNow);
+                await Task.Run(() => PhoneViewService.Write(data));
+            }
+
+            UpdateNoMatchText();
+            await MaybeShowDailySummaryAsync();
         }
         catch (Exception exception)
         {
@@ -202,6 +245,8 @@ public partial class MainWindow
         bool enabled = _appSettings.RemoteSharingEnabled;
         SharingDetailsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
         RemoteActionsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        RemoteVpnPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        UpdateVpnText();
 
         bool hidden = IsSharingCodeHidden;
         SharingCodeLockedPanel.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed;
@@ -225,6 +270,10 @@ public partial class MainWindow
         SharingAddressText.Text = addresses.Count == 0
             ? $"{Environment.MachineName}{port}"
             : $"{string.Join(" or ", addresses)}  (or the PC name {Environment.MachineName}){port}";
+        if (_appSettings.RemoteSharingAllowVpn && GetVpnAddress() is { } vpnAddress)
+        {
+            SharingAddressText.Text += $"\nOver Tailscale: {vpnAddress}";
+        }
 
         if (!enabled)
         {
@@ -493,7 +542,7 @@ public partial class MainWindow
                 addresses.AddRange(nic.GetIPProperties().UnicastAddresses
                     .Where(address => address.Address.AddressFamily == AddressFamily.InterNetwork)
                     .Select(address => address.Address.ToString())
-                    .Where(address => !address.StartsWith("169.254.", StringComparison.Ordinal)));
+                    .Where(address => !address.StartsWith("169.254.", StringComparison.Ordinal) && !VpnAddresses.IsVpnHost(address)));
             }
         }
         catch (NetworkInformationException)
@@ -507,9 +556,11 @@ public partial class MainWindow
 
     private async void AddRemotePcButton_Click(object sender, RoutedEventArgs e) => await AddRemotePcAsync(null, null);
 
+    private IEnumerable<string> RemoteGroups => _appSettings.RemotePcs.Select(pc => pc.Group.Trim()).Where(group => group.Length > 0);
+
     private async Task AddRemotePcAsync(string? host, string? name)
     {
-        RemotePcEditorWindow editor = new(_remoteMonitorClient, host: host, name: name, code: _appSettings.RemoteNetworkCode) { Owner = this };
+        RemotePcEditorWindow editor = new(_remoteMonitorClient, host: host, name: name, code: _appSettings.RemoteNetworkCode, groups: RemoteGroups) { Owner = this };
         if (editor.ShowDialog() != true)
         {
             return;
@@ -537,7 +588,7 @@ public partial class MainWindow
             return;
         }
 
-        RemotePcEditorWindow editor = new(_remoteMonitorClient, view.Entry) { Owner = this };
+        RemotePcEditorWindow editor = new(_remoteMonitorClient, view.Entry, groups: RemoteGroups) { Owner = this };
         if (editor.ShowDialog() != true)
         {
             return;
@@ -551,6 +602,8 @@ public partial class MainWindow
 
         await SaveRemoteSettingsAsync();
         view.Reset(editor.Result);
+        UpdateGroupFilter();
+        RemotePcsCollectionView.Refresh();
         await PollRemotePcsAsync();
     }
 
@@ -593,7 +646,16 @@ public partial class MainWindow
         try
         {
             HashSet<string> own = GetLocalIpv4Addresses().ToHashSet(StringComparer.OrdinalIgnoreCase);
-            IReadOnlyList<DiscoveredRemotePc> found = await _remoteMonitorClient.DiscoverAsync(RemoteMonitoringProtocol.DefaultPort);
+            if (GetVpnAddress() is { } ownVpnAddress)
+            {
+                own.Add(ownVpnAddress);
+            }
+
+            // This network, plus PCs on this PC's Tailscale network when Tailscale is installed.
+            Task<IReadOnlyList<DiscoveredRemotePc>> local = _remoteMonitorClient.DiscoverAsync(RemoteMonitoringProtocol.DefaultPort);
+            Task<IReadOnlyList<DiscoveredRemotePc>> vpn = _remoteMonitorClient.DiscoverVpnAsync(RemoteMonitoringProtocol.DefaultPort);
+            List<DiscoveredRemotePc> found = (await local).ToList();
+            found.AddRange((await vpn).Where(pc => found.All(known => !string.Equals(known.Hello.MachineName, pc.Hello.MachineName, StringComparison.OrdinalIgnoreCase))));
             List<DiscoveredRemotePc> candidates = found
                 .Where(pc => !own.Contains(pc.Address))
                 .Where(pc => _appSettings.RemotePcs.All(existing =>
@@ -861,7 +923,7 @@ public partial class MainWindow
 
         bool enable = RemoteActionsToggle.IsChecked == true;
         if (enable && WpfMessageBox.Show(this,
-                "Allow the PC monitoring this one to restart or shut down this PC, lock it, show messages, clear temporary files and start Windows Update checks?\n\nOnly a PC with the pairing code can do this, every action is confirmed on that PC and logged here, and you can turn this off at any time.",
+                "Allow the PC monitoring this one to restart or shut down this PC, lock it, show messages, clear temporary files, start Windows Update checks and create restore points?\n\nOnly a PC with the pairing code can do this, every action is confirmed on that PC and logged here, and you can turn this off at any time.",
                 "Allow actions", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
             _loadingRemoteSharing = true;
@@ -925,6 +987,7 @@ public partial class MainWindow
     private void ShowRemoteAlert(RemoteAlert alert)
     {
         ApplicationLogService.WriteMessage("Network PCs alert", $"{alert.Title}: {alert.Message}");
+        _remoteAlertLog.Add(alert);
         _recentRemoteAlerts.Insert(0, alert);
         if (_recentRemoteAlerts.Count > 5)
         {
@@ -933,10 +996,29 @@ public partial class MainWindow
 
         UpdateRecentRemoteAlertsText();
         StatusText.Text = $"{alert.Title}. {alert.Message}";
-        if (_appSettings.DesktopNotificationsEnabled && _trayIcon is { Visible: true })
+        ShowBalloon(alert.Title, alert.Message, alert.IsRecovery ? System.Windows.Forms.ToolTipIcon.Info : System.Windows.Forms.ToolTipIcon.Warning,
+            () => ShowNetworkPcsPage());
+    }
+
+    /// <summary>A notification that runs <paramref name="onClick"/> when clicked (when notifications are allowed).</summary>
+    private bool ShowBalloon(string title, string message, System.Windows.Forms.ToolTipIcon icon, Action? onClick)
+    {
+        if (!_appSettings.DesktopNotificationsEnabled || _trayIcon is not { Visible: true })
         {
-            _trayIcon.ShowBalloonTip(8000, alert.Title, alert.Message,
-                alert.IsRecovery ? System.Windows.Forms.ToolTipIcon.Info : System.Windows.Forms.ToolTipIcon.Warning);
+            return false;
+        }
+
+        _balloonClick = onClick is null ? null : (onClick, DateTime.Now);
+        _trayIcon.ShowBalloonTip(8000, title, message, icon);
+        return true;
+    }
+
+    private void OnBalloonClicked()
+    {
+        if (_balloonClick is { } click && DateTime.Now - click.ShownAt < TimeSpan.FromMinutes(1))
+        {
+            _balloonClick = null;
+            click.Action();
         }
     }
 
@@ -946,6 +1028,464 @@ public partial class MainWindow
         RecentRemoteAlertsText.Text = "Recent: " + string.Join("\n", _recentRemoteAlerts.Select(alert => $"{alert.At:HH:mm}  {alert.Title}"));
     }
 
+    private void ShowNetworkPcsPage()
+    {
+        ShowDashboardFromTray();
+        NavigationList.SelectedIndex = 4;
+    }
+
+    // ---- Search, groups and sorting -----------------------------------------------------------------------
+
+    private ListCollectionView RemotePcsCollectionView => (ListCollectionView)CollectionViewSource.GetDefaultView(_remotePcViews);
+
+    private void SetUpRemotePcsView()
+    {
+        if (_remotePcsViewReady)
+        {
+            return;
+        }
+
+        _remotePcsViewReady = true;
+        ListCollectionView view = RemotePcsCollectionView;
+        view.Filter = item => item is RemotePcView pc && MatchesRemotePcFilter(pc);
+        // Re-checked on every poll, so a search for a signed-in user follows who is signed in.
+        view.IsLiveFiltering = true;
+        view.LiveFilteringProperties.Add(nameof(RemotePcView.SearchText));
+        ApplyRemotePcSort();
+    }
+
+    private bool MatchesRemotePcFilter(RemotePcView pc)
+    {
+        if (RemotePcGroupComboBox.SelectedItem is System.Windows.Controls.ComboBoxItem { Tag: string group } && group != "*"
+            && !string.Equals(pc.Group, group, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return false;
+        }
+
+        string[] words = RemotePcSearchBox.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        string text = pc.SearchText;
+        return words.All(word => text.Contains(word, StringComparison.CurrentCultureIgnoreCase));
+    }
+
+    private void RemotePcFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_remotePcsViewReady)
+        {
+            return;
+        }
+
+        RemotePcSearchHint.Visibility = RemotePcSearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        RemotePcsCollectionView.Refresh();
+        UpdateNoMatchText();
+    }
+
+    private void RemotePcSort_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_remotePcsViewReady)
+        {
+            ApplyRemotePcSort();
+        }
+    }
+
+    private void ApplyRemotePcSort()
+    {
+        string sort = RemotePcSortComboBox.SelectedItem is System.Windows.Controls.ComboBoxItem { Tag: string tag } ? tag : "name";
+        ListCollectionView view = RemotePcsCollectionView;
+        using (view.DeferRefresh())
+        {
+            view.SortDescriptions.Clear();
+            view.LiveSortingProperties.Clear();
+            if (sort == "problems")
+            {
+                view.SortDescriptions.Add(new System.ComponentModel.SortDescription(nameof(RemotePcView.SortRank), System.ComponentModel.ListSortDirection.Ascending));
+                view.LiveSortingProperties.Add(nameof(RemotePcView.SortRank));
+            }
+            else if (sort == "group")
+            {
+                view.SortDescriptions.Add(new System.ComponentModel.SortDescription(nameof(RemotePcView.Group), System.ComponentModel.ListSortDirection.Ascending));
+            }
+
+            view.SortDescriptions.Add(new System.ComponentModel.SortDescription(nameof(RemotePcView.Title), System.ComponentModel.ListSortDirection.Ascending));
+            view.LiveSortingProperties.Add(nameof(RemotePcView.Title));
+            view.IsLiveSorting = true;
+        }
+    }
+
+    /// <summary>"All groups", each group used, and "No group" when some PCs have none.</summary>
+    private void UpdateGroupFilter()
+    {
+        List<string> groups = RemoteGroups.Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(group => group, StringComparer.CurrentCultureIgnoreCase).ToList();
+        string selected = RemotePcGroupComboBox.SelectedItem is System.Windows.Controls.ComboBoxItem { Tag: string tag } ? tag : "*";
+        List<(string Label, string Tag)> items = new() { ("All groups", "*") };
+        items.AddRange(groups.Select(group => (group, group)));
+        if (groups.Count > 0 && _appSettings.RemotePcs.Any(pc => pc.Group.Trim().Length == 0))
+        {
+            items.Add(("No group", string.Empty));
+        }
+
+        RemotePcGroupComboBox.Visibility = groups.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        bool same = RemotePcGroupComboBox.Items.Count == items.Count
+            && RemotePcGroupComboBox.Items.Cast<System.Windows.Controls.ComboBoxItem>().Select(item => item.Tag as string).SequenceEqual(items.Select(item => item.Tag));
+        if (same)
+        {
+            return;
+        }
+
+        RemotePcGroupComboBox.Items.Clear();
+        foreach ((string label, string groupTag) in items)
+        {
+            RemotePcGroupComboBox.Items.Add(new System.Windows.Controls.ComboBoxItem { Content = label, Tag = groupTag });
+        }
+
+        int index = items.FindIndex(item => string.Equals(item.Tag, selected, StringComparison.CurrentCultureIgnoreCase));
+        RemotePcGroupComboBox.SelectedIndex = index >= 0 ? index : 0;
+    }
+
+    private void UpdateNoMatchText() =>
+        RemotePcsNoMatchText.Visibility = _remotePcViews.Count > 0 && _remotePcsViewReady && RemotePcsCollectionView.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    // ---- History, software and more ----------------------------------------------------------------------
+
+    private void HistoryRemotePcButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: RemotePcView view })
+        {
+            RemotePcEntry pc = view.Entry;
+            new RemotePcHistoryWindow(view.Title, (days, token) => _remoteMonitorClient.GetHistoryAsync(pc, days, token),
+                view.Stats?.CpuTemperatureIsCpuSpecific == true ? view.Stats.CpuTemperatureAlertThresholdCelsius : null) { Owner = this }.Show();
+        }
+    }
+
+    private void MoreRemotePcButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button { ContextMenu: { } menu } button)
+        {
+            menu.PlacementTarget = button;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+    }
+
+    private void SoftwareRemotePcButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: RemotePcView view })
+        {
+            RemotePcEntry pc = view.Entry;
+            string name = view.Title;
+            new SoftwareWindow($"Software: {name}", severalPcs: false,
+                async token => new[] { await SoftwareWindow.ReadAsync(_remoteMonitorClient, pc, name, token) }) { Owner = this }.Show();
+        }
+    }
+
+    private void AllSoftwareButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_remotePcViews.Count == 0)
+        {
+            WpfMessageBox.Show(this, "Add PCs to monitor first.", "Software", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        List<(RemotePcEntry Pc, string Name)> pcs = _remotePcViews.Select(view => (view.Entry, view.Title)).ToList();
+        new SoftwareWindow("Software on all monitored PCs", severalPcs: true, async token =>
+        {
+            using SemaphoreSlim limiter = new(6, 6);
+            SoftwareSource[] sources = await Task.WhenAll(pcs.Select(async pc =>
+            {
+                await limiter.WaitAsync(token);
+                try
+                {
+                    return await SoftwareWindow.ReadAsync(_remoteMonitorClient, pc.Pc, pc.Name, token);
+                }
+                finally
+                {
+                    limiter.Release();
+                }
+            }));
+            return sources;
+        }) { Owner = this }.Show();
+    }
+
+    // ---- Waking --------------------------------------------------------------------------------------------
+
+    private async void WakeRemotePcButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: RemotePcView view })
+        {
+            return;
+        }
+
+        int sent = await WakeOnLanService.SendAsync(view.Entry.WakeMacAddresses, view.Entry.LastKnownAddress);
+        if (sent == 0)
+        {
+            WpfMessageBox.Show(this, "The wake signal could not be sent: this PC has no connected network.", "Wake", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        view.MarkWakeSent();
+        ApplicationLogService.WriteMessage("Network PCs", $"Wake-on-LAN sent to {view.Title} ({string.Join(", ", view.Entry.WakeMacAddresses)}).");
+        StatusText.Text = $"Wake signal sent to {view.Title}. A PC takes up to a few minutes to start; its tile turns green when it answers.";
+    }
+
+    // ---- VPN (Tailscale) -----------------------------------------------------------------------------------
+
+    /// <summary>This PC's Tailscale IPv4 address, when it has one.</summary>
+    private static string? GetVpnAddress()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .Where(nic => nic.OperationalStatus == OperationalStatus.Up)
+                .SelectMany(nic => nic.GetIPProperties().UnicastAddresses)
+                .Select(address => address.Address)
+                .Where(address => address.AddressFamily == AddressFamily.InterNetwork)
+                .Select(address => address.ToString())
+                .FirstOrDefault(VpnAddresses.IsVpnHost);
+        }
+        catch (NetworkInformationException)
+        {
+            return null;
+        }
+    }
+
+    private void UpdateVpnText()
+    {
+        bool installed = RemoteMonitorClient.TailscaleExecutable() is not null;
+        string? address = GetVpnAddress();
+        RemoteVpnText.Text = (_appSettings.RemoteSharingAllowVpn ? "On: " : string.Empty)
+            + "for a main PC at another site or at home. Install Tailscale (tailscale.com) on this PC and on the main PC and sign in with the same account; "
+            + "this then opens the port to Tailscale addresses only (on any network). Add this PC on the main PC by its Tailscale name or address. "
+            + (address is not null ? $"This PC's Tailscale address: {address}." : installed ? "Tailscale is installed but not connected." : "Tailscale is not installed on this PC.");
+        RemoteVpnText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty,
+            _appSettings.RemoteSharingAllowVpn && address is null ? "WarningBrush" : "MutedTextBrush");
+    }
+
+    private async void RemoteVpnToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingRemoteSharing)
+        {
+            return;
+        }
+
+        _appSettings.RemoteSharingAllowVpn = RemoteVpnToggle.IsChecked == true;
+        await SaveRemoteSettingsAsync();
+        ApplicationLogService.WriteMessage("Network PCs", _appSettings.RemoteSharingAllowVpn ? "PCs on the Tailscale VPN allowed." : "VPN access turned off.");
+        StatusText.Text = _appSettings.RemoteSharingAllowVpn
+            ? "PCs on your Tailscale network can now reach this PC (with the pairing code)."
+            : "Only PCs on the local network can reach this PC now.";
+        UpdateSharingPanel();
+    }
+
+    // ---- Daily summary -----------------------------------------------------------------------------------
+
+    private async void DailySummarySetting_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingRemoteSharing)
+        {
+            return;
+        }
+
+        _appSettings.DailySummaryEnabled = DailySummaryToggle.IsChecked == true;
+        if (DailySummaryHourComboBox.SelectedItem is System.Windows.Controls.ComboBoxItem { Tag: int hour })
+        {
+            _appSettings.DailySummaryHour = hour;
+        }
+
+        await SaveRemoteSettingsAsync();
+        UpdateDailySummaryNote();
+        UpdateRemotePollingTimer();
+    }
+
+    private void UpdateDailySummaryNote()
+    {
+        DailySummaryHourComboBox.IsEnabled = _appSettings.DailySummaryEnabled;
+        DailySummaryNoteText.Text = _appSettings.DailySummaryEnabled
+            ? $"Each day at {_appSettings.DailySummaryHour:00}:00 (or when the dashboard starts later that day) one notification sums up what needs attention, the last 24 hours of alerts and printers low on ink or toner. Clicking it opens a printable page."
+            : "Off. Show summary now still works.";
+    }
+
+    private async void ShowDailySummaryButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_remotePcViews.Count == 0)
+        {
+            WpfMessageBox.Show(this, "Add PCs to monitor first.", "Daily summary", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        await PollRemotePcsAsync();
+        if (await BuildDailySummaryAsync() is { } path)
+        {
+            OpenFile(path);
+        }
+    }
+
+    /// <summary>Once a day, from the chosen hour, after every PC has been checked at least once.</summary>
+    private async Task MaybeShowDailySummaryAsync()
+    {
+        DateTime now = DateTime.Now;
+        string today = now.ToString("yyyy-MM-dd");
+        if (!_appSettings.DailySummaryEnabled || _remotePcViews.Count == 0 || now.Hour < _appSettings.DailySummaryHour
+            || _appSettings.DailySummaryLastDate == today || _dailySummaryRunning || _remotePcViews.Any(view => view.StatusKind == "Checking"))
+        {
+            return;
+        }
+
+        _appSettings.DailySummaryLastDate = today;
+        await SaveRemoteSettingsAsync();
+        if (await BuildDailySummaryAsync() is not { } path)
+        {
+            return;
+        }
+
+        string headline = _lastDailySummaryHeadline;
+        if (!ShowBalloon(headline, _lastDailySummaryMessage, System.Windows.Forms.ToolTipIcon.Info, () => OpenFile(path)))
+        {
+            StatusText.Text = $"{headline}. Open it with Show summary now on the Network PCs page.";
+        }
+    }
+
+    private string _lastDailySummaryHeadline = "Daily summary";
+    private string _lastDailySummaryMessage = string.Empty;
+
+    /// <summary>Builds the summary (asking the printers for their levels) and saves it; returns the page's path.</summary>
+    private async Task<string?> BuildDailySummaryAsync()
+    {
+        if (_dailySummaryRunning)
+        {
+            return null;
+        }
+
+        _dailySummaryRunning = true;
+        try
+        {
+            List<(string Name, string Address)> printers = KnownNetworkPrinters()
+                .Where(printer => IPAddress.TryParse(printer.Address, out _))
+                .GroupBy(printer => printer.Address).Select(group => group.First()).ToList();
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(30));
+            PrinterSuppliesResult[] supplies = await Task.WhenAll(printers.Select(printer => PrinterSuppliesService.ReadAsync(printer.Address, timeout.Token)));
+            DailySummary summary = DailySummaryService.Build(
+                _remotePcViews.ToList(),
+                _remoteAlertLog.Since(DateTime.Now.AddDays(-1)),
+                printers.Zip(supplies, (printer, result) => (printer.Name, result)).ToList(),
+                DateTime.Now,
+                Environment.MachineName);
+
+            string folder = System.IO.Path.Combine(SharedDataPaths.LogsDirectory, "daily-summaries");
+            System.IO.Directory.CreateDirectory(folder);
+            foreach (string old in System.IO.Directory.EnumerateFiles(folder, "daily-summary-*.html").OrderByDescending(file => file).Skip(30))
+            {
+                System.IO.File.Delete(old);
+            }
+
+            string path = System.IO.Path.Combine(folder, $"daily-summary-{DateTime.Now:yyyy-MM-dd}.html");
+            await System.IO.File.WriteAllTextAsync(path, summary.Html, new System.Text.UTF8Encoding(true));
+            _lastDailySummaryMessage = summary.Message;
+            _lastDailySummaryHeadline = summary.Headline;
+            ApplicationLogService.WriteMessage("Network PCs", $"{summary.Headline}. Saved to {path}.");
+            return path;
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException or OperationCanceledException)
+        {
+            ApplicationLogService.WriteException("Daily summary", exception);
+            StatusText.Text = $"The daily summary could not be made: {exception.Message}";
+            return null;
+        }
+        finally
+        {
+            _dailySummaryRunning = false;
+        }
+    }
+
+    private void OpenFile(string path)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            StatusText.Text = $"Could not open {path}: {exception.Message}";
+        }
+    }
+
+    // ---- Phone view ----------------------------------------------------------------------------------------
+
+    private string PhoneLink => PhoneViewService.Link(GetLocalIpv4Addresses().FirstOrDefault() ?? Environment.MachineName, _appSettings.RemoteSharingPort, _appSettings.PhoneViewKey);
+
+    private void UpdatePhoneViewPanel()
+    {
+        bool enabled = _appSettings.PhoneViewEnabled;
+        PhoneViewDetailsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        if (!enabled)
+        {
+            return;
+        }
+
+        PhoneViewLinkBox.Text = PhoneLink;
+        PhoneViewNoteText.Text = IsBackgroundServiceRunning
+            ? "Open the link on a phone connected to the same network (Wi-Fi) as this PC; it refreshes every 15 seconds while this dashboard runs (also in the notification area). "
+              + "Anyone with the link can see these tiles (read-only, nothing can be changed). New link makes the old one stop working. This PC's network must be set to Private."
+            : "The background service is not running, so the phone page cannot be served. Start it on System Stats > Background service.";
+        PhoneViewNoteText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, IsBackgroundServiceRunning ? "MutedTextBrush" : "DangerBrush");
+    }
+
+    private async void PhoneViewToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingRemoteSharing)
+        {
+            return;
+        }
+
+        bool enable = PhoneViewToggle.IsChecked == true;
+        if (enable && string.IsNullOrWhiteSpace(_appSettings.PhoneViewKey))
+        {
+            _appSettings.PhoneViewKey = PhoneViewService.NewKey();
+        }
+
+        _appSettings.PhoneViewEnabled = enable;
+        await SaveRemoteSettingsAsync();
+        if (enable)
+        {
+            PhoneViewService.Write(PhoneViewService.Build(_remotePcViews, Environment.MachineName, DateTime.UtcNow));
+        }
+        else
+        {
+            PhoneViewService.Delete();
+        }
+
+        ApplicationLogService.WriteMessage("Network PCs", enable ? "Phone view turned on." : "Phone view turned off.");
+        StatusText.Text = enable ? "Phone view on. Open the link shown on a phone on the same Wi-Fi." : "Phone view off. Phone links no longer work.";
+        UpdatePhoneViewPanel();
+        UpdateRemotePollingTimer();
+    }
+
+    private void CopyPhoneLinkButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(PhoneViewLinkBox.Text);
+            StatusText.Text = "Phone link copied. Send it to your phone (for example by email or chat) and open it there.";
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            StatusText.Text = "The clipboard is busy. Try Copy link again.";
+        }
+    }
+
+    private void OpenPhoneLinkButton_Click(object sender, RoutedEventArgs e) => OpenFile(PhoneViewLinkBox.Text);
+
+    private async void NewPhoneLinkButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (WpfMessageBox.Show(this, "Make a new phone link? The current link stops working on every phone that has it.",
+                "Phone view", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _appSettings.PhoneViewKey = PhoneViewService.NewKey();
+        await SaveRemoteSettingsAsync();
+        ApplicationLogService.WriteMessage("Network PCs", "New phone view link made; the old link no longer works.");
+        UpdatePhoneViewPanel();
+    }
     private async Task SaveRemoteSettingsAsync()
     {
         try

@@ -260,6 +260,47 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.77] - 2026-10-21
+
+### Added (Network PCs)
+- **History graphs:** History on a tile shows that PC's last 24 hours or 7 days of CPU load, temperature (with its
+  alert line), memory, disk activity and network download and upload, with a one-line summary (average and peak CPU,
+  hottest moment, time it was off). Each PC's background service records a reading every minute and keeps 8 days,
+  so overnight is covered even when the main PC was off.
+- **Installed software:** More > Installed software on a tile lists that PC's programs with version, publisher, install
+  date and size. **Software** at the top searches every PC at once ("which PCs have AnyDesk?") and saves a CSV.
+- **Wake-on-LAN:** each PC now reports its network adapters, so an offline tile on this network gets a **Wake**
+  button (it notes when the adapter's "Wake on magic packet" is off). The tile shows the wake signal and turns
+  green when the PC starts.
+- **Groups and search:** a Group per PC (in Add PC / Edit), shown on its tile; a search box (name, user, model,
+  processor, Windows version), a group filter, and sorting by name, group or problems first.
+- **Daily summary:** one notification each morning (08:00 by default, changeable): what needs attention, alerts of
+  the last 24 hours and printers low on ink or toner. Clicking it opens a printable page; **Show summary now** makes
+  one at any time.
+- **Restore points and backups:** tiles show the last restore point and Windows Backup, amber when System Protection
+  is off or there has been no restore point for 30 days. **Create restore point** is a new action (needs "Allow
+  actions" on that PC). Both are in the inventory report too, with Group and Wake-on-LAN.
+- **Phone view:** a read-only page of the tiles for a phone on the same Wi-Fi, served by this PC's background service
+  behind a secret link (Copy link, Open here, New link). It refreshes every 15 seconds and works in light and dark.
+- **PCs outside the network (Tailscale):** "Also allow PCs on my VPN (Tailscale)" under This PC opens the port to
+  Tailscale addresses only. Find PCs also lists Windows Utility PCs on your Tailscale network, PCs can be added by
+  Tailscale name, and such tiles say "via VPN" and wait longer before calling a PC offline.
+
+### Added (elsewhere)
+- **Ink and toner** on the Print Spooler tile: levels of the network printers (installed or found by Scan network,
+  or any IP address), read over SNMP or IPP. Amber is low, red is empty.
+- **Asleep instead of Offline:** managed devices in Network Center can be marked "Phone, tablet or laptop that sleeps
+  on Wi-Fi"; they then show amber Asleep and no outage is logged. Every device is now pinged twice and tried on common
+  ports before it counts as offline, so devices that block ping show as online. A **Wake** button appears for offline
+  devices whose adapter address is known.
+
+### Fixed
+- The "Last 7 days" problems line was hidden on PCs without a battery; it now shows on every tile (labelled Issues).
+
+### Notes
+- The monitored PCs need 2.0.77 for history, software, wake details, restore points and the restore point action
+  (Update all on Network PCs). History starts recording once a PC has 2.0.77.
+- Wake-on-LAN works on the local network only, for PCs whose adapter and firmware allow it (usually wired).
 ## [2.0.76] - 2026-10-21
 
 ### Fixed

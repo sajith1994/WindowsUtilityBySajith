@@ -10,7 +10,8 @@ namespace CentricDeviceMonitor.Dialogs;
 
 /// <summary>
 /// Actions on a monitored PC that allows them: message, restart or shut down with a countdown (and cancel), lock,
-/// clear temporary files and a Windows Update check. Every action is confirmed here first and logged on both PCs.
+/// clear temporary files, a Windows Update check and a restore point. Every action is confirmed here first and logged
+/// on both PCs.
 /// </summary>
 public partial class RemoteActionsWindow : Window
 {
@@ -91,6 +92,20 @@ public partial class RemoteActionsWindow : Window
 
     private async void UpdateScanButton_Click(object sender, RoutedEventArgs e) =>
         await RunAsync(new RemoteActionRequest { Action = RemoteActions.UpdateScan });
+
+    private async void RestorePointButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (Version.TryParse(_view.Stats?.AppVersion, out Version? version) && version < new Version(2, 0, 77))
+        {
+            ShowResult($"{_view.Title} has Windows Utility {version.ToString(3)}, which cannot create restore points yet. Update it first (Update on its tile).", ok: false);
+            return;
+        }
+
+        if (Confirm($"Create a restore point on {_view.Title} now? It takes up to a few minutes and slows that PC a little meanwhile."))
+        {
+            await RunAsync(new RemoteActionRequest { Action = RemoteActions.RestorePoint });
+        }
+    }
 
     private bool Confirm(string question, bool warn = false) =>
         WpfMessageBox.Show(this, question, Title, MessageBoxButton.YesNo, warn ? MessageBoxImage.Warning : MessageBoxImage.Question) == MessageBoxResult.Yes;

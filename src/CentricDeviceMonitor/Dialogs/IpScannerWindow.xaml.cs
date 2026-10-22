@@ -567,7 +567,7 @@ public partial class IpScannerWindow : Window
             NetworkCheckResult result = await _networkDeviceService.CheckAsync(device.IpAddress);
             device.Hostname = result.Hostname;
             device.MacAddress = result.MacAddress;
-            device.Status = result.IsOnline ? "Online" : "Offline";
+            device.Status = result.IsOnline ? "Online" : device.PowerSaving ? "Asleep" : "Offline";
             device.RoundTripTime = result.RoundTripTime;
             device.LastChecked = DateTime.Now;
             device.LastError = result.ErrorMessage;

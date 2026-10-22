@@ -3,13 +3,16 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
-using System.Reflection;
 using CentricDeviceMonitor.Models;
 using CentricDeviceMonitor.Services;
 using Xunit;
 using ServiceSnapshot = service::CentricDeviceMonitor.Models.BackgroundServiceSnapshot;
 using ServiceActionRequest = service::CentricDeviceMonitor.Models.RemoteActionRequest;
 using ServiceActionResult = service::CentricDeviceMonitor.Models.RemoteActionResult;
+using ServiceServer = service::CentricDeviceMonitor.ServiceHost.RemoteStatsServer;
+using ServiceServerSettings = service::CentricDeviceMonitor.ServiceHost.RemoteServerSettings;
+using ServiceHistory = service::CentricDeviceMonitor.ServiceHost.HistoryRecorder;
+using ServiceSample = service::CentricDeviceMonitor.ServiceHost.HistorySample;
 
 namespace CentricDeviceMonitor.Tests;
 
@@ -22,20 +25,22 @@ public sealed class RemoteServerIntegrationTests : IDisposable
     private const string Code = "OFFICE-2026-HQ";
     private readonly int _port = FreePort();
     private readonly string _viewersFile = Path.Combine(Path.GetTempPath(), $"wu-viewers-{Guid.NewGuid():N}.json");
-    private readonly object _server;
-    private readonly Type _serverType;
+    private readonly string _historyFile = Path.Combine(Path.GetTempPath(), $"wu-history-{Guid.NewGuid():N}.csv");
+    private readonly string _phoneFile = Path.Combine(Path.GetTempPath(), $"wu-phone-{Guid.NewGuid():N}.json");
+    private readonly ServiceServer _server;
+    private readonly ServiceHistory _history;
     private readonly List<string> _actionsRun = new();
+    private DateTime _clock = DateTime.UtcNow.AddMinutes(-30);
 
     public RemoteServerIntegrationTests()
     {
-        _serverType = typeof(ServiceSnapshot).Assembly.GetType("CentricDeviceMonitor.ServiceHost.RemoteStatsServer")!;
         Func<ServiceSnapshot?> snapshot = () => new ServiceSnapshot { UpdatedAt = DateTime.Now, CpuUsagePercent = 12, RamUsagePercent = 34, CpuModel = "Test CPU" };
-        _server = Activator.CreateInstance(_serverType, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null,
-            new object?[] { snapshot, "localhost", _viewersFile, (Func<ServiceActionRequest, Task<ServiceActionResult>>)FakeAction }, null)!;
+        _history = new ServiceHistory(_historyFile, () => _clock);
+        _server = new ServiceServer(snapshot, "localhost", _viewersFile, FakeAction, _history, _phoneFile);
         Apply(enabled: true, Code);
     }
 
-    private void Apply(bool enabled, string code) => _serverType.GetMethod("Apply")!.Invoke(_server, new object[] { enabled, _port, code });
+    private void Apply(bool enabled, string code) => _server.Apply(enabled, _port, code);
 
     private RemotePcEntry Entry(string code = Code) => new() { Host = "localhost", Port = _port, PairingCode = code };
 
@@ -96,12 +101,10 @@ public sealed class RemoteServerIntegrationTests : IDisposable
     public async Task AConnectingPc_IsRecordedAsAViewerUntilTheCodeChanges()
     {
         await new RemoteMonitorClient().GetStatsAsync("localhost", _port, Code);
-        IList<object> viewers = ((System.Collections.IEnumerable)_serverType.GetProperty("Viewers")!.GetValue(_server)!).Cast<object>().ToList();
-        Assert.Single(viewers);
+        Assert.Single(_server.Viewers);
 
         Apply(enabled: true, "NEWCODE-1234");
-        viewers = ((System.Collections.IEnumerable)_serverType.GetProperty("Viewers")!.GetValue(_server)!).Cast<object>().ToList();
-        Assert.Empty(viewers);
+        Assert.Empty(_server.Viewers);
     }
 
     [Fact]
@@ -125,7 +128,7 @@ public sealed class RemoteServerIntegrationTests : IDisposable
         return Task.FromResult(new ServiceActionResult { Ok = true, Message = $"fake {request.Action}" });
     }
 
-    private void AllowActions(bool allowed) => _serverType.GetProperty("ActionsEnabled")!.SetValue(_server, allowed);
+    private void AllowActions(bool allowed) => _server.ActionsEnabled = allowed;
 
     [Fact]
     public async Task Actions_AreRefusedUntilThePcAllowsThem()
@@ -191,10 +194,79 @@ public sealed class RemoteServerIntegrationTests : IDisposable
         Assert.True((await new RemoteMonitorClient().GetStatsAsync("localhost", _port, Code)).Stats!.ActionsAllowed);
     }
 
+    [Fact]
+    public async Task History_ReturnsTheRecordedMinutesWithGapsWhereThePcWasOff()
+    {
+        // Ten minutes recorded, ten off, then five more.
+        for (int minute = 0; minute < 26; minute++)
+        {
+            if (minute is >= 10 and < 20)
+            {
+                continue;
+            }
+
+            _clock = DateTime.UtcNow.AddMinutes(-30 + minute);
+            _history.Add(new ServiceSample(Cpu: 40, Temperature: 60 + minute, Ram: 50, Disk: 5, Receive: 1_000_000, Send: 500_000));
+            _history.Add(new ServiceSample(Cpu: 60, Temperature: 55, Ram: 50, Disk: 15, Receive: 3_000_000, Send: 500_000));
+        }
+
+        _history.Flush();
+        _clock = DateTime.UtcNow;
+        RemoteHistory history = await new RemoteMonitorClient().GetHistoryAsync(Entry(), 1);
+        Assert.Equal(5, history.StepMinutes);
+        List<RemoteHistoryPoint> recorded = history.Points.Where(point => point.CpuPercent is not null).ToList();
+        Assert.NotEmpty(recorded);
+        Assert.All(recorded, point => Assert.Equal(50, point.CpuPercent!.Value, 1));
+        Assert.Equal(85, recorded.Max(point => point.TemperatureCelsius)!.Value, 1);
+        Assert.Contains(history.Points, point => point.CpuPercent is null);
+        Assert.Equal(2_000_000, recorded[0].ReceiveBitsPerSec!.Value, 0);
+    }
+
+    [Fact]
+    public async Task Software_ListsTheInstalledPrograms()
+    {
+        RemoteSoftwareList software = await new RemoteMonitorClient().GetSoftwareAsync(Entry());
+        Assert.True(DateTime.UtcNow - software.CollectedUtc < TimeSpan.FromMinutes(11));
+        Assert.All(software.Programs, program => Assert.False(string.IsNullOrWhiteSpace(program.Name)));
+    }
+
+    [Fact]
+    public async Task PhonePage_NeedsTheLinkKey()
+    {
+        _server.Apply(new ServiceServerSettings(true, _port, Code, PhoneEnabled: true, PhoneKey: "PHONEKEY2345"));
+        File.WriteAllText(_phoneFile, "{\"mainPcName\":\"MAIN\",\"pcs\":[{\"name\":\"PC1\"}]}");
+        using HttpClient http = new();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync($"http://localhost:{_port}{RemoteMonitoringProtocol.PhonePagePath}?k=WRONGKEY0000")).StatusCode);
+        HttpResponseMessage page = await http.GetAsync($"http://localhost:{_port}{RemoteMonitoringProtocol.PhonePagePath}?k=phonekey2345");
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Contains("<title>Network PCs</title>", await page.Content.ReadAsStringAsync());
+        Assert.Contains("\"PC1\"", await http.GetStringAsync($"http://localhost:{_port}{RemoteMonitoringProtocol.PhoneDataPath}?k=PHONEKEY2345"));
+    }
+
+    [Fact]
+    public async Task PhonePageAlone_DoesNotShareThisPcsStats()
+    {
+        _server.Apply(new ServiceServerSettings(false, _port, Code, PhoneEnabled: true, PhoneKey: "PHONEKEY2345"));
+        Assert.False(_server.IsActive);
+        Assert.Equal(RemoteStatsState.NotSharing, (await new RemoteMonitorClient().GetStatsAsync("localhost", _port, Code)).State);
+        using HttpClient http = new();
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"http://localhost:{_port}{RemoteMonitoringProtocol.HelloPath}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await http.GetAsync($"http://localhost:{_port}{RemoteMonitoringProtocol.PhonePagePath}?k=PHONEKEY2345")).StatusCode);
+    }
+
+    [Fact]
+    public async Task PhonePage_IsOffUnlessTurnedOn()
+    {
+        using HttpClient http = new();
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"http://localhost:{_port}{RemoteMonitoringProtocol.PhonePagePath}?k=PHONEKEY2345")).StatusCode);
+    }
+
     public void Dispose()
     {
-        ((IDisposable)_server).Dispose();
+        _server.Dispose();
         File.Delete(_viewersFile);
+        File.Delete(_historyFile);
+        File.Delete(_phoneFile);
     }
 
     private static int FreePort()

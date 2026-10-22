@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Add a PC to monitor"
         Width="500"
-        Height="560"
+        Height="640"
         MinWidth="440"
         MinHeight="460"
         ResizeMode="CanResize"
@@ -24,11 +24,15 @@
                 <TextBox x:Name="NameTextBox" Height="40" Padding="10,4" FontSize="13" VerticalContentAlignment="Center" MaxLength="60"
                          ToolTip="A friendly name. Left empty, the PC's own name is used." />
 
+                <TextBlock Text="Group (optional)" FontWeight="SemiBold" Margin="0,14,0,6" />
+                <ComboBox x:Name="GroupComboBox" IsEditable="True" Height="40" FontSize="13"
+                          ToolTip="For example Office, Workshop or Laptops. Pick one already used or type a new one. Network PCs can show one group at a time." />
+
                 <TextBlock Text="PC name or IP address" FontWeight="SemiBold" Margin="0,14,0,6" />
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
                     <TextBox x:Name="HostTextBox" Height="40" Padding="10,4" FontSize="13" VerticalContentAlignment="Center" MaxLength="253"
-                             ToolTip="Example: 192.168.1.50 or OFFICE-PC" />
+                             ToolTip="Example: 192.168.1.50 or OFFICE-PC. Over Tailscale: its Tailscale name (office-pc) or 100.x.y.z address." />
                     <TextBlock Grid.Column="1" Text="Port" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" Margin="12,0,8,0" />
                     <TextBox Grid.Column="2" x:Name="PortTextBox" Height="40" Padding="10,4" FontSize="13" VerticalContentAlignment="Center" MaxLength="5"
                              ToolTip="Leave at 47810 unless it was changed on that PC." />

@@ -7,8 +7,9 @@ namespace CentricDeviceMonitor.ServiceHost;
 /// <summary>
 /// Carries out actions asked for by the PC monitoring this one (only when "Allow actions" is on). Runs in the
 /// LocalSystem service: restart and shutdown use shutdown.exe with a visible countdown and message, the message
-/// and lock act on the signed-in users' sessions, cleanup removes temporary files older than a day, and the
-/// Windows Update scan asks the update orchestrator to check for updates.
+/// and lock act on the signed-in users' sessions, cleanup removes temporary files older than a day, the
+/// Windows Update scan asks the update orchestrator to check for updates, and a restore point is made through
+/// System Restore.
 /// </summary>
 internal static class RemoteActionExecutor
 {
@@ -59,6 +60,14 @@ internal static class RemoteActionExecutor
 
             case RemoteActions.ClearTemp:
                 return await Task.Run(ClearTemporaryFiles);
+
+            case RemoteActions.RestorePoint:
+            {
+                Task<RemoteActionResult> create = Task.Run(() => RecoveryStatusProvider.CreateRestorePoint(from));
+                return await Task.WhenAny(create, Task.Delay(TimeSpan.FromSeconds(150))) == create
+                    ? await create
+                    : Ok("Windows is still creating the restore point (it can take a few minutes); it appears on the tile when done.");
+            }
 
             case RemoteActions.UpdateScan:
             {

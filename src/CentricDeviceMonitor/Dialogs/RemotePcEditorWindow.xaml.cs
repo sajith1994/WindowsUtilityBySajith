@@ -13,7 +13,9 @@ public partial class RemotePcEditorWindow : Window
 
     public RemotePcEntry Result { get; }
 
-    public RemotePcEditorWindow(RemoteMonitorClient client, RemotePcEntry? existing = null, string? host = null, string? name = null, string? code = null)
+    /// <param name="groups">Groups already used on the Network PCs page, offered in the Group list.</param>
+    public RemotePcEditorWindow(RemoteMonitorClient client, RemotePcEntry? existing = null, string? host = null, string? name = null, string? code = null,
+        IEnumerable<string>? groups = null)
     {
         InitializeComponent();
         _client = client;
@@ -25,8 +27,15 @@ public partial class RemotePcEditorWindow : Window
                 DisplayName = existing.DisplayName,
                 Host = existing.Host,
                 Port = existing.Port,
-                PairingCode = existing.PairingCode
+                PairingCode = existing.PairingCode,
+                Group = existing.Group,
+                WakeMacAddresses = existing.WakeMacAddresses.ToList(),
+                WakeOnLanEnabled = existing.WakeOnLanEnabled,
+                LastKnownAddress = existing.LastKnownAddress
             };
+        GroupComboBox.ItemsSource = (groups ?? Enumerable.Empty<string>()).Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(group => group, StringComparer.CurrentCultureIgnoreCase).ToList();
+        GroupComboBox.Text = existing?.Group ?? string.Empty;
 
         if (existing is not null)
         {
@@ -123,6 +132,15 @@ public partial class RemotePcEditorWindow : Window
         }
 
         Result.DisplayName = NameTextBox.Text.Trim();
+        Result.Group = GroupComboBox.Text.Trim();
+        if (!string.Equals(Result.Host, host, StringComparison.OrdinalIgnoreCase))
+        {
+            // Another PC (or the same PC by another name): its wake details are learned again.
+            Result.WakeMacAddresses = new List<string>();
+            Result.WakeOnLanEnabled = null;
+            Result.LastKnownAddress = string.Empty;
+        }
+
         Result.Host = host;
         Result.Port = port;
         Result.PairingCode = code;

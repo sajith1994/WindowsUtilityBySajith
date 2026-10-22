@@ -26,13 +26,34 @@ public sealed class RemotePcView : INotifyPropertyChanged
     public bool IsOnline => _result?.State == RemoteStatsState.Online;
 
     public string StateMessage => _result?.Message ?? "Not checked yet";
+
     public bool HasStats => Stats is not null;
+
+    public string Group => Entry.Group.Trim();
+
+    public bool HasGroup => Group.Length > 0;
+
+    /// <summary>Reached over Tailscale rather than the local network.</summary>
+    public bool ViaVpn => VpnAddresses.IsVpnHost(Entry.Host);
+
+    /// <summary>Problems first: offline, then warnings, then the rest (for "Problems first" sorting).</summary>
+    public int SortRank => StatusKind switch
+    {
+        "Offline" => 0,
+        "Warning" => 1,
+        "Checking" => 2,
+        _ => 3
+    };
+
+    /// <summary>Everything the search box matches: names, address, group, model, processor and signed-in users.</summary>
+    public string SearchText => string.Join(" ", Title, Entry.Host, Group, Stats?.MachineName, ModelText, CpuModel, SessionsText, Stats?.OsDisplay);
 
     public string Title => !string.IsNullOrWhiteSpace(Entry.DisplayName) ? Entry.DisplayName : Stats?.MachineName ?? Entry.Host;
 
-    public string Subtitle => Stats is { } stats
+    public string Subtitle => (Stats is { } stats
         ? $"{stats.OsDisplay}  •  up {FormatUptime(stats.UptimeSeconds)}"
-        : Entry.Port == RemoteMonitoringProtocol.DefaultPort ? Entry.Host : $"{Entry.Host}:{Entry.Port}";
+        : Entry.Port == RemoteMonitoringProtocol.DefaultPort ? Entry.Host : $"{Entry.Host}:{Entry.Port}")
+        + (ViaVpn ? "  •  via VPN" : string.Empty);
 
     public string AddressToolTip => Stats is { } stats
         ? $"{stats.MachineName} at {Entry.Host}:{Entry.Port}  •  Windows Utility {stats.AppVersion}"
@@ -186,6 +207,77 @@ public sealed class RemotePcView : INotifyPropertyChanged
     public bool ProblemsSerious => Stats?.Problems?.HasSerious == true;
 
     public string ProblemsText => Stats?.Problems is { HasAny: true } problems ? problems.Describe() : string.Empty;
+
+    // ---- Restore points and backups ----
+
+    public const int RestorePointStaleDays = 30;
+
+    public bool HasRecovery => Stats?.Recovery is not null;
+
+    /// <summary>System Protection off, or no restore point in the last 30 days.</summary>
+    public bool RecoveryNeedsAttention => Stats?.Recovery is { } recovery && RecoveryStale(recovery);
+
+    internal static bool RecoveryStale(RemoteRecoveryInfo recovery) =>
+        recovery.SystemProtectionOn == false
+        || recovery.LastRestorePointUtc is not DateTime last
+        || DateTime.UtcNow - last > TimeSpan.FromDays(RestorePointStaleDays);
+
+    /// <summary>"Restore point 3 days ago • backup yesterday" or "System Protection off • no restore point".</summary>
+    public string RecoveryText
+    {
+        get
+        {
+            if (Stats?.Recovery is not { } recovery)
+            {
+                return string.Empty;
+            }
+
+            List<string> parts = new();
+            if (recovery.SystemProtectionOn == false)
+            {
+                parts.Add("System Protection off");
+            }
+
+            parts.Add(recovery.LastRestorePointUtc is DateTime last ? $"Restore point {Ago(last)}" : "No restore point");
+            if (recovery.LastBackupUtc is DateTime backup)
+            {
+                parts.Add($"Windows Backup {Ago(backup)}");
+            }
+
+            return string.Join("  •  ", parts);
+        }
+    }
+
+    public string RecoveryToolTip => Stats?.Recovery is { LastRestorePointDescription.Length: > 0 } recovery
+        ? $"{recovery.RestorePointCount} restore point{(recovery.RestorePointCount == 1 ? "" : "s")}; newest: {recovery.LastRestorePointDescription}"
+        : string.Empty;
+
+    // ---- Waking ----
+
+    private DateTime? _wakeSentAt;
+
+    /// <summary>
+    /// Offline (not just not sharing), an adapter address is known from when it was last online, and it is on this
+    /// network (a wake signal does not cross a VPN or router).
+    /// </summary>
+    public bool CanWake => _result?.State == RemoteStatsState.Unreachable && Entry.WakeMacAddresses.Count > 0 && !ViaVpn;
+
+    public bool IsWaking => _wakeSentAt is DateTime sent && DateTime.Now - sent < TimeSpan.FromMinutes(3) && !IsOnline;
+
+    public string WakeText => IsWaking
+        ? $"Wake signal sent at {_wakeSentAt:HH:mm}. Waiting for {Title} to start (up to 3 minutes)..."
+        : CanWake && Entry.WakeOnLanEnabled == false
+            ? "Its network adapter has \"Wake on magic packet\" turned off, so Wake may not work."
+            : string.Empty;
+
+    public bool HasWakeText => WakeText.Length > 0;
+
+    public void MarkWakeSent()
+    {
+        _wakeSentAt = DateTime.Now;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+    }
+
     // ---- Security (Windows Update, antivirus, firewall) ----
 
     public const int UpdatesStaleDays = 30;
@@ -294,6 +386,7 @@ public sealed class RemotePcView : INotifyPropertyChanged
             : age.TotalDays < 60 ? $"{(int)age.TotalDays} days ago"
             : $"on {local:d MMM yyyy}";
     }
+
     public double RamPercent => Stats?.RamUsagePercent ?? 0;
 
     public string RamText => Stats is null ? "--" : $"{Stats.RamUsagePercent:0}%";
@@ -346,16 +439,19 @@ public sealed class RemotePcView : INotifyPropertyChanged
         _updateRequested = requested;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
     }
+
     public string UpdatedText => _result?.State == RemoteStatsState.Online
         ? $"Updated {DateTime.Now:HH:mm:ss}  •  v{Stats?.AppVersion}"
         : _lastSeen is DateTime seen ? $"Last seen {seen:dd/MM HH:mm}" : string.Empty;
 
     public void Update(RemoteStatsResult result)
     {
+        int rank = _result is null ? -1 : SortRank;
         _result = result;
         if (result.State == RemoteStatsState.Online)
         {
             _lastSeen = DateTime.Now;
+            _wakeSentAt = null;
             LastKnownStats = result.Stats;
             if (_updateRequested && (!string.IsNullOrEmpty(result.Stats?.UpdateStatus) || !IsOutdatedFor(result.Stats)))
             {
@@ -364,6 +460,37 @@ public sealed class RemotePcView : INotifyPropertyChanged
         }
 
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+        if (rank != SortRank)
+        {
+            // Named as well, so "Problems first" sorting moves only this tile.
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SortRank)));
+        }
+    }
+
+    /// <summary>
+    /// Wired adapter addresses (then Wi-Fi) the PC reported, for waking it later. Returns true when they changed, so
+    /// the caller saves them.
+    /// </summary>
+    public bool RememberWakeDetails()
+    {
+        if (Stats is not { Adapters.Count: > 0 } stats)
+        {
+            return false;
+        }
+
+        List<string> macs = stats.Adapters.Where(adapter => adapter.MacAddress.Length > 0)
+            .OrderByDescending(adapter => adapter.IsWired).Select(adapter => adapter.MacAddress).Distinct().ToList();
+        bool? wiredWake = stats.Adapters.Where(adapter => adapter.IsWired).Select(adapter => adapter.WakeOnMagicPacket).FirstOrDefault(wake => wake.HasValue);
+        string address = System.Net.IPAddress.TryParse(Entry.Host, out _) ? Entry.Host : Entry.LastKnownAddress;
+        if (macs.SequenceEqual(Entry.WakeMacAddresses, StringComparer.OrdinalIgnoreCase) && wiredWake == Entry.WakeOnLanEnabled)
+        {
+            return false;
+        }
+
+        Entry.WakeMacAddresses = macs;
+        Entry.WakeOnLanEnabled = wiredWake;
+        Entry.LastKnownAddress = address;
+        return true;
     }
 
     /// <summary>After editing the entry (name, address or code): show Checking until the next poll.</summary>

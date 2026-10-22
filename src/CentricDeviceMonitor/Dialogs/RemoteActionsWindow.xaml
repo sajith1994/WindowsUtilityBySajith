@@ -58,11 +58,13 @@
                 <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,12,0,0">
                     <StackPanel>
                         <TextBlock Text="Maintenance" FontSize="14" FontWeight="SemiBold" />
-                        <TextBlock Text="Lock the screen (the user signs in again with their password), remove temporary files older than a day, or make Windows Update check for updates now." FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,2,0,8" />
+                        <TextBlock Text="Lock the screen (the user signs in again with their password), remove temporary files older than a day, make Windows Update check for updates now, or create a restore point before a risky change." FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,2,0,8" />
                         <WrapPanel>
                             <Button x:Name="LockButton" Content="Lock screen" Tag="&#xE72E;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" Click="LockButton_Click" />
                             <Button x:Name="ClearTempButton" Content="Clear temporary files" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" Click="ClearTempButton_Click" />
                             <Button x:Name="UpdateScanButton" Content="Check for Windows updates" Tag="&#xE895;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" Click="UpdateScanButton_Click" />
+                            <Button x:Name="RestorePointButton" Content="Create restore point" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" Click="RestorePointButton_Click"
+                                    ToolTip="Saves Windows' system state on that PC, so it can be put back if a change goes wrong. Needs System Protection on." />
                         </WrapPanel>
                     </StackPanel>
                 </Border>

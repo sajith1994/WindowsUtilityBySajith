@@ -25,7 +25,6 @@ public static class RemoteMonitoringProtocol
     /// <summary>GET: the monitored PC measures its own internet speed and reports it.</summary>
     public const string InternetSpeedPath = "/wu/v1/speed/internet";
 
-    /// <summary>Paths that need a signed request.</summary>
     /// <summary>POST: the monitored PC updates itself to the latest official release (downloaded and verified by it).</summary>
     public const string UpdatePath = "/wu/v1/update";
 
@@ -37,17 +36,37 @@ public static class RemoteMonitoringProtocol
 
     /// <summary>What an action request signs: the path plus the SHA-256 of its body, so the body cannot be changed.</summary>
     public static string ActionSignedText(byte[] body) => $"{ActionPath}\n{Convert.ToHexString(SHA256.HashData(body))}";
+
     /// <summary>GET: programs using the PC now, who is signed in, last restart and the last 30 days of problems.</summary>
     public const string DetailsPath = "/wu/v1/details";
 
+    /// <summary>GET ?days=1|7: the PC's own readings, recorded every minute by its service (kept for 8 days).</summary>
+    public const string HistoryPath = "/wu/v1/history";
+
+    /// <summary>GET: programs installed on the PC (for all users).</summary>
+    public const string SoftwarePath = "/wu/v1/software";
+
+    /// <summary>GET ?k=link key: the read-only phone page of the monitored PCs, served by the main PC.</summary>
+    public const string PhonePagePath = "/wu/phone";
+
+    /// <summary>GET ?k=link key: the data behind the phone page.</summary>
+    public const string PhoneDataPath = "/wu/phone/data";
+
     /// <summary>Paths that need a signed request.</summary>
-    public static readonly string[] SignedPaths = { StatsPath, SpeedDownloadPath, SpeedUploadPath, InternetSpeedPath, UpdatePath, DetailsPath };
+    public static readonly string[] SignedPaths = { StatsPath, SpeedDownloadPath, SpeedUploadPath, InternetSpeedPath, UpdatePath, DetailsPath, HistoryPath, SoftwarePath };
 
     /// <summary>Paths that take POST instead of GET.</summary>
     public static readonly string[] PostPaths = { SpeedUploadPath, UpdatePath, ActionPath };
+
     public const string TimeHeader = "X-WU-Time";
     public const string SignatureHeader = "X-WU-Signature";
     public const string FirewallRuleName = "Windows Utility remote monitoring";
+
+    /// <summary>Second rule, only with "Also allow PCs on my VPN": opens the port to Tailscale addresses on any network.</summary>
+    public const string VpnFirewallRuleName = "Windows Utility remote monitoring (VPN)";
+
+    /// <summary>Tailscale's address ranges (IPv4 shared address space and its IPv6 prefix).</summary>
+    public const string VpnRemoteAddresses = "100.64.0.0/10,fd7a:115c:a1e0::/48";
 
     /// <summary>Signed requests older or newer than this (on the client's clock) are refused.</summary>
     public static readonly TimeSpan MaxClockSkew = TimeSpan.FromMinutes(5);
@@ -155,6 +174,13 @@ public sealed class RemoteStatsPayload
 
     /// <summary>Signed-in users and whether each is active, locked or disconnected.</summary>
     public List<RemoteSessionInfo> Sessions { get; set; } = new();
+
+    /// <summary>Wired and Wi-Fi adapters with their addresses and whether they wake the PC (empty from PCs on 2.0.76 or older).</summary>
+    public List<RemoteAdapterInfo> Adapters { get; set; } = new();
+
+    /// <summary>Restore points and backups (null from PCs on 2.0.76 or older, or before the first check).</summary>
+    public RemoteRecoveryInfo? Recovery { get; set; }
+
     /// <summary>Problems logged in the last 7 days (null from PCs on 2.0.73 or older, or before the first check).</summary>
     public RemoteProblemSummary? Problems { get; set; }
 
@@ -175,6 +201,7 @@ public sealed class RemoteStatsPayload
     public double? BatteryFullMWh { get; set; }
     public double? BatteryHealthPercent { get; set; }
     public uint? BatteryCycleCount { get; set; }
+
     /// <summary>Progress of an update started from another PC ("Downloading 2.0.68...", "Update failed: ..."); empty otherwise.</summary>
     public string UpdateStatus { get; set; } = string.Empty;
 
@@ -327,10 +354,123 @@ public sealed class RemoteSecurityInfo
     /// <summary>Profiles with the firewall off, e.g. "Public".</summary>
     public string FirewallOffProfiles { get; set; } = string.Empty;
 }
+
+/// <summary>A physical network adapter, for Wake-on-LAN.</summary>
+public sealed class RemoteAdapterInfo
+{
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>"AA-BB-CC-DD-EE-FF".</summary>
+    public string MacAddress { get; set; } = string.Empty;
+
+    public bool IsWired { get; set; }
+    public bool IsConnected { get; set; }
+
+    /// <summary>"Wake on magic packet" in the adapter's power settings; null when Windows does not say.</summary>
+    public bool? WakeOnMagicPacket { get; set; }
+}
+
+/// <summary>System restore and Windows backup state of a monitored PC.</summary>
+public sealed class RemoteRecoveryInfo
+{
+    public DateTime CheckedUtc { get; set; }
+
+    /// <summary>System Protection (restore points) on the Windows drive; null when it could not be read.</summary>
+    public bool? SystemProtectionOn { get; set; }
+
+    public DateTime? LastRestorePointUtc { get; set; }
+    public string LastRestorePointDescription { get; set; } = string.Empty;
+    public int RestorePointCount { get; set; }
+
+    /// <summary>Last successful Windows Backup (wbadmin / Backup and Restore), from the event log.</summary>
+    public DateTime? LastBackupUtc { get; set; }
+}
+
+/// <summary>One minute (or a longer stretch, when averaged) of a PC's readings.</summary>
+public sealed class RemoteHistoryPoint
+{
+    public DateTime TimeUtc { get; set; }
+    public double? CpuPercent { get; set; }
+
+    /// <summary>Highest CPU temperature in the stretch.</summary>
+    public double? TemperatureCelsius { get; set; }
+    public double? RamPercent { get; set; }
+
+    /// <summary>Busiest disk's active time.</summary>
+    public double? DiskActivePercent { get; set; }
+    public double? ReceiveBitsPerSec { get; set; }
+    public double? SendBitsPerSec { get; set; }
+}
+
+public sealed class RemoteHistory
+{
+    public int Days { get; set; }
+
+    /// <summary>Length of each point in minutes (5 for a day, 30 for a week).</summary>
+    public int StepMinutes { get; set; }
+
+    /// <summary>When the PC started recording (its oldest kept minute).</summary>
+    public DateTime? RecordingSinceUtc { get; set; }
+    public List<RemoteHistoryPoint> Points { get; set; } = new();
+}
+
+/// <summary>An installed program.</summary>
+public sealed class RemoteProgram
+{
+    public string Name { get; set; } = string.Empty;
+    public string Version { get; set; } = string.Empty;
+    public string Publisher { get; set; } = string.Empty;
+    public DateTime? InstalledOn { get; set; }
+    public long? SizeBytes { get; set; }
+
+    /// <summary>"All users" or the user it is installed for.</summary>
+    public string InstalledFor { get; set; } = string.Empty;
+}
+
+public sealed class RemoteSoftwareList
+{
+    public DateTime CollectedUtc { get; set; }
+    public List<RemoteProgram> Programs { get; set; } = new();
+}
+
+/// <summary>What the phone page shows, written by the main PC's dashboard after each check of the monitored PCs.</summary>
+public sealed class PhoneViewData
+{
+    public string MainPcName { get; set; } = string.Empty;
+    public DateTime UpdatedUtc { get; set; }
+    public List<PhoneViewPc> Pcs { get; set; } = new();
+}
+
+public sealed class PhoneViewPc
+{
+    public string Name { get; set; } = string.Empty;
+    public string Group { get; set; } = string.Empty;
+
+    /// <summary>Online, Warning, Offline or Checking (same as the tile's status pill).</summary>
+    public string StatusKind { get; set; } = string.Empty;
+    public string StatusLabel { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public double? CpuPercent { get; set; }
+    public string Temperature { get; set; } = string.Empty;
+    public double? RamPercent { get; set; }
+    public List<PhoneViewDisk> Disks { get; set; } = new();
+    public string SignedIn { get; set; } = string.Empty;
+    public List<string> Notes { get; set; } = new();
+    public string LastSeen { get; set; } = string.Empty;
+}
+
+public sealed class PhoneViewDisk
+{
+    public string Name { get; set; } = string.Empty;
+    public double UsedPercent { get; set; }
+    public string Free { get; set; } = string.Empty;
+    public bool Low { get; set; }
+}
+
 /// <summary>An action for a monitored PC.</summary>
 public sealed class RemoteActionRequest
 {
-    /// <summary>message, lock, restart, shutdown, cancel-shutdown, clear-temp or update-scan.</summary>
+    /// <summary>message, lock, restart, shutdown, cancel-shutdown, clear-temp, update-scan or restore-point.</summary>
     public string Action { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public int DelayMinutes { get; set; }
@@ -357,9 +497,11 @@ public static class RemoteActions
     public const string CancelShutdown = "cancel-shutdown";
     public const string ClearTemp = "clear-temp";
     public const string UpdateScan = "update-scan";
+    public const string RestorePoint = "restore-point";
 
-    public static readonly string[] All = { Message, Lock, Restart, Shutdown, CancelShutdown, ClearTemp, UpdateScan };
+    public static readonly string[] All = { Message, Lock, Restart, Shutdown, CancelShutdown, ClearTemp, UpdateScan, RestorePoint };
 }
+
 /// <summary>Answer to an update request.</summary>
 public sealed class RemoteUpdateResult
 {
@@ -410,4 +552,47 @@ public sealed class RemotePcEntry
     public string Host { get; set; } = string.Empty;
     public int Port { get; set; } = RemoteMonitoringProtocol.DefaultPort;
     public string PairingCode { get; set; } = string.Empty;
+
+    /// <summary>Group shown on the tile and used to filter, e.g. "Office" or "Laptops"; empty for none.</summary>
+    public string Group { get; set; } = string.Empty;
+
+    /// <summary>Adapter addresses last reported by the PC, used to wake it when it is off or asleep.</summary>
+    public List<string> WakeMacAddresses { get; set; } = new();
+
+    /// <summary>Whether a wired adapter reported "Wake on magic packet" turned on.</summary>
+    public bool? WakeOnLanEnabled { get; set; }
+
+    /// <summary>Last IPv4 address the PC was reached at (when added by name), for a directed wake packet.</summary>
+    public string LastKnownAddress { get; set; } = string.Empty;
+}
+
+public static class VpnAddresses
+{
+    /// <summary>
+    /// Tailscale addresses (100.64.0.0/10, fd7a:115c:a1e0::/48) and MagicDNS names (*.ts.net): such PCs are reached
+    /// over the VPN, so they get longer timeouts and a "via VPN" label.
+    /// </summary>
+    public static bool IsVpnHost(string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return false;
+        }
+
+        host = host.Trim().TrimEnd('.');
+        if (host.EndsWith(".ts.net", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!System.Net.IPAddress.TryParse(host.Trim('[', ']'), out System.Net.IPAddress? address))
+        {
+            return false;
+        }
+
+        byte[] bytes = address.GetAddressBytes();
+        return address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+            ? bytes[0] == 100 && (bytes[1] & 0xC0) == 64
+            : bytes.Length == 16 && bytes[0] == 0xFD && bytes[1] == 0x7A && bytes[2] == 0x11 && bytes[3] == 0x5C && bytes[4] == 0xA1 && bytes[5] == 0xE0;
+    }
 }

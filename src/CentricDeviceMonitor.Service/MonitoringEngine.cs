@@ -95,11 +95,17 @@ internal sealed class MonitoringEngine : IDisposable
         "Waiting for the first background GPU power scan.");
     private DateTime? _lastGpuPowerRecordedAt;
     private readonly RemoteStatsServer _remoteServer;
+    private readonly HistoryRecorder _history = new();
     private volatile BackgroundServiceSnapshot? _lastSnapshot;
+
+    /// <summary>Last real adapter address of each device, kept across restarts so an offline device can be woken.</summary>
+    private readonly Dictionary<Guid, string> _knownMacs = new();
+    private bool _knownMacsChanged;
+    private static readonly string KnownMacsFilePath = Path.Combine(SharedDataPaths.ServiceDirectory, "device-macs.json");
 
     public MonitoringEngine()
     {
-        _remoteServer = new RemoteStatsServer(() => _lastSnapshot);
+        _remoteServer = new RemoteStatsServer(() => _lastSnapshot, history: _history);
     }
 
     public void Start()
@@ -148,6 +154,7 @@ internal sealed class MonitoringEngine : IDisposable
             _cancellationTokenSource = null;
             _runTask = null;
             _remoteServer.Dispose();
+            _history.Flush();
         }
 
         ServiceLog.Write("Service", "Stopped.");
@@ -157,6 +164,7 @@ internal sealed class MonitoringEngine : IDisposable
     {
         await LoadCpuLogsAsync();
         await LoadSystemHealthLogsAsync();
+        LoadKnownMacs();
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -168,8 +176,7 @@ internal sealed class MonitoringEngine : IDisposable
                 _cpuAlertThresholdCelsius = NormalizeCpuAlertThreshold(settings.CpuTemperatureAlertThresholdCelsius);
                 NormalizePowerSchedule(settings);
                 _lastSettings = settings;
-                _remoteServer.Apply(settings.RemoteSharingEnabled, settings.RemoteSharingPort, settings.RemoteSharingCode);
-                _remoteServer.ActionsEnabled = settings.RemoteSharingEnabled && settings.RemoteActionsEnabled;
+                ApplyRemoteSettings(settings);
 
                 if (monitoringEnabled != _lastMonitoringEnabled || intervalSeconds != _lastIntervalSeconds)
                 {
@@ -237,6 +244,78 @@ internal sealed class MonitoringEngine : IDisposable
         }
     }
 
+    private void ApplyRemoteSettings(AppSettings settings)
+    {
+        _remoteServer.Apply(new RemoteServerSettings(
+            settings.RemoteSharingEnabled,
+            settings.RemoteSharingPort,
+            settings.RemoteSharingCode,
+            settings.RemoteSharingEnabled && settings.RemoteActionsEnabled,
+            settings.RemoteSharingEnabled && settings.RemoteSharingAllowVpn,
+            settings.PhoneViewEnabled,
+            settings.PhoneViewKey));
+    }
+
+    private void LoadKnownMacs()
+    {
+        try
+        {
+            if (File.Exists(KnownMacsFilePath)
+                && System.Text.Json.JsonSerializer.Deserialize<Dictionary<Guid, string>>(File.ReadAllText(KnownMacsFilePath)) is { } saved)
+            {
+                foreach ((Guid id, string mac) in saved)
+                {
+                    _knownMacs[id] = mac;
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            ServiceLog.WriteException("Device addresses load", exception);
+        }
+    }
+
+    private void SaveKnownMacsIfChanged()
+    {
+        Dictionary<Guid, string> copy;
+        lock (_knownMacs)
+        {
+            if (!_knownMacsChanged)
+            {
+                return;
+            }
+
+            _knownMacsChanged = false;
+            copy = new Dictionary<Guid, string>(_knownMacs);
+        }
+
+        try
+        {
+            File.WriteAllText(KnownMacsFilePath, System.Text.Json.JsonSerializer.Serialize(copy));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ServiceLog.WriteException("Device addresses save", exception);
+        }
+    }
+
+    private void RememberMac(Guid deviceId, string mac)
+    {
+        if (string.IsNullOrWhiteSpace(mac) || mac == "Not available" || mac.Replace("-", string.Empty).All(digit => digit is '0' or 'F' or 'f'))
+        {
+            return;
+        }
+
+        lock (_knownMacs)
+        {
+            if (!_knownMacs.TryGetValue(deviceId, out string? known) || known != mac)
+            {
+                _knownMacs[deviceId] = mac;
+                _knownMacsChanged = true;
+            }
+        }
+    }
+
     private async Task RunPingCycleAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<DeviceEntry> devices = await _deviceStorage.LoadAsync();
@@ -277,6 +356,7 @@ internal sealed class MonitoringEngine : IDisposable
             });
 
             await Task.WhenAll(checks);
+            SaveKnownMacsIfChanged();
         }
         finally
         {
@@ -290,7 +370,13 @@ internal sealed class MonitoringEngine : IDisposable
         try
         {
             NetworkCheckResult result = await _networkService.CheckAsync(device.IpAddress, cancellationToken);
-            string statusText = result.IsOnline ? "Online" : "Offline";
+            // Phones and tablets doze on Wi-Fi and stop answering: that is Asleep, not an outage.
+            bool asleep = !result.IsOnline && device.PowerSaving;
+            string statusText = result.IsOnline ? "Online" : asleep ? "Asleep" : "Offline";
+            if (result.IsOnline)
+            {
+                RememberMac(device.Id, result.MacAddress);
+            }
 
             lock (_deviceStatuses)
             {
@@ -302,11 +388,14 @@ internal sealed class MonitoringEngine : IDisposable
                     MacAddress = result.MacAddress,
                     RoundTripTime = result.RoundTripTime,
                     LastChecked = checkedAt,
-                    LastError = result.ErrorMessage
+                    LastError = asleep ? "Not answering (power saving)." : result.ErrorMessage
                 };
             }
 
-            await TrackDeviceConnectivityAsync(device, result.IsOnline, checkedAt, result.ErrorMessage);
+            if (!asleep)
+            {
+                await TrackDeviceConnectivityAsync(device, result.IsOnline, checkedAt, result.ErrorMessage);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -875,6 +964,14 @@ internal sealed class MonitoringEngine : IDisposable
                 .ToList();
         }
 
+        lock (_knownMacs)
+        {
+            foreach (DeviceRuntimeStatus status in statuses)
+            {
+                status.LastKnownMacAddress = _knownMacs.GetValueOrDefault(status.DeviceId) ?? string.Empty;
+            }
+        }
+
         int deviceCount = knownDeviceCount ?? (await _deviceStorage.LoadAsync()).Count;
         ActivitySample activity = _activityMonitor.Sample();
         BackgroundServiceSnapshot snapshot = new()
@@ -931,12 +1028,22 @@ internal sealed class MonitoringEngine : IDisposable
             RemoteSharingActive = _remoteServer.IsActive,
             RemoteSharingStatus = _remoteServer.Status,
             RemoteViewers = _remoteServer.Viewers,
+            PhoneViewStatus = _remoteServer.PhoneStatus,
             DiskActivity = activity.Disks,
             NetworkActivity = activity.Adapters,
             Devices = statuses
         };
 
         _lastSnapshot = snapshot;
+        try
+        {
+            _history.Add(snapshot);
+        }
+        catch (Exception exception)
+        {
+            ServiceLog.WriteException("History", exception);
+        }
+
         await _runtimeStore.SaveAsync(snapshot);
         _lastSnapshotAt = DateTime.Now;
     }
@@ -975,8 +1082,6 @@ internal sealed class MonitoringEngine : IDisposable
                 settings.PowerScheduleLastTriggeredDate = marker;
                 await _settingsService.SaveAsync(settings);
                 _lastSettings = settings;
-                _remoteServer.Apply(settings.RemoteSharingEnabled, settings.RemoteSharingPort, settings.RemoteSharingCode);
-                _remoteServer.ActionsEnabled = settings.RemoteSharingEnabled && settings.RemoteActionsEnabled;
 
                 bool restart = string.Equals(settings.PowerScheduleAction, "Restart", StringComparison.OrdinalIgnoreCase);
                 string action = restart ? "restart" : "shutdown";
@@ -1001,8 +1106,6 @@ internal sealed class MonitoringEngine : IDisposable
                     settings.PowerScheduleLastTriggeredDate = string.Empty;
                     await _settingsService.SaveAsync(settings);
                     _lastSettings = settings;
-                _remoteServer.Apply(settings.RemoteSharingEnabled, settings.RemoteSharingPort, settings.RemoteSharingCode);
-                _remoteServer.ActionsEnabled = settings.RemoteSharingEnabled && settings.RemoteActionsEnabled;
                     ServiceLog.WriteException("Power schedule", exception);
                 }
 

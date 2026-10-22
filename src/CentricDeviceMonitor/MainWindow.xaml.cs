@@ -68,6 +68,7 @@ public partial class MainWindow : Window
     private string _lastSpoolerStatus = string.Empty;
     private bool _refreshingPrinters;
     private bool _scanningNetworkPrinters;
+    private IReadOnlyList<NetworkPrinterInfo> _networkPrinters = Array.Empty<NetworkPrinterInfo>();
     private bool _installingPrinter;
     private UpdateCheckResult? _availableUpdate;
     private DispatcherTimer? _autoInstallTimer;
@@ -544,6 +545,7 @@ public partial class MainWindow : Window
             menu.Items.Add("Exit dashboard", null, (_, _) => Dispatcher.Invoke(ExitDashboard));
             menu.Opening += (_, _) => Dispatcher.BeginInvoke(new Action(() => _ = RefreshBackgroundMonitoringServiceAsync()));
             _trayIcon.ContextMenuStrip = menu;
+            _trayIcon.BalloonTipClicked += (_, _) => Dispatcher.Invoke(OnBalloonClicked);
             _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(() =>
             {
                 UpdateTrayServiceStatus();
@@ -830,6 +832,7 @@ public partial class MainWindow : Window
         DeviceEditorTitleText.Text = existingDevice is null ? "Add device" : "Edit device";
         DeviceEditorNameTextBox.Text = existingDevice?.Name ?? string.Empty;
         DeviceEditorIpTextBox.Text = existingDevice?.IpAddress ?? string.Empty;
+        DeviceEditorPowerSavingCheck.IsChecked = existingDevice?.PowerSaving == true;
         DeviceEditorValidationText.Text = string.Empty;
         DeviceEditorOverlay.Visibility = Visibility.Visible;
 
@@ -917,7 +920,8 @@ public partial class MainWindow : Window
                 {
                     Id = Guid.NewGuid(),
                     Name = name,
-                    IpAddress = normalizedIpAddress
+                    IpAddress = normalizedIpAddress,
+                    PowerSaving = DeviceEditorPowerSavingCheck.IsChecked == true
                 };
 
                 Devices.Add(deviceToRefresh);
@@ -930,6 +934,7 @@ public partial class MainWindow : Window
                 deviceToRefresh = _deviceBeingEdited;
                 deviceToRefresh.Name = name;
                 deviceToRefresh.IpAddress = normalizedIpAddress;
+                deviceToRefresh.PowerSaving = DeviceEditorPowerSavingCheck.IsChecked == true;
                 deviceToRefresh.Status = "Not checked";
                 deviceToRefresh.Hostname = "Not available";
                 deviceToRefresh.MacAddress = "Not available";
@@ -1085,7 +1090,13 @@ public partial class MainWindow : Window
         try
         {
             NetworkCheckResult result = await _networkService.CheckAsync(device.IpAddress);
-            string status = result.IsOnline ? "Online" : "Offline";
+            // Phones and tablets that doze on Wi-Fi are Asleep, not an outage.
+            bool asleep = !result.IsOnline && device.PowerSaving;
+            string status = result.IsOnline ? "Online" : asleep ? "Asleep" : "Offline";
+            if (result.IsOnline && WakeOnLanService.ParseMac(result.MacAddress) is not null)
+            {
+                device.LastKnownMacAddress = result.MacAddress;
+            }
 
             device.Status = status;
             device.Hostname = result.Hostname;
@@ -1094,7 +1105,7 @@ public partial class MainWindow : Window
             device.LastChecked = checkedAt;
             device.LastError = result.ErrorMessage;
 
-            if (!IsBackgroundServiceRunning)
+            if (!IsBackgroundServiceRunning && !asleep)
             {
                 await TrackDashboardDeviceIncidentAsync(
                     device,
@@ -1109,7 +1120,9 @@ public partial class MainWindow : Window
             {
                 StatusText.Text = result.IsOnline
                     ? $"{device.Name} is online."
-                    : $"{device.Name} did not respond. A connection incident is recorded when a loss is detected.";
+                    : asleep
+                        ? $"{device.Name} is asleep (not answering, which phones and tablets do to save battery)."
+                        : $"{device.Name} did not respond. A connection incident is recorded when a loss is detected.";
             }
         }
         catch (Exception exception)
@@ -1276,6 +1289,32 @@ public partial class MainWindow : Window
             WpfMessageBox.Show(exception.Message, "Unable to open shortcut", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+
+    private async void WakeDeviceButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: DeviceEntry device } || device.LastKnownMacAddress.Length == 0)
+        {
+            return;
+        }
+
+        int sent = await WakeOnLanService.SendAsync(new[] { device.LastKnownMacAddress }, device.IpAddress);
+        ApplicationLogService.WriteMessage("Wake-on-LAN", $"Wake signal sent to {device.Name} ({device.IpAddress}, {device.LastKnownMacAddress}): {sent} packets.");
+        StatusText.Text = sent > 0
+            ? $"Wake signal sent to {device.Name}. If it supports Wake-on-LAN it starts within a minute or two; it turns green on the next check."
+            : "The wake signal could not be sent: this PC has no connected network.";
+    }
+
+    private void PrinterSuppliesButton_Click(object sender, RoutedEventArgs e) =>
+        new PrinterSuppliesWindow(KnownNetworkPrinters()) { Owner = this }.Show();
+
+    /// <summary>Installed printers with a network address, then printers found by the scan that are not installed.</summary>
+    private List<(string Name, string Address)> KnownNetworkPrinters() =>
+        _installedPrinters.Where(printer => !printer.IsVirtual && printer.Address is not null)
+            .Select(printer => (printer.Name, printer.Address!))
+            .Concat(_networkPrinters.Select(printer => (
+                !string.IsNullOrEmpty(printer.Model) ? printer.Model : string.IsNullOrEmpty(printer.HostName) ? printer.Address : printer.HostName,
+                printer.Address)))
+            .ToList();
 
     private void OpenDevicesAndPrintersButton_Click(object sender, RoutedEventArgs e) =>
         RunWindowsTool(_windowsUtilityService.OpenDevicesAndPrinters, "Devices and Printers");
@@ -2929,6 +2968,10 @@ public partial class MainWindow : Window
             device.RoundTripTime = runtimeStatus.RoundTripTime;
             device.LastChecked = runtimeStatus.LastChecked;
             device.LastError = runtimeStatus.LastError ?? string.Empty;
+            if (!string.IsNullOrEmpty(runtimeStatus.LastKnownMacAddress))
+            {
+                device.LastKnownMacAddress = runtimeStatus.LastKnownMacAddress;
+            }
         }
 
         UpdateSelectedDeviceDetails();
@@ -3621,6 +3664,7 @@ public partial class MainWindow : Window
             }
 
             IReadOnlyList<NetworkPrinterInfo> printers = await _printerService.ScanNetworkPrintersAsync(_installedPrinters);
+            _networkPrinters = printers;
             int notInstalled = printers.Count(printer => !printer.IsInstalled);
             NetworkPrintersHeaderText.Text = printers.Count == 0
                 ? "Printers on the network"

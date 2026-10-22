@@ -1,0 +1,55 @@
+<Window x:Class="CentricDeviceMonitor.Dialogs.RemotePcHistoryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:CentricDeviceMonitor.Controls"
+        Title="History"
+        Width="1000"
+        Height="760"
+        MinWidth="680"
+        MinHeight="520"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock x:Name="HeadingText" Text="History" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock x:Name="SummaryText" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <ComboBox x:Name="RangeComboBox" Width="150" SelectionChanged="RangeComboBox_SelectionChanged">
+                    <ComboBoxItem Content="Last 24 hours" Tag="1" IsSelected="True" />
+                    <ComboBoxItem Content="Last 7 days" Tag="7" />
+                </ComboBox>
+                <Button x:Name="RefreshButton" Content="Refresh" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RefreshButton_Click" Margin="8,0,0,0" />
+            </StackPanel>
+        </Grid>
+
+        <WrapPanel Grid.Row="1" Margin="0,0,0,8">
+            <CheckBox x:Name="CpuCheck" Content="CPU load" IsChecked="True" Margin="0,0,16,4" Checked="SeriesCheck_Changed" Unchecked="SeriesCheck_Changed" />
+            <CheckBox x:Name="TemperatureCheck" Content="Temperature" IsChecked="True" Margin="0,0,16,4" Checked="SeriesCheck_Changed" Unchecked="SeriesCheck_Changed" />
+            <CheckBox x:Name="RamCheck" Content="Memory" IsChecked="True" Margin="0,0,16,4" Checked="SeriesCheck_Changed" Unchecked="SeriesCheck_Changed" />
+            <CheckBox x:Name="DiskCheck" Content="Disk activity" IsChecked="True" Margin="0,0,16,4" Checked="SeriesCheck_Changed" Unchecked="SeriesCheck_Changed" />
+            <CheckBox x:Name="DownloadCheck" Content="Network download" IsChecked="True" Margin="0,0,16,4" Checked="SeriesCheck_Changed" Unchecked="SeriesCheck_Changed" />
+            <CheckBox x:Name="UploadCheck" Content="Network upload" Margin="0,0,16,4" Checked="SeriesCheck_Changed" Unchecked="SeriesCheck_Changed" />
+        </WrapPanel>
+
+        <Border Grid.Row="2" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,10,8,4">
+            <controls:LiveChart x:Name="Chart" EmptyText="Loading history..." />
+        </Border>
+
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusLine" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Recorded every minute by that PC's background service and kept for 8 days. Hover to read a value; click to pin it." />
+            <Button Grid.Column="1" Content="Close" Tag="&#xE711;" Style="{StaticResource IconButton}" Width="100" MinHeight="36" IsCancel="True" Click="CloseButton_Click" Margin="12,0,0,0" />
+        </Grid>
+    </Grid>
+</Window>

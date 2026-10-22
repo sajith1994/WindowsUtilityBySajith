@@ -33,16 +33,29 @@ public sealed class NetworkDeviceService
 
         try
         {
-            using Ping ping = new();
-            PingReply reply = await ping.SendPingAsync(parsedAddress, 1500)
-                .WaitAsync(cancellationToken).ConfigureAwait(false);
-
-            if (reply.Status == IPStatus.Success)
+            // A second, longer ping catches devices that were slow to answer the first (Wi-Fi power saving).
+            IPStatus status = IPStatus.Unknown;
+            foreach (int timeout in new[] { 1500, 2500 })
             {
-                return new NetworkCheckResult(true, hostname, macAddress, reply.RoundtripTime, string.Empty);
+                using Ping ping = new();
+                PingReply reply = await ping.SendPingAsync(parsedAddress, timeout)
+                    .WaitAsync(cancellationToken).ConfigureAwait(false);
+
+                if (reply.Status == IPStatus.Success)
+                {
+                    return new NetworkCheckResult(true, hostname, macAddress, reply.RoundtripTime, string.Empty);
+                }
+
+                status = reply.Status;
             }
 
-            return new NetworkCheckResult(false, hostname, macAddress, null, $"Ping status: {reply.Status}");
+            // Some devices block ping but still answer (or refuse) a connection, which proves they are on.
+            if (await AnswersOnAnyPortAsync(parsedAddress, cancellationToken).ConfigureAwait(false) is int port)
+            {
+                return new NetworkCheckResult(true, hostname, ResolveMacAddress(parsedAddress), null, $"Does not answer ping; answered on port {port}.");
+            }
+
+            return new NetworkCheckResult(false, hostname, macAddress, null, $"Ping status: {status}");
         }
         catch (OperationCanceledException)
         {
@@ -52,6 +65,36 @@ public sealed class NetworkDeviceService
         {
             return new NetworkCheckResult(false, hostname, macAddress, null, exception.Message);
         }
+    }
+
+    /// <summary>Ports that phones, PCs, printers, NAS boxes and media players commonly answer on.</summary>
+    private static readonly int[] ProbePorts = { 80, 443, 445, 139, 22, 3389, 9100, 5000, 8009, 62078 };
+
+    /// <summary>The first port where the device accepted or refused a connection (either means it is on), or null.</summary>
+    private static async Task<int?> AnswersOnAnyPortAsync(IPAddress address, CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMilliseconds(900));
+        Task<int?>[] probes = ProbePorts.Select(async port =>
+        {
+            using System.Net.Sockets.TcpClient client = new();
+            try
+            {
+                await client.ConnectAsync(address, port, timeout.Token).ConfigureAwait(false);
+                return (int?)port;
+            }
+            catch (System.Net.Sockets.SocketException exception) when (exception.SocketErrorCode == System.Net.Sockets.SocketError.ConnectionRefused)
+            {
+                return port;
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                return null;
+            }
+        }).ToArray();
+
+        int?[] answers = await Task.WhenAll(probes).ConfigureAwait(false);
+        return answers.FirstOrDefault(port => port.HasValue);
     }
 
 
