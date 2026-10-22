@@ -59,7 +59,7 @@ public sealed class PrivilegedChannelTests : IDisposable
         (string action, Dictionary<string, string> arguments, string requester) = Assert.Single(_done);
         Assert.Equal(PrivilegedServiceActions.NetworkRepair, action);
         Assert.Equal(NetworkRepairKinds.FlushDns, arguments["kind"]);
-        Assert.Equal(WindowsIdentity.GetCurrent().Name, requester, ignoreCase: true);
+        Assert.Equal(ExpectedOwner(), requester, ignoreCase: true);
         Assert.Empty(Directory.EnumerateFiles(Requests));
         Assert.Empty(Directory.EnumerateFiles(Responses));
     }
@@ -142,7 +142,7 @@ public sealed class PrivilegedChannelTests : IDisposable
         Directory.CreateDirectory(_root);
         string path = Path.Combine(_root, "owner.json");
         File.WriteAllText(path, "{}");
-        Assert.Equal(WindowsIdentity.GetCurrent().Name, ServiceProcessor.RequestedBy(path), ignoreCase: true);
+        Assert.Equal(ExpectedOwner(), ServiceProcessor.RequestedBy(path), ignoreCase: true);
         Assert.Equal("unknown user", ServiceProcessor.RequestedBy(Path.Combine(_root, "missing.json")));
     }
 
@@ -151,6 +151,23 @@ public sealed class PrivilegedChannelTests : IDisposable
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() => ServiceStartupTask.SetAsync("unknown user", true, CancellationToken.None));
         await Assert.ThrowsAsync<InvalidOperationException>(() => ServiceStartupTask.SetAsync("S-1-5-21-1-2-3-1001", true, CancellationToken.None));
+    }
+
+    /// <summary>
+    /// The owner Windows gives a new file: the user for a standard user (the case this is for), but the
+    /// Administrators group for an elevated administrator (as on the build server).
+    /// </summary>
+    private static string ExpectedOwner()
+    {
+        string path = Path.GetTempFileName();
+        try
+        {
+            return new FileInfo(path).GetAccessControl().GetOwner(typeof(NTAccount))!.Value;
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     public void Dispose()
