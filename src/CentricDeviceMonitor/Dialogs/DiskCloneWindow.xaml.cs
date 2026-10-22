@@ -19,6 +19,7 @@ public partial class DiskCloneWindow : Window
     private IReadOnlyList<CloneDisk> _disks = Array.Empty<CloneDisk>();
     private ClonePlan? _clonePlan;
     private ClonePlan? _partitionPlan;
+    private BootSetupPlan? _bootPlan;
     private CancellationTokenSource? _running;
 
     public sealed record PlanRow(string Partition, string FileSystem, string Now, string Planned, string How);
@@ -69,6 +70,10 @@ public partial class DiskCloneWindow : Window
             PartitionSourceComboBox.SelectedIndex = PartitionSourceComboBox.Items.Count > 0 ? 0 : -1;
             PartitionTargetDiskComboBox.ItemsSource = _disks;
             PartitionTargetDiskComboBox.SelectedItem = TargetDiskComboBox.SelectedItem ?? _disks.FirstOrDefault();
+            int? bootDisk = (BootDiskComboBox.SelectedItem as CloneDisk)?.Number;
+            List<CloneDisk> bootDisks = _disks.Where(disk => !disk.IsBoot && !disk.IsSystem && disk.Style is "GPT" or "MBR").ToList();
+            BootDiskComboBox.ItemsSource = bootDisks;
+            BootDiskComboBox.SelectedItem = bootDisks.FirstOrDefault(disk => disk.Number == bootDisk) ?? bootDisks.FirstOrDefault();
 
             List<LetterChoice> letters = new() { new("Next free letter", null), new("No letter", '-') };
             HashSet<char> used = DriveInfo.GetDrives().Select(drive => char.ToUpperInvariant(drive.Name[0])).ToHashSet();
@@ -78,6 +83,7 @@ public partial class DiskCloneWindow : Window
             StatusLine.Text = $"{_disks.Count} disk{(_disks.Count == 1 ? "" : "s")} found. Tip: do the first clone with a spare disk, and keep the old disk until the new one starts Windows.";
             UpdateClonePlan();
             UpdatePartitionPlan();
+            UpdateBootPlan();
         }
         catch (Exception exception) when (exception is InvalidOperationException or System.Text.Json.JsonException or KeyNotFoundException
             or Win32Exception or IOException)
@@ -151,6 +157,7 @@ public partial class DiskCloneWindow : Window
         StartCloneButton.IsEnabled = idle && _clonePlan?.CanStart == true && TargetDiskComboBox.SelectedItem is CloneDisk target
             && ConfirmDiskBox.Text.Trim() == target.Number.ToString();
         StartPartitionButton.IsEnabled = idle && _partitionPlan?.CanStart == true;
+        MakeBootableButton.IsEnabled = idle && _bootPlan?.CanStart == true;
     }
 
     private async void StartCloneButton_Click(object sender, RoutedEventArgs e)
@@ -244,6 +251,86 @@ public partial class DiskCloneWindow : Window
         if (ok)
         {
             WpfMessageBox.Show(this, $"{source.Partition.Title} was copied to Disk {target.Number}.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        await LoadDisksAsync();
+    }
+
+    // ---- Make a disk start Windows -------------------------------------------------------------------------
+
+    private void BootDisk_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded)
+        {
+            FillBootWindowsChoices();
+            UpdateBootPlan();
+        }
+    }
+
+    private void FillBootWindowsChoices()
+    {
+        // NTFS partitions that could hold Windows, the largest first (the Windows partition usually is).
+        List<PartitionChoice> choices = BootDiskComboBox.SelectedItem is CloneDisk disk
+            ? disk.Partitions.Where(partition => partition.IsNtfs && !partition.IsRecovery).OrderByDescending(partition => partition.Size)
+                .Select(partition => new PartitionChoice(disk, partition)).ToList()
+            : new List<PartitionChoice>();
+        BootWindowsComboBox.ItemsSource = choices;
+        BootWindowsComboBox.SelectedIndex = choices.Count > 0 ? 0 : -1;
+    }
+
+    private void BootSelection_Changed(object sender, SelectionChangedEventArgs e) => UpdateBootPlan();
+
+    private void UpdateBootPlan()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        if (BootDiskComboBox.SelectedItem is not CloneDisk disk)
+        {
+            _bootPlan = null;
+            BootPlanText.Text = "No other disk with partitions is connected.";
+            BootPlanText.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+            UpdateStartButtons();
+            return;
+        }
+
+        if (BootWindowsComboBox.ItemsSource is null)
+        {
+            FillBootWindowsChoices();
+        }
+
+        _bootPlan = DiskClonePlanner.PlanBootSetup(disk, (BootWindowsComboBox.SelectedItem as PartitionChoice)?.Partition);
+        BootPlanText.Text = _bootPlan.Problems.Count > 0
+            ? string.Join("\n", _bootPlan.Problems)
+            : $"Boot files go to {_bootPlan.Boot!.Title} on Disk {disk.Number} ({(disk.Style == "GPT" ? "UEFI" : "BIOS")} start)"
+              + (_bootPlan.SetActive ? ", and the Windows partition is made active" : string.Empty)
+              + $". The Windows now on {_bootPlan.Windows!.Title} becomes drive C when the PC starts from this disk.";
+        BootPlanText.SetResourceReference(TextBlock.ForegroundProperty, _bootPlan.Problems.Count > 0 ? "DangerBrush" : "TextBrush");
+        UpdateStartButtons();
+    }
+
+    private async void MakeBootableButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_bootPlan is not { CanStart: true } plan || BootDiskComboBox.SelectedItem is not CloneDisk disk)
+        {
+            return;
+        }
+
+        if (WpfMessageBox.Show(this,
+                $"Make Disk {disk.Number} ({disk.Name}) start the Windows on {plan.Windows!.Title}?\n\nThe boot files on its {plan.Boot!.Title} are replaced. The disk Windows runs from now is not changed.",
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        bool ok = await RunAsync(token => _service.MakeDiskStartWindowsAsync(disk, plan, Progress(), token));
+        if (ok)
+        {
+            WpfMessageBox.Show(this,
+                $"Disk {disk.Number} is set up to start Windows.\n\nShut down, then start from it: swap the disks, or choose it first in the BIOS/UEFI boot menu. Keep the old disk until Windows runs well from the new one.",
+                Title, MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         await LoadDisksAsync();

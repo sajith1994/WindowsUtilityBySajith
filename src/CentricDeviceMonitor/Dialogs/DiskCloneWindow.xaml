@@ -76,7 +76,8 @@
 
             <!-- One partition -->
             <TabItem Header="Copy one partition">
-                <StackPanel Margin="0,12,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,12,8,0">
                     <TextBlock Text="Partition to copy" FontWeight="SemiBold" Margin="0,0,0,6" />
                     <ComboBox x:Name="PartitionSourceComboBox" DisplayMemberPath="DisplayText" SelectionChanged="PartitionSelection_Changed" />
                     <Grid Margin="0,14,0,0">
@@ -97,7 +98,30 @@
                     </WrapPanel>
                     <TextBlock x:Name="PartitionPlanText" TextWrapping="Wrap" Margin="0,10,0,0" />
                     <Button x:Name="StartPartitionButton" Content="Copy partition" Tag="&#xE8C8;" Style="{StaticResource IconPrimaryButton}" HorizontalAlignment="Left" Margin="0,14,0,0" MinHeight="34" IsEnabled="False" Click="StartPartitionButton_Click" />
+
+                    <!-- After copying the EFI and Windows partitions one by one. -->
+                    <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,22,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Make a disk start Windows" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,10"
+                                       Text="After copying the EFI system partition and the Windows partition to a new disk one by one: writes the boot files to that disk and makes the copied Windows start as C:. (A whole-disk clone does this by itself.)" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Disk" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                    <ComboBox x:Name="BootDiskComboBox" DisplayMemberPath="DisplayText" SelectionChanged="BootDisk_Changed" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Its Windows partition" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                    <ComboBox x:Name="BootWindowsComboBox" DisplayMemberPath="DisplayText" SelectionChanged="BootSelection_Changed" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock x:Name="BootPlanText" TextWrapping="Wrap" Margin="0,10,0,0" />
+                            <Button x:Name="MakeBootableButton" Content="Make this disk start Windows" Tag="&#xE7E8;" Style="{StaticResource IconCompactButton}" HorizontalAlignment="Left" Margin="0,10,0,0" IsEnabled="False" Click="MakeBootableButton_Click" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
 

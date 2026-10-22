@@ -260,6 +260,20 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.80] - 2026-10-22
+
+### Added
+- **Make this disk start Windows** (Clone & migrate > Copy one partition). After copying the EFI system partition and
+  the Windows partition to a new disk one by one, choose the disk and its Windows partition and press the button: the
+  boot files are written to that disk (bcdboot, UEFI for GPT disks, BIOS with the active partition for MBR disks) and
+  the copied Windows is set to start as drive C. Temporary drive letters are given only where needed and removed
+  afterwards. The disk Windows is running from, encrypted or non-NTFS partitions and a GPT disk without an EFI
+  partition are refused with an explanation.
+
+### Fixed
+- Copy one partition: "No letter" now also removes a letter Windows gave the new partition by itself, and a chosen
+  letter replaces it instead of failing.
+- Whole-disk clone: the boot step reuses letters Windows already gave the new partitions.
 ## [2.0.79] - 2026-10-22
 
 ### Added

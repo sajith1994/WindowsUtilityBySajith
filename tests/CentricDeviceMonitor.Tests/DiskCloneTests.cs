@@ -128,6 +128,47 @@ public class DiskClonePlannerTests
     }
 
     [Fact]
+    public void BootFiles_GoToTheEfiPartitionOfAGptDisk()
+    {
+        ClonePartition efi = Part(1, MiB, 200 * MiB, DiskClonePlanner.EfiType, fileSystem: "FAT32");
+        ClonePartition windows = Part(2, 300 * MiB, 200 * GiB, DiskClonePlanner.BasicDataType, used: 100 * GiB);
+        CloneDisk disk = new(1, "New SSD", 500 * GiB, "GPT", 512, false, false, "NVMe", new[] { efi, windows });
+
+        BootSetupPlan plan = DiskClonePlanner.PlanBootSetup(disk, windows);
+        Assert.True(plan.CanStart, string.Join(" ", plan.Problems));
+        Assert.Equal(efi, plan.Boot);
+        Assert.False(plan.SetActive);
+
+        BootSetupPlan noEfi = DiskClonePlanner.PlanBootSetup(disk with { Partitions = new[] { windows } }, windows);
+        Assert.Contains(noEfi.Problems, problem => problem.Contains("no EFI system partition"));
+    }
+
+    [Fact]
+    public void AnMbrDisk_UsesItsActivePartitionOrMakesWindowsActive()
+    {
+        ClonePartition reserved = Part(1, MiB, 500 * MiB, string.Empty) with { IsActive = true };
+        ClonePartition windows = Part(2, 501 * MiB, 200 * GiB, string.Empty, used: 50 * GiB);
+        CloneDisk disk = new(1, "New SSD", 500 * GiB, "MBR", 512, false, false, "SATA", new[] { reserved, windows });
+        Assert.Equal(reserved, DiskClonePlanner.PlanBootSetup(disk, windows).Boot);
+
+        BootSetupPlan noActive = DiskClonePlanner.PlanBootSetup(disk with { Partitions = new[] { windows } }, windows);
+        Assert.Equal(windows, noActive.Boot);
+        Assert.True(noActive.SetActive);
+    }
+
+    [Fact]
+    public void BootSetup_RefusesTheRunningDiskAndPartitionsThatCannotHoldWindows()
+    {
+        CloneDisk running = WindowsDisk(500 * GiB, 100 * GiB);
+        Assert.Contains(DiskClonePlanner.PlanBootSetup(running, running.Partitions[2]).Problems, problem => problem.Contains("running from"));
+
+        ClonePartition fat = Part(2, 300 * MiB, 20 * GiB, DiskClonePlanner.BasicDataType, fileSystem: "FAT32");
+        CloneDisk disk = new(1, "USB", 64 * GiB, "GPT", 512, false, false, "USB", new[] { Part(1, MiB, 200 * MiB, DiskClonePlanner.EfiType, fileSystem: "FAT32"), fat });
+        Assert.Contains(DiskClonePlanner.PlanBootSetup(disk, fat).Problems, problem => problem.Contains("not NTFS"));
+        Assert.False(DiskClonePlanner.PlanBootSetup(disk, null).CanStart);
+    }
+
+    [Fact]
     public void APartitionCopy_NeedsEnoughRoomAndCanFillIt()
     {
         ClonePartition data = Part(5, MiB, 10 * GiB, DiskClonePlanner.BasicDataType, used: 4 * GiB, letter: 'D');

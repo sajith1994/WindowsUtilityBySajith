@@ -79,6 +79,12 @@ public sealed record ClonePlan(
     public ulong TotalBytes => Partitions.Aggregate(0UL, (sum, partition) => sum + partition.BytesToCopy);
 }
 
+/// <summary>Where the boot files go to make a disk start the Windows on one of its partitions.</summary>
+public sealed record BootSetupPlan(ClonePartition? Windows, ClonePartition? Boot, bool SetActive, IReadOnlyList<string> Problems)
+{
+    public bool CanStart => Problems.Count == 0 && Windows is not null && Boot is not null;
+}
+
 /// <summary>A free stretch of a disk, or an existing partition that may be replaced.</summary>
 public sealed record CloneTargetSpace(ulong Offset, ulong Size, ClonePartition? Replaces)
 {
@@ -250,6 +256,62 @@ public static class DiskClonePlanner
         ulong size = fillSpace ? AlignDown(space.Size) : source.Size;
         PlannedPartition planned = new(source, space.Offset, Math.Max(size, source.Size), ModeFor(source));
         return new ClonePlan(new[] { planned }, problems, Array.Empty<string>(), null);
+    }
+
+    /// <summary>
+    /// After copying partitions one by one: the boot files go to the disk's EFI partition (GPT), or to its active
+    /// partition (MBR; the Windows partition is made active when none is).
+    /// </summary>
+    public static BootSetupPlan PlanBootSetup(CloneDisk disk, ClonePartition? windows)
+    {
+        List<string> problems = new();
+        if (disk.IsBoot || disk.IsSystem)
+        {
+            problems.Add($"Disk {disk.Number} is the disk Windows is running from; it already starts Windows.");
+        }
+
+        if (windows is null)
+        {
+            problems.Add($"Choose the partition on Disk {disk.Number} that holds the copied Windows (usually the largest NTFS partition).");
+            return new BootSetupPlan(null, null, false, problems);
+        }
+
+        if (!windows.IsNtfs)
+        {
+            problems.Add($"{windows.Title} is not NTFS, so it cannot hold Windows.");
+        }
+
+        if (windows.IsEncrypted)
+        {
+            problems.Add($"{windows.Title} is encrypted with BitLocker. Unlock or decrypt it first.");
+        }
+
+        ClonePartition? boot;
+        bool setActive = false;
+        if (disk.Style == "GPT")
+        {
+            boot = disk.Partitions.FirstOrDefault(partition => partition.IsEfi);
+            if (boot is null)
+            {
+                problems.Add($"Disk {disk.Number} has no EFI system partition. Copy the EFI system partition from the old disk to it first (Copy one partition).");
+            }
+        }
+        else if (disk.Style == "MBR")
+        {
+            boot = disk.Partitions.FirstOrDefault(partition => partition.IsActive);
+            if (boot is null)
+            {
+                boot = windows;
+                setActive = true;
+            }
+        }
+        else
+        {
+            boot = null;
+            problems.Add($"Disk {disk.Number} has no partition table.");
+        }
+
+        return new BootSetupPlan(windows, boot, setActive, problems);
     }
 
     /// <summary>Free stretches of at least 16 MB, then existing partitions that could be replaced (not Windows' own).</summary>

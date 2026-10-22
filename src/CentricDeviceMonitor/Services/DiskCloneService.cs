@@ -186,13 +186,15 @@ public sealed class DiskCloneService
             Log(progress, $"Extended to {DiskClonePlanner.FormatSize(planned.Size)}.");
         }
 
-        if (letter != '-')
+        // Windows may already have given the copy a letter when it came back online.
+        string current = $"$p = Get-Partition -DiskNumber {target.Number} -PartitionNumber {partition.Number}; $l = [string]$p.DriveLetter; $has = $l.Trim([char]0).Length -gt 0";
+        string apply = letter switch
         {
-            string assign = letter is char chosen
-                ? $"Add-PartitionAccessPath -DiskNumber {target.Number} -PartitionNumber {partition.Number} -AccessPath '{chosen}:\\'"
-                : $"Add-PartitionAccessPath -DiskNumber {target.Number} -PartitionNumber {partition.Number} -AssignDriveLetter";
-            await RunPowerShellAsync($"Update-Disk -Number {target.Number}; Start-Sleep -Seconds 2; {assign}", cancellationToken);
-        }
+            '-' => "if ($has) { Remove-PartitionAccessPath -DiskNumber $p.DiskNumber -PartitionNumber $p.PartitionNumber -AccessPath ($l.Trim([char]0) + ':\\') }",
+            char chosen => $"if ($has) {{ Set-Partition -DiskNumber $p.DiskNumber -PartitionNumber $p.PartitionNumber -NewDriveLetter '{chosen}' }} else {{ Add-PartitionAccessPath -DiskNumber $p.DiskNumber -PartitionNumber $p.PartitionNumber -AccessPath '{chosen}:\\' }}",
+            null => "if (-not $has) { Add-PartitionAccessPath -DiskNumber $p.DiskNumber -PartitionNumber $p.PartitionNumber -AssignDriveLetter }"
+        };
+        await RunPowerShellAsync($"Update-Disk -Number {target.Number}; Start-Sleep -Seconds 2; {current}; {apply}", cancellationToken);
 
         Report(progress, "Done", 1, 1);
         Log(progress, "Partition copied.");
@@ -468,10 +470,7 @@ public sealed class DiskCloneService
         return null;
     }
 
-    /// <summary>
-    /// Writes new boot files for the copied Windows (bcdboot) onto the new disk's EFI or system partition, and sets
-    /// the copied Windows' C: to the new Windows partition, so the PC starts from the new disk with Windows on C:.
-    /// </summary>
+    /// <summary>Boot setup at the end of a whole-disk clone, for the copied Windows and boot partitions.</summary>
     private static async Task MakeBootableAsync(CloneDisk source, CloneDisk target, IReadOnlyList<PlannedPartition> partitions,
         IReadOnlyList<TargetPartition> created, IProgress<CloneProgress> progress, CancellationToken cancellationToken)
     {
@@ -485,39 +484,80 @@ public sealed class DiskCloneService
             return;
         }
 
-        char[] free = FreeLetters().Take(2).ToArray();
-        if (free.Length < 2)
+        await SetUpBootAsync(target.Number, source.Style, created[windowsIndex].Number, created[bootIndex].Number, setActive: false,
+            partitions[windowsIndex].Source.Letter ?? 'C', progress, cancellationToken);
+    }
+
+    /// <summary>
+    /// "Make this disk start Windows" after copying partitions one by one: the same boot setup as a whole-disk clone,
+    /// on a disk chosen by the user.
+    /// </summary>
+    public async Task MakeDiskStartWindowsAsync(CloneDisk disk, BootSetupPlan plan, IProgress<CloneProgress> progress, CancellationToken cancellationToken)
+    {
+        if (!plan.CanStart)
         {
-            throw new InvalidOperationException("Two free drive letters are needed for a moment to set up the new disk.");
+            throw new InvalidOperationException(string.Join("\n", plan.Problems));
         }
 
-        char windows = free[0];
-        char boot = bootIndex == windowsIndex ? windows : free[1];
-        TargetPartition windowsPartition = created[windowsIndex];
-        TargetPartition bootPartition = created[bootIndex];
-        string assign = $"select disk {target.Number}\nselect partition {windowsPartition.Number}\nassign letter={windows}";
-        if (boot != windows)
+        Report(progress, $"Making Disk {disk.Number} start Windows...", 0, 1);
+        await SetUpBootAsync(disk.Number, disk.Style, plan.Windows!.Number, plan.Boot!.Number, plan.SetActive, 'C', progress, cancellationToken);
+        Report(progress, "Done", 1, 1);
+        Log(progress, $"Disk {disk.Number} is set up to start Windows. Shut down, then start from it (swap the disks, or choose it first in the BIOS/UEFI boot menu).");
+    }
+
+    /// <summary>
+    /// Writes new boot files for the Windows on a partition (bcdboot) onto the disk's EFI or active partition, and
+    /// sets that Windows' drive letter (C:) to the partition, so the PC starts from the disk with Windows on C:.
+    /// Partitions are given a temporary letter only when they have none (Windows may already have given one).
+    /// </summary>
+    private static async Task SetUpBootAsync(int diskNumber, string style, int windowsPartition, int bootPartition, bool setActive, char windowsLetter,
+        IProgress<CloneProgress> progress, CancellationToken cancellationToken)
+    {
+        if (setActive)
         {
-            assign += $"\nselect partition {bootPartition.Number}\nassign letter={boot}";
+            await RunDiskPartAsync($"select disk {diskNumber}\nselect partition {bootPartition}\nactive", cancellationToken);
+            Log(progress, "Windows partition marked active (BIOS start).");
         }
 
-        await RunDiskPartAsync(assign, cancellationToken);
+        Dictionary<int, char> letters = await PartitionLettersAsync(diskNumber, cancellationToken);
+        Queue<char> free = new(FreeLetters());
+        List<(int Partition, char Letter)> assigned = new();
+        async Task<char> LetterFor(int partition)
+        {
+            if (letters.TryGetValue(partition, out char existing))
+            {
+                return existing;
+            }
+
+            char letter = free.Count > 0 ? free.Dequeue() : throw new InvalidOperationException("A free drive letter is needed for a moment to set up the disk.");
+            await RunDiskPartAsync($"select disk {diskNumber}\nselect partition {partition}\nassign letter={letter}", cancellationToken);
+            assigned.Add((partition, letter));
+            letters[partition] = letter;
+            return letter;
+        }
+
         try
         {
-            string firmware = source.Style == "GPT" ? "UEFI" : "BIOS";
+            char windows = await LetterFor(windowsPartition);
+            char boot = await LetterFor(bootPartition);
+            if (!File.Exists($@"{windows}:\Windows\System32\config\SYSTEM"))
+            {
+                throw new InvalidOperationException($"There is no Windows on the partition chosen (no {windows}:\\Windows folder). Choose the partition the Windows partition was copied to.");
+            }
+
+            string firmware = style == "GPT" ? "UEFI" : "BIOS";
             (int bcdExit, string bcdOutput) = await RunAsync("bcdboot.exe", $"{windows}:\\Windows /s {boot}: /f {firmware}", cancellationToken);
             if (bcdExit != 0)
             {
                 throw new InvalidOperationException($"bcdboot could not write the boot files: {bcdOutput.Trim()}");
             }
 
-            Log(progress, $"Boot files written to the new disk ({firmware}).");
+            Log(progress, $"Boot files written to the disk ({firmware}).");
 
-            // Give the copied Windows the same letter it had, on the new partition.
-            char letter = partitions[windowsIndex].Source.Letter ?? 'C';
-            string details = await RunPowerShellAsync($"$p = Get-Partition -DiskNumber {target.Number} -PartitionNumber {windowsPartition.Number}; $d = Get-Disk -Number {target.Number}; '{{0}}|{{1}}|{{2}}' -f $p.Guid, [uint32]$d.Signature, [uint64]$p.Offset", cancellationToken);
+            // Give the copied Windows its letter on this partition.
+            string details = await RunPowerShellAsync($"$p = Get-Partition -DiskNumber {diskNumber} -PartitionNumber {windowsPartition}; $d = Get-Disk -Number {diskNumber}; '{{0}}|{{1}}|{{2}}' -f $p.Guid, [uint32]$d.Signature, [uint64]$p.Offset", cancellationToken);
             string[] fields = details.Trim().Split('|');
-            byte[] value = DiskClonePlanner.MountedDevicesValue(source.Style,
+            byte[] value = DiskClonePlanner.MountedDevicesValue(style,
                 Guid.TryParse(fields[0], out Guid partitionGuid) ? partitionGuid : Guid.Empty,
                 uint.TryParse(fields.ElementAtOrDefault(1), out uint signature) ? signature : 0,
                 ulong.TryParse(fields.ElementAtOrDefault(2), out ulong offset) ? offset : 0);
@@ -530,27 +570,48 @@ public sealed class DiskCloneService
 
             try
             {
-                await RunAsync("reg.exe", $"add {hive}\\MountedDevices /v \"\\DosDevices\\{letter}:\" /t REG_BINARY /d {Convert.ToHexString(value)} /f", cancellationToken);
+                await RunAsync("reg.exe", $"add {hive}\\MountedDevices /v \"\\DosDevices\\{windowsLetter}:\" /t REG_BINARY /d {Convert.ToHexString(value)} /f", cancellationToken);
             }
             finally
             {
                 await RunAsync("reg.exe", $"unload {hive}", CancellationToken.None);
             }
 
-            Log(progress, $"The copied Windows starts as {letter}: on the new disk.");
+            Log(progress, $"That Windows starts as {windowsLetter}: from this disk.");
         }
         finally
         {
-            string remove = $"select disk {target.Number}\nselect partition {windowsPartition.Number}\nremove letter={windows}";
-            if (boot != windows)
+            foreach ((int partition, char letter) in assigned)
             {
-                remove += $"\nselect partition {bootPartition.Number}\nremove letter={boot}";
+                try
+                {
+                    await RunDiskPartAsync($"select disk {diskNumber}\nselect partition {partition}\nremove letter={letter}", CancellationToken.None);
+                }
+                catch (InvalidOperationException exception)
+                {
+                    Log(progress, $"The temporary letter {letter}: could not be removed ({exception.Message}).");
+                }
             }
-
-            await RunDiskPartAsync(remove, CancellationToken.None);
         }
     }
 
+    /// <summary>Drive letters the disk's partitions have now.</summary>
+    private static async Task<Dictionary<int, char>> PartitionLettersAsync(int diskNumber, CancellationToken cancellationToken)
+    {
+        string output = await RunPowerShellAsync(
+            $"Get-Partition -DiskNumber {diskNumber} | ForEach-Object {{ '{{0}}|{{1}}' -f $_.PartitionNumber, [string]$_.DriveLetter }}", cancellationToken);
+        Dictionary<int, char> letters = new();
+        foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] parts = line.Split('|');
+            if (parts.Length == 2 && int.TryParse(parts[0], out int number) && parts[1].Trim('\0', ' ') is { Length: > 0 } letter && char.IsLetter(letter[0]))
+            {
+                letters[number] = char.ToUpperInvariant(letter[0]);
+            }
+        }
+
+        return letters;
+    }
     private static IEnumerable<char> FreeLetters()
     {
         HashSet<char> used = DriveInfo.GetDrives().Select(drive => char.ToUpperInvariant(drive.Name[0])).ToHashSet();
