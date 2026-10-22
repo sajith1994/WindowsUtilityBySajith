@@ -260,6 +260,13 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.81] - 2026-10-22
+
+### Fixed
+- Clone and migrate: a recovery partition was reported as encrypted with BitLocker (and the clone refused) while
+  BitLocker was off. Only a volume Windows reports as encrypted, or being encrypted or decrypted, is refused now.
+- Clone and migrate: cloning to a disk of the same size no longer "grows" Windows by a few megabytes ("C: grows from
+  235 GB to 235 GB"); partitions keep their size unless the new disk has at least 1 GB more room.
 ## [2.0.80] - 2026-10-22
 
 ### Added

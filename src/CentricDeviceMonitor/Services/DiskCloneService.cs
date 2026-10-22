@@ -37,7 +37,15 @@ public sealed class DiskCloneService
             $encrypted = @{}
             try {
                 Get-CimInstance -Namespace root/CIMV2/Security/MicrosoftVolumeEncryption -ClassName Win32_EncryptableVolume -ErrorAction Stop |
-                    ForEach-Object { $encrypted[[string]$_.DeviceID] = ($_.ConversionStatus -ne 0) }
+                    ForEach-Object {
+                        # 1-5 = encrypted, or being encrypted or decrypted. The property is empty on some volumes
+                        # (recovery partitions), so ask the volume itself; an empty answer is not encryption.
+                        $status = $_.ConversionStatus
+                        if ($null -eq $status) {
+                            try { $status = (Invoke-CimMethod -InputObject $_ -MethodName GetConversionStatus -ErrorAction Stop).ConversionStatus } catch { }
+                        }
+                        $encrypted[[string]$_.DeviceID] = ($null -ne $status -and [int]$status -ge 1 -and [int]$status -le 5)
+                    }
             } catch { }
             $disks = foreach ($d in Get-Disk) {
                 $parts = @()

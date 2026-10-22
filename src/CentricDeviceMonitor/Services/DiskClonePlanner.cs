@@ -176,6 +176,11 @@ public static class DiskClonePlanner
             // Windows can only extend NTFS; any other file system keeps its size (the rest stays free).
             growSize = grow.Size;
         }
+        else if (growSize > grow.Size && growSize - grow.Size < GiB)
+        {
+            // Same-size disks differ by a few megabytes; growing for that is a needless step.
+            growSize = grow.Size;
+        }
 
         PlannedPartition? shrinkFirst = null;
         if (growSize < grow.Size)

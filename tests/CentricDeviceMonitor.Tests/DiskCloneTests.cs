@@ -128,6 +128,16 @@ public class DiskClonePlannerTests
     }
 
     [Fact]
+    public void ADiskOfTheSameSize_KeepsThePartitionSizes()
+    {
+        CloneDisk source = WindowsDisk(500 * GiB, 200 * GiB);
+        ClonePlan plan = DiskClonePlanner.PlanClone(source, EmptyDisk(1, source.Size + 300 * MiB));
+
+        Assert.True(plan.CanStart, string.Join(" ", plan.Problems));
+        Assert.DoesNotContain(plan.Partitions, partition => partition.Grows || partition.Shrinks);
+        Assert.DoesNotContain(plan.Notes, note => note.Contains("grows"));
+    }
+    [Fact]
     public void BootFiles_GoToTheEfiPartitionOfAGptDisk()
     {
         ClonePartition efi = Part(1, MiB, 200 * MiB, DiskClonePlanner.EfiType, fileSystem: "FAT32");
