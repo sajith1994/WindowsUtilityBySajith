@@ -117,6 +117,7 @@ public partial class DiskCloneWindow : Window
             _clonePlan = null;
             PlanGrid.ItemsSource = null;
             PlanProblemsText.Visibility = Visibility.Collapsed;
+            DecryptButton.Visibility = Visibility.Collapsed;
             PlanNotesText.Text = TargetDiskComboBox.Items.Count == 0
                 ? "No other disk is connected. Connect the new SSD (in a second slot, or with a USB adapter or enclosure), then select Refresh disks."
                 : "Choose the disk to copy from and the disk to copy to.";
@@ -134,6 +135,7 @@ public partial class DiskCloneWindow : Window
             Describe(planned, usedOnly))).ToList();
         PlanProblemsText.Text = string.Join("\n", _clonePlan.Problems);
         PlanProblemsText.Visibility = _clonePlan.Problems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        DecryptButton.Visibility = source.Partitions.Any(partition => partition.IsEncrypted) ? Visibility.Visible : Visibility.Collapsed;
         long total = _clonePlan.Partitions.Sum(planned => (long)(usedOnly ? planned.BytesToCopy : planned.Mode == CopyMode.Skip ? 0 : planned.Source.Size));
         PlanNotesText.Text = string.Join("\n", _clonePlan.Notes.Append(
             $"About {DiskClonePlanner.FormatSize((ulong)total)} is copied. Everything on Disk {target.Number} ({target.Name}, {DiskClonePlanner.FormatSize(target.Size)}) is erased first."));
@@ -158,6 +160,31 @@ public partial class DiskCloneWindow : Window
             && ConfirmDiskBox.Text.Trim() == target.Number.ToString();
         StartPartitionButton.IsEnabled = idle && _partitionPlan?.CanStart == true;
         MakeBootableButton.IsEnabled = idle && _bootPlan?.CanStart == true;
+        DecryptButton.IsEnabled = idle;
+        PartitionDecryptButton.IsEnabled = idle;
+    }
+
+    private async void DecryptButton_Click(object sender, RoutedEventArgs e)
+    {
+        List<ClonePartition> encrypted = sender == DecryptButton
+            ? (SourceDiskComboBox.SelectedItem as CloneDisk)?.Partitions.Where(partition => partition.IsEncrypted).ToList() ?? new()
+            : PartitionSourceComboBox.SelectedItem is PartitionChoice { Partition.IsEncrypted: true } choice ? new() { choice.Partition } : new();
+        if (encrypted.Count == 0)
+        {
+            return;
+        }
+
+        string names = string.Join(", ", encrypted.Select(partition => partition.Title));
+        if (WpfMessageBox.Show(this,
+                $"Turn BitLocker off on {names} and decrypt it?\n\nThe data stays as it is; only the encryption is removed, so it can be copied. You can turn BitLocker on again on the new disk. Decrypting takes from seconds to a few minutes per partition.",
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunAsync(token => _service.DecryptAsync(encrypted, Progress(), token),
+            "Stopped waiting. Windows carries on decrypting; select Refresh disks in a while.");
+        await LoadDisksAsync();
     }
 
     private async void StartCloneButton_Click(object sender, RoutedEventArgs e)
@@ -214,6 +241,7 @@ public partial class DiskCloneWindow : Window
             || PartitionSpaceComboBox.SelectedItem is not CloneTargetSpace space)
         {
             _partitionPlan = null;
+            PartitionDecryptButton.Visibility = Visibility.Collapsed;
             PartitionPlanText.Text = PartitionTargetDiskComboBox.SelectedItem is CloneDisk ? "There is no free space or partition to copy to on that disk." : string.Empty;
             UpdateStartButtons();
             return;
@@ -228,6 +256,7 @@ public partial class DiskCloneWindow : Window
               + (space.Replaces is { } replaced ? $", replacing {replaced.Title} (its data is lost)." : ".")
               + (planned.Mode == CopyMode.SnapshotUsed ? " It is read from a snapshot, used space only." : " Every sector is copied.");
         PartitionPlanText.SetResourceReference(TextBlock.ForegroundProperty, _partitionPlan.Problems.Count > 0 ? "DangerBrush" : space.Replaces is null ? "TextBrush" : "WarningBrush");
+        PartitionDecryptButton.Visibility = source.Partition.IsEncrypted ? Visibility.Visible : Visibility.Collapsed;
         UpdateStartButtons();
     }
 
@@ -357,7 +386,7 @@ public partial class DiskCloneWindow : Window
     });
 
     /// <summary>Runs a clone or copy with the window locked, the PC kept awake and Cancel available. Returns true when it finished.</summary>
-    private async Task<bool> RunAsync(Func<CancellationToken, Task> work)
+    private async Task<bool> RunAsync(Func<CancellationToken, Task> work, string? cancelledText = null)
     {
         _running = new CancellationTokenSource();
         ProgressPanel.Visibility = Visibility.Visible;
@@ -376,7 +405,7 @@ public partial class DiskCloneWindow : Window
         catch (OperationCanceledException)
         {
             StageText.Text = "Cancelled";
-            StatusLine.Text = "Cancelled. The disk copied to is incomplete: clone again, or clean it in Disk tools. The disk copied from was not changed.";
+            StatusLine.Text = cancelledText ?? "Cancelled. The disk copied to is incomplete: clone again, or clean it in Disk tools. The disk copied from was not changed.";
             return false;
         }
         catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or Win32Exception

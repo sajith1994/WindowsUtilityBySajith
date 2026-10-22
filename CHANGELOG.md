@@ -260,6 +260,17 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.82] - 2026-10-22
+
+### Added
+- Clone and migrate: a **Decrypt** button when a partition to copy is encrypted with BitLocker. It turns BitLocker off
+  on that partition and follows the decryption to the end, also for partitions without a drive letter, which Control
+  Panel > BitLocker does not list (for example a PC maker's recovery partition that Windows' device encryption left
+  encrypted with protection off).
+
+### Changed
+- Recovery partitions are named with their label in the plan, for example "Recovery (DELLSUPPORT)", and the BitLocker
+  message says when a partition has no drive letter.
 ## [2.0.81] - 2026-10-22
 
 ### Fixed

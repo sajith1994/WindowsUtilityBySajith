@@ -128,6 +128,18 @@ public class DiskClonePlannerTests
     }
 
     [Fact]
+    public void AnEncryptedRecoveryPartition_IsNamedAndExplained()
+    {
+        ClonePartition dell = Part(5, 400 * GiB, 2 * GiB, DiskClonePlanner.RecoveryType, encrypted: true) with { Label = "DELLSUPPORT" };
+        Assert.Equal("Recovery (DELLSUPPORT)", dell.Title);
+        Assert.Equal("Recovery", (dell with { Label = "Recovery" }).Title);
+
+        string problem = DiskClonePlanner.EncryptedProblem(dell);
+        Assert.Contains("Recovery (DELLSUPPORT) is encrypted with BitLocker", problem);
+        Assert.Contains("no drive letter", problem);
+        Assert.DoesNotContain("no drive letter", DiskClonePlanner.EncryptedProblem(dell with { Letter = 'D' }));
+    }
+    [Fact]
     public void ADiskOfTheSameSize_KeepsThePartitionSizes()
     {
         CloneDisk source = WindowsDisk(500 * GiB, 200 * GiB);

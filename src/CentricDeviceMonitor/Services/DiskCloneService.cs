@@ -514,6 +514,61 @@ public sealed class DiskCloneService
     }
 
     /// <summary>
+    /// Turns BitLocker off on partitions so they can be copied, and waits until they are fully decrypted. Works on
+    /// partitions without a drive letter (such as a PC maker's recovery partition), which Control Panel does not list.
+    /// Decrypting carries on in Windows if the wait is cancelled.
+    /// </summary>
+    public async Task DecryptAsync(IReadOnlyList<ClonePartition> partitions, IProgress<CloneProgress> progress, CancellationToken cancellationToken)
+    {
+        foreach (ClonePartition partition in partitions)
+        {
+            if (partition.VolumePath.Length == 0)
+            {
+                throw new InvalidOperationException($"{partition.Title} has no volume Windows can decrypt.");
+            }
+
+            string volume = $"Get-CimInstance -Namespace root/CIMV2/Security/MicrosoftVolumeEncryption -ClassName Win32_EncryptableVolume | Where-Object DeviceID -eq '{partition.VolumePath}'";
+            Log(progress, $"Turning BitLocker off on {partition.Title}...");
+            string started = await RunPowerShellAsync($$"""
+                $v = {{volume}}
+                if (-not $v) { throw 'BitLocker does not know this partition.' }
+                $r = Invoke-CimMethod -InputObject $v -MethodName Decrypt
+                [string]$r.ReturnValue
+                """, cancellationToken);
+            if (!uint.TryParse(started.Trim(), out uint code) || code != 0)
+            {
+                throw new InvalidOperationException($"BitLocker could not start decrypting {partition.Title} (error 0x{code:X8}). Try: manage-bde -off {partition.VolumePath}");
+            }
+
+            while (true)
+            {
+                string[] status = (await RunPowerShellAsync($$"""
+                    $s = Invoke-CimMethod -InputObject ({{volume}}) -MethodName GetConversionStatus
+                    "$($s.ConversionStatus) $($s.EncryptionPercentage)"
+                    """, cancellationToken)).Trim().Split(' ');
+                int conversion = int.Parse(status[0], System.Globalization.CultureInfo.InvariantCulture);
+                double percent = double.Parse(status[1], System.Globalization.CultureInfo.InvariantCulture);
+                if (conversion == 0)
+                {
+                    break;
+                }
+
+                if (conversion is not (3 or 5))
+                {
+                    throw new InvalidOperationException($"BitLocker stopped decrypting {partition.Title} (status {conversion}).");
+                }
+
+                Report(progress, $"Decrypting {partition.Title}...", (long)(100 - percent), 100);
+                await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+            }
+
+            Log(progress, $"{partition.Title} is decrypted.");
+        }
+
+        Report(progress, "Done", 1, 1);
+    }
+
+    /// <summary>
     /// Writes new boot files for the Windows on a partition (bcdboot) onto the disk's EFI or active partition, and
     /// sets that Windows' drive letter (C:) to the partition, so the PC starts from the disk with Windows on C:.
     /// Partitions are given a temporary letter only when they have none (Windows may already have given one).

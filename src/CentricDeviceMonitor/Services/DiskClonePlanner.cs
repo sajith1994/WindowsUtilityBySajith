@@ -26,7 +26,8 @@ public sealed record ClonePartition(
     public bool IsNtfs => FileSystem.Equals("NTFS", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>"C: Windows", "EFI system", "Recovery", "D: Data".</summary>
-    public string Title => IsEfi ? "EFI system" : IsMsr ? "Microsoft reserved" : IsRecovery ? "Recovery"
+    public string Title => IsEfi ? "EFI system" : IsMsr ? "Microsoft reserved"
+        : IsRecovery ? (Label.Length > 0 && !Label.Equals("Recovery", StringComparison.OrdinalIgnoreCase) ? $"Recovery ({Label})" : "Recovery")
         : Letter is char letter ? $"{letter}:{(Label.Length > 0 ? " " + Label : string.Empty)}"
         : Label.Length > 0 ? Label : $"Partition {Number}";
 }
@@ -140,7 +141,7 @@ public static class DiskClonePlanner
 
         foreach (ClonePartition encrypted in source.Partitions.Where(partition => partition.IsEncrypted))
         {
-            problems.Add($"{encrypted.Title} is encrypted with BitLocker. Turn BitLocker off (Control Panel > BitLocker) and let it finish decrypting, then clone; turn it on again afterwards.");
+            problems.Add(EncryptedProblem(encrypted));
         }
 
         if (source.Partitions.Any(partition => DynamicTypes.Contains(partition.GptType, StringComparer.OrdinalIgnoreCase) || partition.MbrType == 0x42))
@@ -240,7 +241,7 @@ public static class DiskClonePlanner
 
         if (source.IsEncrypted)
         {
-            problems.Add($"{source.Title} is encrypted with BitLocker. Turn BitLocker off first.");
+            problems.Add(EncryptedProblem(source));
         }
 
         if (space.Replaces is { } replaced && (replaced.IsBoot || replaced.IsSystem))
@@ -262,6 +263,12 @@ public static class DiskClonePlanner
         PlannedPartition planned = new(source, space.Offset, Math.Max(size, source.Size), ModeFor(source));
         return new ClonePlan(new[] { planned }, problems, Array.Empty<string>(), null);
     }
+
+    /// <summary>An encrypted partition would be copied as unreadable data, so it is decrypted first (Decrypt button).</summary>
+    public static string EncryptedProblem(ClonePartition partition) =>
+        $"{partition.Title} is encrypted with BitLocker"
+        + (partition.Letter is null ? " (it has no drive letter, so Control Panel > BitLocker does not list it)" : string.Empty)
+        + ". Select Decrypt to turn BitLocker off on it, then copy; BitLocker can be turned on again afterwards.";
 
     /// <summary>
     /// After copying partitions one by one: the boot files go to the disk's EFI partition (GPT), or to its active
