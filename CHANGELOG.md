@@ -260,6 +260,13 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.83] - 2026-10-22
+
+### Fixed
+- Clone and migrate > Decrypt: the decryption finished, but the window showed "The input string '' was not in a
+  correct format" at the end. A partition without a drive letter drops out of BitLocker's list once it is decrypted;
+  that now counts as finished, and a moment without an answer while BitLocker finishes is waited out.
+- The decrypt progress shows how much of the partition is left ("1 GB of 2 GB") instead of "0 MB of 0 MB".
 ## [2.0.82] - 2026-10-22
 
 ### Added

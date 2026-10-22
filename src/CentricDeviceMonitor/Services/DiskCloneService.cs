@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Management;
 using System.Runtime.InteropServices;
@@ -540,25 +541,47 @@ public sealed class DiskCloneService
                 throw new InvalidOperationException($"BitLocker could not start decrypting {partition.Title} (error 0x{code:X8}). Try: manage-bde -off {partition.VolumePath}");
             }
 
+            int unreadable = 0;
             while (true)
             {
-                string[] status = (await RunPowerShellAsync($$"""
-                    $s = Invoke-CimMethod -InputObject ({{volume}}) -MethodName GetConversionStatus
-                    "$($s.ConversionStatus) $($s.EncryptionPercentage)"
-                    """, cancellationToken)).Trim().Split(' ');
-                int conversion = int.Parse(status[0], System.Globalization.CultureInfo.InvariantCulture);
-                double percent = double.Parse(status[1], System.Globalization.CultureInfo.InvariantCulture);
-                if (conversion == 0)
+                // A fully decrypted partition without a letter drops out of BitLocker's list ("gone"), and while it
+                // finishes the volume can briefly not answer ("busy").
+                string answer = (await RunPowerShellAsync($$"""
+                    try {
+                        $v = {{volume}}
+                        if (-not $v) { 'gone' } else {
+                            $s = Invoke-CimMethod -InputObject $v -MethodName GetConversionStatus -ErrorAction Stop
+                            "$($s.ConversionStatus) $($s.EncryptionPercentage)"
+                        }
+                    } catch { 'busy' }
+                    """, cancellationToken)).Trim();
+                if (answer == "gone")
                 {
                     break;
                 }
 
-                if (conversion is not (3 or 5))
+                string[] status = answer.Split(' ');
+                if (status.Length == 2 && int.TryParse(status[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int conversion)
+                    && double.TryParse(status[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double percent))
                 {
-                    throw new InvalidOperationException($"BitLocker stopped decrypting {partition.Title} (status {conversion}).");
+                    unreadable = 0;
+                    if (conversion == 0)
+                    {
+                        break;
+                    }
+
+                    if (conversion is not (3 or 5))
+                    {
+                        throw new InvalidOperationException($"BitLocker stopped decrypting {partition.Title} (status {conversion}).");
+                    }
+
+                    Report(progress, $"Decrypting {partition.Title}...", (long)(partition.Size * (100 - percent) / 100), (long)partition.Size);
+                }
+                else if (++unreadable >= 10)
+                {
+                    throw new InvalidOperationException($"BitLocker's progress on {partition.Title} could not be read. Select Refresh disks to see whether it finished.");
                 }
 
-                Report(progress, $"Decrypting {partition.Title}...", (long)(100 - percent), 100);
                 await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
             }
 
