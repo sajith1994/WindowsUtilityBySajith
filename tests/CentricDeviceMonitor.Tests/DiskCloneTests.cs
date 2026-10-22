@@ -299,12 +299,33 @@ public class DiskCopyTests
             using SafeFileHandle reader = File.OpenHandle(sourcePath, FileMode.Open, FileAccess.Read);
             using SafeFileHandle writer = File.OpenHandle(targetPath, FileMode.Open, FileAccess.ReadWrite);
             Assert.NotNull(DiskCloneService.Verify(reader, 0, writer, 0, new[] { (0L, (long)data.Length) }));
+
+            // Differences in files a snapshot does not freeze are expected; anywhere else they name the file.
+            static Func<IReadOnlyList<long>, Dictionary<long, List<string>>?> Owned(params string[] files) =>
+                offsets => offsets.ToDictionary(offset => offset, _ => files.ToList());
+            (long, long)[] all = { (0L, (long)data.Length) };
+            Assert.Null(DiskCloneService.Verify(reader, 0, writer, 0, all, Owned(@"\pagefile.sys::$DATA")));
+            Assert.Contains(@"in \Users\me\notes.txt", DiskCloneService.Verify(reader, 0, writer, 0, all, Owned(@"\Users\me\notes.txt::$DATA")));
+            Assert.NotNull(DiskCloneService.Verify(reader, 0, writer, 0, all, Owned())); // in no file: still a difference
+            Assert.NotNull(DiskCloneService.Verify(reader, 0, writer, 0, all, _ => null)); // NTFS could not tell
         }
         finally
         {
             File.Delete(sourcePath);
             File.Delete(targetPath);
         }
+    }
+
+    [Fact]
+    public void FilesSnapshotsDoNotFreeze_AreKnown()
+    {
+        Assert.True(DiskCloneService.ChangesDuringSnapshot(@"\pagefile.sys::$DATA"));
+        Assert.True(DiskCloneService.ChangesDuringSnapshot(@"\HIBERFIL.SYS::$DATA"));
+        Assert.True(DiskCloneService.ChangesDuringSnapshot(@"\swapfile.sys::$DATA"));
+        Assert.True(DiskCloneService.ChangesDuringSnapshot(@"\System Volume Information\{ea9791b8-cdfb-11f1-a5d0-84fdd1598ee9}{3808876b-c176-4e48-b7ae-04046e6cc752}::$DATA"));
+        Assert.False(DiskCloneService.ChangesDuringSnapshot(@"\System Volume Information\IndexerVolumeGuid::$DATA"));
+        Assert.False(DiskCloneService.ChangesDuringSnapshot(@"\Users\SAJITH\Desktop\Jessica\Downloads\OneDriveSetup.exe::$DATA"));
+        Assert.False(DiskCloneService.ChangesDuringSnapshot(@"\Windows\pagefile.sys::$DATA"));
     }
 
     [Fact]

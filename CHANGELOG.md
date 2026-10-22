@@ -260,6 +260,15 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.84] - 2026-10-22
+
+### Fixed
+- Clone and migrate: the check after copying Windows' partition stopped the clone with "The copy of C: differs from the
+  original" although the copy was right. A snapshot does not freeze the page, hibernation and swap files or the
+  storage of restore points (System Volume Information), so they change while the clone runs. The check now asks
+  NTFS which file a difference is in and ignores those files; any other difference still stops the clone and now names
+  the file it is in.
+- The check reads each piece completely before comparing it.
 ## [2.0.83] - 2026-10-22
 
 ### Fixed

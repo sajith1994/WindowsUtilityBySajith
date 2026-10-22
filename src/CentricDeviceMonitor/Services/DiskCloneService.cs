@@ -397,7 +397,8 @@ public sealed class DiskCloneService
                 if (options.Verify)
                 {
                     Report(progress, $"Checking the copy of {planned.Source.Title}...", done, total, clock);
-                    string? difference = await Task.Run(() => Verify(reader, sourceBase, writer, targetBase, ranges), cancellationToken);
+                    Func<IReadOnlyList<long>, Dictionary<long, List<string>>?>? ownersOf = shot is not null ? Native.OwnerLookup(reader) : null;
+                    string? difference = await Task.Run(() => Verify(reader, sourceBase, writer, targetBase, ranges, ownersOf), cancellationToken);
                     if (difference is not null)
                     {
                         throw new InvalidOperationException($"The copy of {planned.Source.Title} differs from the original ({difference}). Do not use the new disk; try again.");
@@ -449,8 +450,29 @@ public sealed class DiskCloneService
         }
     }
 
-    /// <summary>Compares up to 32 pieces spread over the copied ranges; returns where they differ, or null.</summary>
-    internal static string? Verify(SafeFileHandle reader, long sourceBase, SafeFileHandle writer, long targetBase, IReadOnlyList<(long Offset, long Length)> ranges)
+    private const string VssStoreId = "{3808876b-c176-4e48-b7ae-04046e6cc752}";
+
+    /// <summary>
+    /// Files a snapshot does not freeze: reading them from a snapshot gives what Windows writes there now, so their copy
+    /// can differ from a later read without anything being wrong (the page, hibernation and swap files, and the
+    /// storage of other snapshots such as restore points).
+    /// </summary>
+    internal static bool ChangesDuringSnapshot(string stream)
+    {
+        string path = stream.Split(':')[0];
+        return path.Equals(@"\pagefile.sys", StringComparison.OrdinalIgnoreCase)
+            || path.Equals(@"\hiberfil.sys", StringComparison.OrdinalIgnoreCase)
+            || path.Equals(@"\swapfile.sys", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(@"\System Volume Information\", StringComparison.OrdinalIgnoreCase) && path.Contains(VssStoreId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Compares up to 32 pieces spread over the copied ranges; returns where they differ, or null. With
+    /// <paramref name="ownersOf"/> (the files owning byte offsets), differences inside files a snapshot does not freeze
+    /// are not counted.
+    /// </summary>
+    internal static string? Verify(SafeFileHandle reader, long sourceBase, SafeFileHandle writer, long targetBase, IReadOnlyList<(long Offset, long Length)> ranges,
+        Func<IReadOnlyList<long>, Dictionary<long, List<string>>?>? ownersOf = null)
     {
         const int piece = 1024 * 1024;
         using AlignedIoBuffer original = new(piece);
@@ -468,15 +490,49 @@ public sealed class DiskCloneService
             }
 
             long start = offset + (length > size ? random.NextInt64((length - size) / 4096 + 1) * 4096 : 0);
-            RandomAccess.Read(reader, original.Memory.Span[..size], sourceBase + start);
-            RandomAccess.Read(writer, copy.Memory.Span[..size], targetBase + start);
-            if (!original.Memory.Span[..size].SequenceEqual(copy.Memory.Span[..size]))
+            ReadFully(reader, original.Memory.Span[..size], sourceBase + start);
+            ReadFully(writer, copy.Memory.Span[..size], targetBase + start);
+            List<long> differing = new();
+            for (int block = 0; block < size; block += 4096)
             {
-                return $"at {DiskClonePlanner.FormatSize((ulong)start)}";
+                if (!original.Memory.Span.Slice(block, 4096).SequenceEqual(copy.Memory.Span.Slice(block, 4096)))
+                {
+                    differing.Add(start + block);
+                }
+            }
+
+            if (differing.Count == 0)
+            {
+                continue;
+            }
+
+            // A difference counts unless every differing block belongs to a file a snapshot does not freeze.
+            Dictionary<long, List<string>>? owners = ownersOf?.Invoke(differing);
+            long real = differing.FirstOrDefault(block =>
+                owners is null || !owners.TryGetValue(block, out List<string>? files) || files.Count == 0 || !files.All(ChangesDuringSnapshot), -1);
+            if (real >= 0)
+            {
+                string? file = owners is not null && owners.TryGetValue(real, out List<string>? found) ? found.FirstOrDefault() : null;
+                return $"at {DiskClonePlanner.FormatSize((ulong)real)}" + (file is null ? string.Empty : $", in {file.Split(':')[0]}");
             }
         }
 
         return null;
+    }
+
+    private static void ReadFully(SafeFileHandle handle, Span<byte> buffer, long position)
+    {
+        int read = 0;
+        while (read < buffer.Length)
+        {
+            int got = RandomAccess.Read(handle, buffer[read..], position + read);
+            if (got <= 0)
+            {
+                throw new IOException($"Reading stopped early at {DiskClonePlanner.FormatSize((ulong)(position + read))}.");
+            }
+
+            read += got;
+        }
     }
 
     /// <summary>Boot setup at the end of a whole-disk clone, for the copied Windows and boot partitions.</summary>
@@ -860,6 +916,7 @@ public sealed class DiskCloneService
         private const uint FsctlAllowExtendedDasdIo = 0x00090083;
         private const uint FsctlGetNtfsVolumeData = 0x00090064;
         private const uint FsctlGetVolumeBitmap = 0x0009006F;
+        private const uint FsctlLookupStreamFromCluster = 0x000901FC;
 
         public static SafeFileHandle Open(string path, bool write)
         {
@@ -926,6 +983,67 @@ public sealed class DiskCloneService
             byte[] bitmap = output[16..];
             ranges = DiskClonePlanner.UsedRanges(bitmap, bitmapClusters, bytesPerCluster, partitionSize);
             return true;
+        }
+
+        /// <summary>
+        /// Finds the files bytes of an NTFS volume belong to ("\pagefile.sys::$DATA"), as "fsutil volume querycluster"
+        /// does: for each byte offset asked, the files owning its cluster (none when it is in no file). Null when the
+        /// volume is not NTFS or NTFS cannot tell. NTFS reads its whole file table for each call, so ask for many
+        /// offsets at once.
+        /// </summary>
+        public static Func<IReadOnlyList<long>, Dictionary<long, List<string>>?>? OwnerLookup(SafeFileHandle volume)
+        {
+            byte[] volumeData = new byte[512];
+            if (!DeviceIoControl(volume, FsctlGetNtfsVolumeData, IntPtr.Zero, 0, volumeData, volumeData.Length, out _, IntPtr.Zero))
+            {
+                return null;
+            }
+
+            int bytesPerCluster = BitConverter.ToInt32(volumeData, 44);
+            if (bytesPerCluster <= 0)
+            {
+                return null;
+            }
+
+            byte[] output = new byte[1024 * 1024];
+            return offsets =>
+            {
+                // LOOKUP_STREAM_FROM_CLUSTER_INPUT: Flags, NumberOfClusters, Cluster[].
+                List<long> clusters = offsets.Select(offset => offset / bytesPerCluster).Distinct().ToList();
+                byte[] input = new byte[8 + 8 * clusters.Count];
+                BitConverter.TryWriteBytes(input.AsSpan(4), clusters.Count);
+                for (int index = 0; index < clusters.Count; index++)
+                {
+                    BitConverter.TryWriteBytes(input.AsSpan(8 + 8 * index), clusters[index]);
+                }
+
+                if (!DeviceIoControl(volume, FsctlLookupStreamFromCluster, input, input.Length, output, output.Length, out int returned, IntPtr.Zero) || returned < 12)
+                {
+                    return null;
+                }
+
+                // LOOKUP_STREAM_FROM_CLUSTER_OUTPUT: Offset (of the first entry), NumberOfMatches, BufferSizeRequired.
+                // Each entry: OffsetToNext, Flags, Reserved, Cluster, then the stream's name.
+                Dictionary<long, List<string>> owners = clusters.ToDictionary(cluster => cluster * bytesPerCluster, _ => new List<string>());
+                int entry = BitConverter.ToInt32(output, 0);
+                while (entry > 0 && entry + 24 <= returned)
+                {
+                    int next = BitConverter.ToInt32(output, entry);
+                    long cluster = BitConverter.ToInt64(output, entry + 16);
+                    int nameEnd = next > 0 ? Math.Min(entry + next, returned) : returned;
+                    string name = Encoding.Unicode.GetString(output, entry + 24, Math.Max(0, nameEnd - entry - 24));
+                    int terminator = name.IndexOf('\0');
+                    if (owners.TryGetValue(cluster * bytesPerCluster, out List<string>? list))
+                    {
+                        list.Add(terminator >= 0 ? name[..terminator] : name);
+                    }
+
+                    entry = next > 0 ? entry + next : 0;
+                }
+
+                // Answered per offset asked (offsets inside one cluster share its owners).
+                return offsets.Distinct().ToDictionary(offset => offset, offset => owners[offset / bytesPerCluster * bytesPerCluster]);
+            };
         }
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
