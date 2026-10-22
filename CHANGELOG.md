@@ -260,6 +260,17 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.85] - 2026-10-22
+
+### Changed
+- **The old internal name is gone.** The background service is now `WindowsUtilityService` (WindowsUtilityService.exe),
+  the status icon WindowsUtilityTray.exe, and the data folders `%PROGRAMDATA%\WindowsUtility` and
+  `%LOCALAPPDATA%\WindowsUtility`. The projects, namespaces, solution, installer and its scripts use the same name.
+- **Upgrading moves everything across:** the installer stops and removes the old service, installs it under the new
+  name, renames the shared data folder (devices, settings, history, logs and remote-PC pairings stay) and deletes the
+  old program files. If the folder cannot be renamed it is copied; the new service copies anything still missing, and
+  the dashboard moves each user's own folder. Updates started from another PC work the same way. The old names remain
+  only in the code that cleans up after older versions.
 ## [2.0.84] - 2026-10-22
 
 ### Fixed

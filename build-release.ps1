@@ -6,9 +6,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$appProject = Join-Path $root "src\CentricDeviceMonitor\CentricDeviceMonitor.csproj"
-$serviceProject = Join-Path $root "src\CentricDeviceMonitor.Service\CentricDeviceMonitor.Service.csproj"
-$trayProject = Join-Path $root "src\CentricDeviceMonitor.Tray\CentricDeviceMonitor.Tray.csproj"
+$appProject = Join-Path $root "src\WindowsUtility\WindowsUtility.csproj"
+$serviceProject = Join-Path $root "src\WindowsUtility.Service\WindowsUtility.Service.csproj"
+$trayProject = Join-Path $root "src\WindowsUtility.Tray\WindowsUtility.Tray.csproj"
 $appProjectDirectory = Split-Path -Parent $appProject
 $serviceProjectDirectory = Split-Path -Parent $serviceProject
 $trayProjectDirectory = Split-Path -Parent $trayProject
@@ -161,12 +161,12 @@ if ($LASTEXITCODE -ne 0) {
 # All three projects publish into $output and share a single copy of the .NET runtime.
 # Publishing them self-contained AND single-file gave each executable its own embedded copy,
 # which tripled the runtime in the installer.
-$serviceExe = Join-Path $output "CentricDeviceMonitorService.exe"
+$serviceExe = Join-Path $output "WindowsUtilityService.exe"
 if (-not (Test-Path $serviceExe)) {
     throw "The background service executable was not produced."
 }
 
-$trayExe = Join-Path $output "CentricDeviceMonitorTray.exe"
+$trayExe = Join-Path $output "WindowsUtilityTray.exe"
 if (-not (Test-Path $trayExe)) {
     throw "The notification-area companion executable was not produced."
 }
@@ -180,8 +180,8 @@ $publishedSizeMb = [math]::Round((Get-ChildItem $output -Recurse -File |
 Write-Host "Published payload size: $publishedSizeMb MB" -ForegroundColor Cyan
 
 $publishedApplication = Join-Path $output "WindowsUtilityBySajith.exe"
-$publishedService = Join-Path $output "CentricDeviceMonitorService.exe"
-$publishedTray = Join-Path $output "CentricDeviceMonitorTray.exe"
+$publishedService = Join-Path $output "WindowsUtilityService.exe"
+$publishedTray = Join-Path $output "WindowsUtilityTray.exe"
 Write-Host "Published application: $publishedApplication" -ForegroundColor Green
 Write-Host "Published service: $publishedService" -ForegroundColor Green
 Write-Host "Published service-status tray companion: $publishedTray" -ForegroundColor Green
@@ -207,7 +207,7 @@ if ($CreateInstaller) {
     }
 
     Write-Host "Creating installer..."
-    & $isccPath "/DMyAppVersion=$buildVersion" (Join-Path $root "installer\CentricDeviceMonitor.iss")
+    & $isccPath "/DMyAppVersion=$buildVersion" (Join-Path $root "installer\WindowsUtility.iss")
     if ($LASTEXITCODE -ne 0) {
         throw "Installer creation failed."
     }

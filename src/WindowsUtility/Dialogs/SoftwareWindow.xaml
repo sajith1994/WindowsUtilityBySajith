@@ -1,0 +1,58 @@
+<Window x:Class="WindowsUtility.Dialogs.SoftwareWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Installed software"
+        Width="1000"
+        Height="720"
+        MinWidth="680"
+        MinHeight="480"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock x:Name="HeadingText" Text="Installed software" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock x:Name="SubText" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0"
+                           Text="Programs as listed in Settings > Apps (for all users, and per user for users who are signed in). Updates and hidden Windows parts are left out." />
+            </StackPanel>
+            <Button Grid.Column="1" x:Name="RefreshButton" Content="Refresh" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" VerticalAlignment="Top" Click="RefreshButton_Click" />
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBox x:Name="SearchBox" Height="36" Padding="10,4" VerticalContentAlignment="Center" TextChanged="SearchBox_TextChanged"
+                     ToolTip="Search by program, publisher, version or PC, for example AnyDesk or Chrome." />
+            <TextBlock x:Name="SearchHint" Text="Search programs (for example AnyDesk or Chrome)" IsHitTestVisible="False" Foreground="{DynamicResource MutedTextBrush}"
+                       VerticalAlignment="Center" Margin="12,0,0,0" />
+            <TextBlock Grid.Column="1" x:Name="CountText" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" Margin="12,0,0,0" />
+        </Grid>
+
+        <DataGrid Grid.Row="2" x:Name="ProgramsGrid" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" CanUserResizeRows="False" SelectionMode="Extended">
+            <DataGrid.Columns>
+                <DataGridTextColumn x:Name="PcColumn" Header="PC" Binding="{Binding Pc}" Width="150" />
+                <DataGridTextColumn Header="Program" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="130" />
+                <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="170" />
+                <DataGridTextColumn Header="Installed" Binding="{Binding Installed}" Width="96" SortMemberPath="InstalledSort" />
+                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="76" SortMemberPath="SizeSort" />
+                <DataGridTextColumn Header="For" Binding="{Binding InstalledFor}" Width="100" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusLine" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" VerticalAlignment="Center" Text="Loading..." />
+            <Button Grid.Column="1" x:Name="ExportButton" Content="Export CSV" Tag="&#xE9F9;" Style="{StaticResource IconButton}" MinHeight="36" Margin="12,0,8,0" Click="ExportButton_Click" IsEnabled="False"
+                    ToolTip="Save the programs shown (after searching) as a CSV file for Excel." />
+            <Button Grid.Column="2" Content="Close" Tag="&#xE711;" Style="{StaticResource IconButton}" Width="100" MinHeight="36" IsCancel="True" Click="CloseButton_Click" />
+        </Grid>
+    </Grid>
+</Window>

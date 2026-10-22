@@ -34,7 +34,7 @@ Write-Host "Publishing version $version" -ForegroundColor Cyan
 if (-not $SkipBuild -and -not $SkipTests) {
     # A release is only built when every test passes.
     Write-Host "Running tests..." -ForegroundColor Cyan
-    & dotnet test (Join-Path $root "tests\CentricDeviceMonitor.Tests\CentricDeviceMonitor.Tests.csproj") -c Release --nologo
+    & dotnet test (Join-Path $root "tests\WindowsUtility.Tests\WindowsUtility.Tests.csproj") -c Release --nologo
     if ($LASTEXITCODE -ne 0) { throw "Tests failed; no installer was built. Fix the failures (or use -SkipTests)." }
 }
 

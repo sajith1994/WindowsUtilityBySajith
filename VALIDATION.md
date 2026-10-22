@@ -77,7 +77,7 @@ A final application/service/tray compile still needs to be performed on a Window
 - Both LocalSystem service monitoring and dashboard fallback monitoring write the shutdown/restart inference when an outage recovers.
 - Device history displays Event, Event at, recovery, downtime, status, event details and original ping result.
 - A separate WinForms tray-companion project is included in the solution and release pipeline.
-- Tray status is based on `CentricDeviceMonitorService` plus the existing background `status.json` heartbeat, and the tray companion is installed in the common Startup folder for interactive sessions.
+- Tray status is based on `WindowsUtilityService` plus the existing background `status.json` heartbeat, and the tray companion is installed in the common Startup folder for interactive sessions.
 - The full dashboard notification-area menu also exposes service, monitoring and heartbeat state.
 - Network Diagnostics contains Release/Renew, Flush DNS, Winsock/TCP-IP Reset, ARP Clear and Full Repair Administrator shortcuts.
 - Destructive/network-disruptive repair actions require explicit confirmation, with an additional RDP-session warning when applicable.
@@ -227,7 +227,7 @@ A final application/service/tray compile still needs to be performed on a Window
 - Live LAN transfer counters use `Interlocked` aggregation across all selected TCP streams. The final Mbps result still uses the existing server-received/client-received totals and common wall clock.
 - Meter values are capped visually at the active scale and the scale expands through common 10/100/1000/2500/5000/10000+ Mbps steps when required.
 - Disabling the LocalSystem service stops it before changing startup to Disabled; enabling sets Automatic plus `DelayedAutostart=1` before starting it.
-- Saved application settings, managed devices, logs, service name, installer AppId and `%PROGRAMDATA%\CentricDeviceMonitor` paths are unchanged.
+- Saved application settings, managed devices, logs, service name, installer AppId and `%PROGRAMDATA%\WindowsUtility` paths are unchanged.
 - A real application/service/tray compile and installer build still needs to be run on Windows with the .NET 10 SDK and Inno Setup 6 because the packaging environment contains neither dotnet/MSBuild nor Windows.
 
 ## 2.0.21 CPU/GPU thermal-load safety checks

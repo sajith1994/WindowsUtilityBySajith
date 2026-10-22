@@ -79,7 +79,7 @@ The **System Power Schedule** card has an explicit master switch plus an Enable/
 
 Managed-device history now records a dedicated shutdown/restart reachability event when a previously unreachable device comes back online. The event stores the outage timestamp, recovery timestamp, downtime and original ping error. Because remote ping monitoring cannot prove whether the cause was a Windows restart, power-off or network interruption, the UI explicitly labels the shutdown/restart event as **inferred from loss of reachability** rather than presenting it as confirmed telemetry.
 
-The installer also deploys `CentricDeviceMonitorTray.exe`, a lightweight non-elevated notification-area companion. Windows services run in Session 0 and cannot directly display UI in the signed-in user's tray, so this companion starts at user logon and immediately verifies the LocalSystem service and its `status.json` heartbeat. Green indicates a running service with a fresh heartbeat, orange indicates a running service with a stale heartbeat, and red indicates stopped/unavailable. Double-click shows a status balloon; right-click shows service state, monitoring state, managed-device count and heartbeat age.
+The installer also deploys `WindowsUtilityTray.exe`, a lightweight non-elevated notification-area companion. Windows services run in Session 0 and cannot directly display UI in the signed-in user's tray, so this companion starts at user logon and immediately verifies the LocalSystem service and its `status.json` heartbeat. Green indicates a running service with a fresh heartbeat, orange indicates a running service with a stale heartbeat, and red indicates stopped/unavailable. Double-click shows a status balloon; right-click shows service state, monitoring state, managed-device count and heartbeat age.
 
 ## Network repair shortcuts
 
@@ -147,7 +147,7 @@ The terms state that Windows Utility is a legitimate technician/admin utility, i
 
 ## Upgrades
 
-The internal service name remains `CentricDeviceMonitorService` for compatibility. The installer retains the permanent AppId used by previous releases. Choose **Upgrade existing installation** to preserve `%PROGRAMDATA%\CentricDeviceMonitor` devices, settings and logs.
+The background service is installed as `WindowsUtilityService` (before 2.0.85 it had another name; upgrading removes the old service and moves the old data folder). The installer retains the permanent AppId used by previous releases. Choose **Upgrade existing installation** to preserve `%PROGRAMDATA%\WindowsUtility` devices, settings and logs.
 
 ## Build
 
@@ -186,7 +186,7 @@ The release version is defined once in `Directory.Build.props` as `AppVersion`. 
 
 ## Publishing an update
 
-1. Bump `AppVersion` in `Directory.Build.props` and `MyAppVersion` in `installer\CentricDeviceMonitor.iss`, add a CHANGELOG entry.
+1. Bump `AppVersion` in `Directory.Build.props` and `MyAppVersion` in `installer\WindowsUtility.iss`, add a CHANGELOG entry.
 2. Run `.\publish-update.ps1 -Upload` (needs the GitHub CLI signed in). It builds the installer, writes `update.json` with the SHA-256 and creates a GitHub release containing both files.
 3. Installed copies pick it up from **About -> Check for updates**, or at the next start (prompted once per version).
 

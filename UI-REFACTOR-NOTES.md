@@ -4,7 +4,7 @@ This refactor changes presentation and navigation only. Existing monitoring, Win
 
 ## 1. Design tokens and controls
 
-`src/CentricDeviceMonitor/App.xaml`
+`src/WindowsUtility/App.xaml`
 
 - Primary accent: `#007AFF`.
 - Light palette: page `#F5F5F7`, card `#FFFFFF`, text `#1D1D1F`.
@@ -18,21 +18,21 @@ This refactor changes presentation and navigation only. Existing monitoring, Win
 
 ## 2. Runtime theming
 
-`src/CentricDeviceMonitor/Services/ThemeManager.cs`
+`src/WindowsUtility/Services/ThemeManager.cs`
 
 - Adds `System`, `Light` and `Dark` modes.
 - `System` reads Windows `AppsUseLightTheme`.
 - The dashboard checks for Windows theme changes while running.
 - Theme brushes are updated centrally, not repeated per page.
 
-`src/CentricDeviceMonitor/Models/AppSettings.cs`
+`src/WindowsUtility/Models/AppSettings.cs`
 
 - Adds `UiThemePreference`, defaulting to `System`.
 - Existing JSON settings files remain compatible because the new property has a default value.
 
 ## 3. Main navigation shell
 
-`src/CentricDeviceMonitor/MainWindow.xaml`
+`src/WindowsUtility/MainWindow.xaml`
 
 The old multi-colored 12+ tile dashboard is replaced with:
 
@@ -51,7 +51,7 @@ All original `x:Name` controls and original XAML event handlers were preserved s
 
 ## 4. Main-window code additions
 
-`src/CentricDeviceMonitor/MainWindow.xaml.cs`
+`src/WindowsUtility/MainWindow.xaml.cs`
 
 - Navigation page switching and contextual toolbar action.
 - Theme selection/persistence.
@@ -75,7 +75,7 @@ Dialog XAML files now use shared card/background/text/border resources instead o
 - Every event handler referenced by the new `MainWindow.xaml` resolves to a method in `MainWindow.xaml.cs`.
 - Requested palette values and border-alpha tokens are present.
 
-A full `dotnet build` could not be executed in the editing environment because the .NET SDK/MSBuild is not installed there. Build on Windows with the repository's existing .NET 10 workflow (`BUILD-INSTALLER.bat` or `dotnet build CentricDeviceMonitor.sln`).
+A full `dotnet build` could not be executed in the editing environment because the .NET SDK/MSBuild is not installed there. Build on Windows with the repository's existing .NET 10 workflow (`BUILD-INSTALLER.bat` or `dotnet build WindowsUtility.sln`).
 
 ## Network / power follow-up
 
@@ -122,7 +122,7 @@ Storage capacity verification now surfaces current, average and fastest throughp
 ## 2.0.7 follow-up
 
 - Managed-device history now distinguishes the reachability event from the raw ping error and records a shutdown/restart inference on recovery. The wording intentionally states that the classification is inferred because agentless ping monitoring cannot prove a Windows power event.
-- Added a separate `CentricDeviceMonitor.Tray` WinForms project for interactive service-health visibility. It starts at user logon because the LocalSystem service itself runs in Session 0 and cannot safely render notification-area UI.
+- Added a separate `WindowsUtility.Tray` WinForms project for interactive service-health visibility. It starts at user logon because the LocalSystem service itself runs in Session 0 and cannot safely render notification-area UI.
 - The tray companion reads the existing service heartbeat and uses a green/orange/red overlay dot for healthy/stale/stopped state. It hides while the main dashboard tray icon is present.
 - Network Diagnostics now groups non-destructive diagnostic shortcuts separately from guarded Administrator repair shortcuts.
 

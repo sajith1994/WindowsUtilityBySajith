@@ -1,0 +1,139 @@
+namespace WindowsUtility.Models;
+
+public sealed class AppSettings
+{
+    // UI theme: System follows the current Windows app theme; Light/Dark are explicit overrides.
+    public string UiThemePreference { get; set; } = "System";
+
+    /// <summary>Buttons, links and highlights use the Windows accent colour instead of the app's blue.</summary>
+    public bool UseWindowsAccentColor { get; set; } = true;
+
+    public bool AutomaticMonitoringEnabled { get; set; } = true;
+
+    /// <summary>Shows the notification-area icon for this dashboard process.</summary>
+    public bool TrayIconEnabled { get; set; } = true;
+
+    /// <summary>Allows balloon notifications from the dashboard. Sound alerts are separate.</summary>
+    public bool DesktopNotificationsEnabled { get; set; } = true;
+
+    /// <summary>Checks for a newer release shortly after the dashboard starts.</summary>
+    public bool AutoCheckForUpdates { get; set; } = true;
+
+    /// <summary>Downloads and installs a new release automatically (after a short countdown) when one is found.</summary>
+    public bool AutoInstallUpdates { get; set; } = true;
+
+    /// <summary>Update version whose dashboard alert was snoozed. A newer release shows the alert again.</summary>
+    public string UpdateSnoozedVersion { get; set; } = string.Empty;
+
+    /// <summary>The snoozed update alert stays hidden until this time (UTC).</summary>
+    public DateTime? UpdateSnoozedUntilUtc { get; set; }
+
+    public int PingIntervalSeconds { get; set; } = 60;
+
+    // The historical overheat event log still starts above 90 C.
+    // This setting controls the user-facing audible alert threshold.
+    public double CpuTemperatureAlertThresholdCelsius { get; set; } = 98.0;
+
+    public bool CpuTemperatureSoundAlertEnabled { get; set; } = true;
+
+    // Repeats the user-facing temperature warning while the CPU remains above the configured threshold.
+    public int CpuTemperatureAlertIntervalSeconds { get; set; } = 60;
+
+    // Legacy one-time delay setting retained so older settings files remain compatible.
+    public int PowerActionDelayMinutes { get; set; } = 1;
+
+    // Daily unattended Windows power schedule. Time is stored in local 24-hour clock values.
+    public bool PowerScheduleEnabled { get; set; }
+
+    public string PowerScheduleAction { get; set; } = "Restart";
+
+    public int PowerScheduleHour { get; set; } = 23;
+
+    public int PowerScheduleMinute { get; set; } = 30;
+
+    // YYYY-MM-DD marker written before a scheduled action is initiated to prevent a reboot loop.
+    public string PowerScheduleLastTriggeredDate { get; set; } = string.Empty;
+
+    // When enabled, Windows closes applications with unsaved work during the power action.
+    public bool ForcePowerAction { get; set; }
+
+    /// <summary>System Stats tile order and sizes. Empty means the built-in layout.</summary>
+    public List<DashboardTileLayout> DashboardLayout { get; set; } = new();
+
+    /// <summary>Tiles pinned to the desktop as widgets, restored when the dashboard starts.</summary>
+    public List<DesktopWidgetLayout> DesktopWidgets { get; set; } = new();
+
+    /// <summary>Lets other PCs on the local network read this PC's stats (served by the background service).</summary>
+    public bool RemoteSharingEnabled { get; set; }
+
+    /// <summary>Pairing code another PC needs to read this PC's stats.</summary>
+    public string RemoteSharingCode { get; set; } = string.Empty;
+
+    public int RemoteSharingPort { get; set; } = RemoteMonitoringProtocol.DefaultPort;
+
+    /// <summary>Accept actions (restart, shut down, lock, message, clear temp, Windows Update scan) from the PC monitoring this one.</summary>
+    public bool RemoteActionsEnabled { get; set; }
+
+    /// <summary>Also accept PCs on a Tailscale VPN (any network), not only the local subnet on private networks.</summary>
+    public bool RemoteSharingAllowVpn { get; set; }
+
+    /// <summary>Set once another PC has connected with the code: the code is then hidden until re-entered.</summary>
+    public bool RemoteSharingCodeLocked { get; set; }
+
+    /// <summary>Code this PC uses when adding PCs (Add all, and pre-filled in Add PC).</summary>
+    public string RemoteNetworkCode { get; set; } = string.Empty;
+
+    /// <summary>Notify about problems on monitored PCs (checked in the background every 30 seconds).</summary>
+    public bool RemoteAlertsEnabled { get; set; } = true;
+
+    public bool RemoteAlertOverheat { get; set; } = true;
+
+    public bool RemoteAlertDisk { get; set; } = true;
+
+    public bool RemoteAlertMemory { get; set; } = true;
+
+    public bool RemoteAlertOffline { get; set; } = true;
+
+    /// <summary>Antivirus or firewall off, or no Windows update for 30 days, on a monitored PC.</summary>
+    public bool RemoteAlertSecurity { get; set; } = true;
+
+    /// <summary>PCs monitored from this PC (Network PCs page).</summary>
+    public List<RemotePcEntry> RemotePcs { get; set; } = new();
+
+    /// <summary>One notification each morning summing up the monitored PCs' last 24 hours.</summary>
+    public bool DailySummaryEnabled { get; set; } = true;
+
+    /// <summary>Hour (local, 0-23) of the daily summary.</summary>
+    public int DailySummaryHour { get; set; } = 8;
+
+    /// <summary>yyyy-MM-dd of the last summary shown, so it appears once a day.</summary>
+    public string DailySummaryLastDate { get; set; } = string.Empty;
+
+    /// <summary>Read-only page of the monitored PCs for a phone on the same network (served by the background service).</summary>
+    public bool PhoneViewEnabled { get; set; }
+
+    /// <summary>Secret part of the phone page link; a new key makes old links stop working.</summary>
+    public string PhoneViewKey { get; set; } = string.Empty;
+}
+
+public sealed class DashboardTileLayout
+{
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>Width in quarters of the dashboard (1 to 4).</summary>
+    public int Span { get; set; } = 2;
+
+    /// <summary>Fixed height in pixels, or null to fit the content.</summary>
+    public double? Height { get; set; }
+}
+
+public sealed class DesktopWidgetLayout
+{
+    public string Id { get; set; } = string.Empty;
+    public double Left { get; set; }
+    public double Top { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+    public bool Topmost { get; set; }
+}
+

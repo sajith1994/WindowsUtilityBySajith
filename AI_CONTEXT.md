@@ -19,9 +19,9 @@ Treat the uploaded source ZIP as the authoritative current implementation. Read 
 3. `VALIDATION.md`
 4. `UI-REFACTOR-NOTES.md`
 5. `Directory.Build.props`
-6. `CentricDeviceMonitor.sln`
-7. `src/CentricDeviceMonitor/MainWindow.xaml`
-8. `src/CentricDeviceMonitor/MainWindow.xaml.cs`
+6. `WindowsUtility.sln`
+7. `src/WindowsUtility/MainWindow.xaml`
+8. `src/WindowsUtility/MainWindow.xaml.cs`
 
 Do **not** rebuild existing features from scratch unless explicitly requested. Preserve working handlers, models, services, installer behavior, data migration, safety checks and existing user data.
 
@@ -64,7 +64,7 @@ The visible branding should remain **Windows Utility**. Company name and website
 
 Project:
 
-`src/CentricDeviceMonitor/CentricDeviceMonitor.csproj`
+`src/WindowsUtility/WindowsUtility.csproj`
 
 Key configuration:
 
@@ -73,7 +73,7 @@ Key configuration:
 - `UseWindowsForms`: `true`
 - `Nullable`: enabled
 - `LangVersion`: 14
-- executable: `CentricDeviceMonitor.exe`
+- executable: `WindowsUtilityBySajith.exe`
 - administrator manifest is used
 
 Important dependencies:
@@ -93,15 +93,15 @@ Main shell:
 
 Project:
 
-`src/CentricDeviceMonitor.Service/CentricDeviceMonitor.Service.csproj`
+`src/WindowsUtility.Service/WindowsUtility.Service.csproj`
 
 Executable:
 
-`CentricDeviceMonitorService.exe`
+`WindowsUtilityService.exe`
 
 Service name:
 
-`CentricDeviceMonitorService`
+`WindowsUtilityService`
 
 The service runs as **LocalSystem** and handles privileged/background monitoring. Important files:
 
@@ -116,11 +116,11 @@ The service shares selected models/services from the WPF project through linked 
 
 Project:
 
-`src/CentricDeviceMonitor.Tray/CentricDeviceMonitor.Tray.csproj`
+`src/WindowsUtility.Tray/WindowsUtility.Tray.csproj`
 
 Executable:
 
-`CentricDeviceMonitorTray.exe`
+`WindowsUtilityTray.exe`
 
 Important file:
 
@@ -134,10 +134,10 @@ This companion exists because a Windows service runs in Session 0 and cannot rel
 
 ### Core UI
 
-- `src/CentricDeviceMonitor/App.xaml` — global design tokens/styles and shared resources.
-- `src/CentricDeviceMonitor/App.xaml.cs` — application startup and global compatibility setup.
-- `src/CentricDeviceMonitor/MainWindow.xaml` — sidebar + four main pages.
-- `src/CentricDeviceMonitor/MainWindow.xaml.cs` — main orchestration, handlers and dashboard refresh behavior.
+- `src/WindowsUtility/App.xaml` — global design tokens/styles and shared resources.
+- `src/WindowsUtility/App.xaml.cs` — application startup and global compatibility setup.
+- `src/WindowsUtility/MainWindow.xaml` — sidebar + four main pages.
+- `src/WindowsUtility/MainWindow.xaml.cs` — main orchestration, handlers and dashboard refresh behavior.
 
 ### Important dialogs
 
@@ -514,31 +514,27 @@ Storage diagnostics were intentionally moved out of this page and into **Utility
 
 Shared data root:
 
-`%PROGRAMDATA%\CentricDeviceMonitor`
+`%PROGRAMDATA%\WindowsUtility`
 
 Important paths include:
 
-- `%PROGRAMDATA%\CentricDeviceMonitor\devices.json`
-- `%PROGRAMDATA%\CentricDeviceMonitor\settings.json`
-- `%PROGRAMDATA%\CentricDeviceMonitor\logs\...`
-- `%PROGRAMDATA%\CentricDeviceMonitor\service\status.json`
-- `%PROGRAMDATA%\CentricDeviceMonitor\service\service.log`
+- `%PROGRAMDATA%\WindowsUtility\devices.json`
+- `%PROGRAMDATA%\WindowsUtility\settings.json`
+- `%PROGRAMDATA%\WindowsUtility\logs\...`
+- `%PROGRAMDATA%\WindowsUtility\service\status.json`
+- `%PROGRAMDATA%\WindowsUtility\service\service.log`
 - privileged request/response directories under the service folder
 
-There is legacy migration logic from:
+Each user's own folder is `%LOCALAPPDATA%\WindowsUtility` (application log; devices and settings of pre-service
+versions are migrated from it).
 
-`%LOCALAPPDATA%\CentricDeviceMonitor`
+### Names before 2.0.85
 
-### Do not casually rename internal identifiers
-
-Although visible company branding was removed, internal names such as:
-
-- `CentricDeviceMonitor`
-- `CentricDeviceMonitorService`
-- `%PROGRAMDATA%\CentricDeviceMonitor`
-- installer AppId
-
-remain intentionally for upgrade/data/service compatibility.
+Until 2.0.85 the projects, namespaces, service (`CentricDeviceMonitorService`), status icon and data folders
+(`CentricDeviceMonitor`) used an older internal name. The installer stops and removes the old service, moves
+`%PROGRAMDATA%\CentricDeviceMonitor` to `%PROGRAMDATA%\WindowsUtility` and deletes the old program files; the service
+(`SharedDataPaths.MoveFromOldFolderName`) copies anything the installer could not move, and the dashboard moves each
+user's `%LOCALAPPDATA%` folder. The old names remain only in that clean-up code. Keep the installer AppId unchanged.
 
 Changing these names without a migration plan could break:
 
@@ -577,8 +573,8 @@ For the next revision, use:
 Also keep release-bearing documentation/fallback values synchronized:
 
 - `Directory.Build.props`
-- `src/CentricDeviceMonitor/app.manifest` (`x.x.x.0`)
-- `installer/CentricDeviceMonitor.iss` fallback `#define MyAppVersion`
+- `src/WindowsUtility/app.manifest` (`x.x.x.0`)
+- `installer/WindowsUtility.iss` fallback `#define MyAppVersion`
 - `README.md`
 - `CHANGELOG.md`
 - `VALIDATION.md`
@@ -598,7 +594,7 @@ SDK selection:
 
 Main solution:
 
-`CentricDeviceMonitor.sln`
+`WindowsUtility.sln`
 
 Common commands:
 
@@ -631,7 +627,7 @@ The release pipeline:
 
 Installer source:
 
-`installer/CentricDeviceMonitor.iss`
+`installer/WindowsUtility.iss`
 
 Stable installer AppId:
 
@@ -919,7 +915,7 @@ Use this as the minimum release checklist:
 - [ ] Preserve disk boot/system protections.
 - [ ] Preserve RDP/network-repair warnings.
 - [ ] Preserve LocalSystem service + tray-companion separation.
-- [ ] Preserve existing `%PROGRAMDATA%\CentricDeviceMonitor` data unless migration is intentional.
+- [ ] Preserve existing `%PROGRAMDATA%\WindowsUtility` data unless migration is intentional.
 - [ ] Verify upgrades preserve managed devices/settings/logs.
 - [ ] Verify Add/Edit managed device works on high DPI and custom Windows locale configurations.
 - [ ] Verify System/Light/Dark themes on any new window.

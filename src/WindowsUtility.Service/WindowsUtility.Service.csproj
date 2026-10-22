@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>14.0</LangVersion>
+    <AssemblyName>WindowsUtilityService</AssemblyName>
+    <RootNamespace>WindowsUtility.ServiceHost</RootNamespace>
+    <Authors>Sajith Varghese</Authors>
+    <Product>Windows Utility Background Service</Product>
+    <Description>LocalSystem background service for device, temperature, CPU, RAM, and network monitoring.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="WindowsUtility.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.7-pre708" />
+    <PackageReference Include="System.Management" Version="10.0.9" />
+    <PackageReference Include="Hwinfo.SharedMemory.Net" Version="2.1.0" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.2" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\WindowsUtility\Models\AppSettings.cs" Link="Models\AppSettings.cs" />
+    <Compile Include="..\WindowsUtility\Models\BackgroundServiceSnapshot.cs" Link="Models\BackgroundServiceSnapshot.cs" />
+    <Compile Include="..\WindowsUtility\Models\RemoteMonitoring.cs" Link="Models\RemoteMonitoring.cs" />
+    <Compile Include="..\WindowsUtility\Models\CpuTemperatureLogEntry.cs" Link="Models\CpuTemperatureLogEntry.cs" />
+    <Compile Include="..\WindowsUtility\Models\CpuTemperatureSampleEntry.cs" Link="Models\CpuTemperatureSampleEntry.cs" />
+    <Compile Include="..\WindowsUtility\Models\DeviceEntry.cs" Link="Models\DeviceEntry.cs" />
+    <Compile Include="..\WindowsUtility\Models\DevicePingLogEntry.cs" Link="Models\DevicePingLogEntry.cs" />
+    <Compile Include="..\WindowsUtility\Models\SystemHealthLogEntry.cs" Link="Models\SystemHealthLogEntry.cs" />
+    <Compile Include="..\WindowsUtility\Models\PrivilegedServiceCommand.cs" Link="Models\PrivilegedServiceCommand.cs" />
+    <Compile Include="..\WindowsUtility\Services\AppSettingsService.cs" Link="Services\AppSettingsService.cs" />
+    <Compile Include="..\WindowsUtility\Services\BackgroundServiceRuntimeStore.cs" Link="Services\BackgroundServiceRuntimeStore.cs" />
+    <Compile Include="..\WindowsUtility\Services\CpuTemperatureLogService.cs" Link="Services\CpuTemperatureLogService.cs" />
+    <Compile Include="..\WindowsUtility\Services\CpuTemperatureSampleLogService.cs" Link="Services\CpuTemperatureSampleLogService.cs" />
+    <Compile Include="..\WindowsUtility\Services\DeviceLogService.cs" Link="Services\DeviceLogService.cs" />
+    <Compile Include="..\WindowsUtility\Services\DeviceStorageService.cs" Link="Services\DeviceStorageService.cs" />
+    <Compile Include="..\WindowsUtility\Services\HardwareMonitorService.cs" Link="Services\HardwareMonitorService.cs" />
+    <Compile Include="..\WindowsUtility\Services\NetworkDeviceService.cs" Link="Services\NetworkDeviceService.cs" />
+    <Compile Include="..\WindowsUtility\Services\SystemHealthLogService.cs" Link="Services\SystemHealthLogService.cs" />
+    <Compile Include="..\WindowsUtility\Services\SystemResourceMonitorService.cs" Link="Services\SystemResourceMonitorService.cs" />
+    <Compile Include="..\WindowsUtility\Services\ActivityMonitor.cs" Link="Services\ActivityMonitor.cs" />
+    <Compile Include="..\WindowsUtility\Services\BatteryDiagnosticsService.cs" Link="Services\BatteryDiagnosticsService.cs" />
+    <Compile Include="..\WindowsUtility\Models\BatteryHealthInfo.cs" Link="Models\BatteryHealthInfo.cs" />
+    <Compile Include="..\WindowsUtility\Services\UpdateService.cs" Link="Services\UpdateService.cs" />
+    <Compile Include="..\WindowsUtility\Services\ApplicationLogService.cs" Link="Services\ApplicationLogService.cs" />
+    <Compile Include="..\WindowsUtility\Services\SystemPowerService.cs" Link="Services\SystemPowerService.cs" />
+    <Compile Include="..\WindowsUtility\Services\SharedDataPaths.cs" Link="Services\SharedDataPaths.cs" />
+    <Compile Include="..\WindowsUtility\Services\PrinterOperations.cs" Link="Services\PrinterOperations.cs" />
+    <Compile Include="..\WindowsUtility\Services\MaintenanceOperations.cs" Link="Services\MaintenanceOperations.cs" />
+    <Compile Include="..\WindowsUtility\Services\TemporaryFileCleanupService.cs" Link="Services\TemporaryFileCleanupService.cs" />
+  </ItemGroup>
+</Project>
