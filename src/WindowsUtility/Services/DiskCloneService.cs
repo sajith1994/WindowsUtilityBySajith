@@ -36,6 +36,7 @@ public sealed class DiskCloneService
         const string script = """
             $ErrorActionPreference = 'Stop'
             $encrypted = @{}
+            $locked = @{}
             try {
                 Get-CimInstance -Namespace root/CIMV2/Security/MicrosoftVolumeEncryption -ClassName Win32_EncryptableVolume -ErrorAction Stop |
                     ForEach-Object {
@@ -46,6 +47,10 @@ public sealed class DiskCloneService
                             try { $status = (Invoke-CimMethod -InputObject $_ -MethodName GetConversionStatus -ErrorAction Stop).ConversionStatus } catch { }
                         }
                         $encrypted[[string]$_.DeviceID] = ($null -ne $status -and [int]$status -ge 1 -and [int]$status -le 5)
+                        # An unlocked volume reads as plain data through its volume path, so it can be copied as it is.
+                        $lock = 0
+                        try { $lock = (Invoke-CimMethod -InputObject $_ -MethodName GetLockStatus -ErrorAction Stop).LockStatus } catch { }
+                        $locked[[string]$_.DeviceID] = ([int]$lock -eq 1)
                     }
             } catch { }
             $disks = foreach ($d in Get-Disk) {
@@ -64,6 +69,7 @@ public sealed class DiskCloneService
                             Used = $(if ($v -and $v.Size) { [uint64]($v.Size - $v.SizeRemaining) } else { [uint64]0 })
                             Label = $(if ($v) { [string]$v.FileSystemLabel } else { '' })
                             Encrypted = [bool]($path -and $encrypted.ContainsKey($path) -and $encrypted[$path])
+                            Locked = [bool]($path -and $locked.ContainsKey($path) -and $locked[$path])
                             Guid = [string]$p.Guid
                         }
                     }
@@ -103,6 +109,7 @@ public sealed class DiskCloneService
                         part.GetProperty("Used").GetUInt64(),
                         Text(part, "Label"),
                         part.GetProperty("Encrypted").GetBoolean(),
+                        part.TryGetProperty("Locked", out JsonElement lockedValue) && lockedValue.ValueKind == JsonValueKind.True,
                         Text(part, "Guid")));
                 }
             }

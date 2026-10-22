@@ -18,8 +18,16 @@ public sealed record ClonePartition(
     ulong UsedBytes,
     string Label,
     bool IsEncrypted,
+    bool IsLocked,
     string Guid)
 {
+    /// <summary>
+    /// An unlocked BitLocker volume reads as plain data through its volume path (and a snapshot of it), so it is copied
+    /// like any other and the copy is not encrypted. A locked one, or one Windows gives no volume, must be unlocked or
+    /// decrypted first.
+    /// </summary>
+    public bool NeedsDecrypting => IsEncrypted && (IsLocked || VolumePath.Length == 0);
+
     public bool IsEfi => GptType.Equals(DiskClonePlanner.EfiType, StringComparison.OrdinalIgnoreCase);
     public bool IsMsr => GptType.Equals(DiskClonePlanner.MsrType, StringComparison.OrdinalIgnoreCase);
     public bool IsRecovery => GptType.Equals(DiskClonePlanner.RecoveryType, StringComparison.OrdinalIgnoreCase) || MbrType == 0x27;
@@ -141,7 +149,14 @@ public static class DiskClonePlanner
 
         foreach (ClonePartition encrypted in source.Partitions.Where(partition => partition.IsEncrypted))
         {
-            problems.Add(EncryptedProblem(encrypted));
+            if (encrypted.NeedsDecrypting)
+            {
+                problems.Add(EncryptedProblem(encrypted));
+            }
+            else
+            {
+                notes.Add(EncryptedNote(encrypted));
+            }
         }
 
         if (source.Partitions.Any(partition => DynamicTypes.Contains(partition.GptType, StringComparer.OrdinalIgnoreCase) || partition.MbrType == 0x42))
@@ -239,9 +254,14 @@ public static class DiskClonePlanner
             problems.Add($"The disks use different sector sizes ({sourceSectorSize} and {target.LogicalSectorSize} bytes).");
         }
 
-        if (source.IsEncrypted)
+        List<string> notes = new();
+        if (source.NeedsDecrypting)
         {
             problems.Add(EncryptedProblem(source));
+        }
+        else if (source.IsEncrypted)
+        {
+            notes.Add(EncryptedNote(source));
         }
 
         if (space.Replaces is { } replaced && (replaced.IsBoot || replaced.IsSystem))
@@ -261,14 +281,22 @@ public static class DiskClonePlanner
 
         ulong size = fillSpace ? AlignDown(space.Size) : source.Size;
         PlannedPartition planned = new(source, space.Offset, Math.Max(size, source.Size), ModeFor(source));
-        return new ClonePlan(new[] { planned }, problems, Array.Empty<string>(), null);
+        return new ClonePlan(new[] { planned }, problems, notes, null);
     }
 
-    /// <summary>An encrypted partition would be copied as unreadable data, so it is decrypted first (Decrypt button).</summary>
+    /// <summary>A locked encrypted partition (or one without a volume) would be copied as unreadable data.</summary>
     public static string EncryptedProblem(ClonePartition partition) =>
-        $"{partition.Title} is encrypted with BitLocker"
-        + (partition.Letter is null ? " (it has no drive letter, so Control Panel > BitLocker does not list it)" : string.Empty)
-        + ". Select Decrypt to turn BitLocker off on it, then copy; BitLocker can be turned on again afterwards.";
+        $"{partition.Title} is encrypted with BitLocker and "
+        + (partition.IsLocked
+            ? "locked. Unlock it (open it in Explorer and enter its password or recovery key), or select Decrypt to turn BitLocker off on it, then copy."
+            : "Windows gives it no volume to read it through"
+              + (partition.Letter is null ? " (it has no drive letter, so Control Panel > BitLocker does not list it)" : string.Empty)
+              + ". Select Decrypt to turn BitLocker off on it, then copy; BitLocker can be turned on again afterwards.");
+
+    /// <summary>An unlocked encrypted partition is copied as plain data; BitLocker stays on where it is.</summary>
+    public static string EncryptedNote(ClonePartition partition) =>
+        $"{partition.Title} is encrypted with BitLocker and unlocked, so it is copied readable: BitLocker stays on here, "
+        + "and the copy on the new disk is not encrypted (turn BitLocker on there afterwards if wanted).";
 
     /// <summary>
     /// After copying partitions one by one: the boot files go to the disk's EFI partition (GPT), or to its active
@@ -293,9 +321,9 @@ public static class DiskClonePlanner
             problems.Add($"{windows.Title} is not NTFS, so it cannot hold Windows.");
         }
 
-        if (windows.IsEncrypted)
+        if (windows.NeedsDecrypting)
         {
-            problems.Add($"{windows.Title} is encrypted with BitLocker. Unlock or decrypt it first.");
+            problems.Add($"{windows.Title} is encrypted with BitLocker and locked. Unlock it (enter its password or recovery key in Explorer) or decrypt it first.");
         }
 
         ClonePartition? boot;

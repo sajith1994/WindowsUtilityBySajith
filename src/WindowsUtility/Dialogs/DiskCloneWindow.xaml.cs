@@ -135,7 +135,7 @@ public partial class DiskCloneWindow : Window
             Describe(planned, usedOnly))).ToList();
         PlanProblemsText.Text = string.Join("\n", _clonePlan.Problems);
         PlanProblemsText.Visibility = _clonePlan.Problems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        DecryptButton.Visibility = source.Partitions.Any(partition => partition.IsEncrypted) ? Visibility.Visible : Visibility.Collapsed;
+        DecryptButton.Visibility = source.Partitions.Any(partition => partition.NeedsDecrypting) ? Visibility.Visible : Visibility.Collapsed;
         long total = _clonePlan.Partitions.Sum(planned => (long)(usedOnly ? planned.BytesToCopy : planned.Mode == CopyMode.Skip ? 0 : planned.Source.Size));
         PlanNotesText.Text = string.Join("\n", _clonePlan.Notes.Append(
             $"About {DiskClonePlanner.FormatSize((ulong)total)} is copied. Everything on Disk {target.Number} ({target.Name}, {DiskClonePlanner.FormatSize(target.Size)}) is erased first."));
@@ -167,8 +167,8 @@ public partial class DiskCloneWindow : Window
     private async void DecryptButton_Click(object sender, RoutedEventArgs e)
     {
         List<ClonePartition> encrypted = sender == DecryptButton
-            ? (SourceDiskComboBox.SelectedItem as CloneDisk)?.Partitions.Where(partition => partition.IsEncrypted).ToList() ?? new()
-            : PartitionSourceComboBox.SelectedItem is PartitionChoice { Partition.IsEncrypted: true } choice ? new() { choice.Partition } : new();
+            ? (SourceDiskComboBox.SelectedItem as CloneDisk)?.Partitions.Where(partition => partition.NeedsDecrypting).ToList() ?? new()
+            : PartitionSourceComboBox.SelectedItem is PartitionChoice { Partition.NeedsDecrypting: true } choice ? new() { choice.Partition } : new();
         if (encrypted.Count == 0)
         {
             return;
@@ -254,9 +254,10 @@ public partial class DiskCloneWindow : Window
             ? string.Join("\n", _partitionPlan.Problems)
             : $"{source.Partition.Title} ({DiskClonePlanner.FormatSize(source.Partition.Size)}) is copied to Disk {target.Number} as a {DiskClonePlanner.FormatSize(planned.Size)} partition"
               + (space.Replaces is { } replaced ? $", replacing {replaced.Title} (its data is lost)." : ".")
-              + (planned.Mode == CopyMode.SnapshotUsed ? " It is read from a snapshot, used space only." : " Every sector is copied.");
+              + (planned.Mode == CopyMode.SnapshotUsed ? " It is read from a snapshot, used space only." : " Every sector is copied.")
+              + string.Concat(_partitionPlan.Notes.Select(note => "\n" + note));
         PartitionPlanText.SetResourceReference(TextBlock.ForegroundProperty, _partitionPlan.Problems.Count > 0 ? "DangerBrush" : space.Replaces is null ? "TextBrush" : "WarningBrush");
-        PartitionDecryptButton.Visibility = source.Partition.IsEncrypted ? Visibility.Visible : Visibility.Collapsed;
+        PartitionDecryptButton.Visibility = source.Partition.NeedsDecrypting ? Visibility.Visible : Visibility.Collapsed;
         UpdateStartButtons();
     }
 

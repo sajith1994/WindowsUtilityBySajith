@@ -12,12 +12,12 @@ public class DiskClonePlannerTests
     private const ulong GiB = DiskClonePlanner.GiB;
 
     private static ClonePartition Part(int number, ulong offset, ulong size, string type, bool boot = false, string fileSystem = "NTFS", ulong used = 0,
-        char? letter = null, bool encrypted = false) =>
+        char? letter = null, bool encrypted = false, bool locked = false) =>
         new(number, offset, size, type, 0, false, boot, type == DiskClonePlanner.EfiType, letter, fileSystem.Length > 0 ? $@"\\?\Volume{{{number}}}\" : string.Empty,
-            fileSystem, used, string.Empty, encrypted, $"{{guid-{number}}}");
+            fileSystem, used, string.Empty, encrypted, locked, $"{{guid-{number}}}");
 
     /// <summary>A typical Windows 11 disk: EFI, MSR, C: and recovery at the end.</summary>
-    private static CloneDisk WindowsDisk(ulong size, ulong usedOnC, bool encrypted = false)
+    private static CloneDisk WindowsDisk(ulong size, ulong usedOnC, bool encrypted = false, bool locked = false)
     {
         ulong recovery = 750 * MiB;
         ulong cOffset = 117 * MiB;
@@ -26,7 +26,7 @@ public class DiskClonePlannerTests
         {
             Part(1, MiB, 100 * MiB, DiskClonePlanner.EfiType, fileSystem: "FAT32"),
             Part(2, 101 * MiB, 16 * MiB, DiskClonePlanner.MsrType, fileSystem: string.Empty),
-            Part(3, cOffset, cSize, DiskClonePlanner.BasicDataType, boot: true, used: usedOnC, letter: 'C', encrypted: encrypted),
+            Part(3, cOffset, cSize, DiskClonePlanner.BasicDataType, boot: true, used: usedOnC, letter: 'C', encrypted: encrypted, locked: locked),
             Part(4, cOffset + cSize, recovery, DiskClonePlanner.RecoveryType, used: 600 * MiB)
         });
     }
@@ -80,8 +80,28 @@ public class DiskClonePlannerTests
         Assert.Contains(DiskClonePlanner.PlanClone(source, source).Problems, problem => problem.Contains("two different disks"));
         Assert.Contains(DiskClonePlanner.PlanClone(source, source with { Number = 5 }).Problems, problem => problem.Contains("running from"));
         Assert.Contains(DiskClonePlanner.PlanClone(source, EmptyDisk(1, 1000 * GiB, sector: 4096)).Problems, problem => problem.Contains("sector sizes"));
-        Assert.Contains(DiskClonePlanner.PlanClone(WindowsDisk(500 * GiB, 100 * GiB, encrypted: true), EmptyDisk(1, 1000 * GiB)).Problems,
-            problem => problem.Contains("BitLocker"));
+        Assert.Contains(DiskClonePlanner.PlanClone(WindowsDisk(500 * GiB, 100 * GiB, encrypted: true, locked: true), EmptyDisk(1, 1000 * GiB)).Problems,
+            problem => problem.Contains("BitLocker") && problem.Contains("locked"));
+    }
+
+    [Fact]
+    public void AnUnlockedBitLockerPartition_IsCopiedReadableWithoutDecrypting()
+    {
+        CloneDisk source = WindowsDisk(500 * GiB, 100 * GiB, encrypted: true);
+        ClonePlan plan = DiskClonePlanner.PlanClone(source, EmptyDisk(1, 1000 * GiB));
+
+        Assert.True(plan.CanStart, string.Join(" ", plan.Problems));
+        Assert.Equal(CopyMode.SnapshotUsed, plan.Partitions[2].Mode);
+        Assert.Contains(plan.Notes, note => note.Contains("unlocked") && note.Contains("not encrypted"));
+
+        ClonePlan copy = DiskClonePlanner.PlanPartitionCopy(source.Partitions[2], 512, EmptyDisk(1, 1000 * GiB), new CloneTargetSpace(MiB, 900 * GiB, null), false);
+        Assert.True(copy.CanStart);
+        Assert.Contains(copy.Notes, note => note.Contains("unlocked"));
+
+        // Without a volume Windows cannot read it decrypted, so it is still refused.
+        ClonePartition noVolume = source.Partitions[2] with { VolumePath = string.Empty };
+        Assert.True(noVolume.NeedsDecrypting);
+        Assert.False(DiskClonePlanner.PlanPartitionCopy(noVolume, 512, EmptyDisk(1, 1000 * GiB), new CloneTargetSpace(MiB, 900 * GiB, null), false).CanStart);
     }
 
     [Fact]
@@ -130,7 +150,7 @@ public class DiskClonePlannerTests
     [Fact]
     public void AnEncryptedRecoveryPartition_IsNamedAndExplained()
     {
-        ClonePartition dell = Part(5, 400 * GiB, 2 * GiB, DiskClonePlanner.RecoveryType, encrypted: true) with { Label = "DELLSUPPORT" };
+        ClonePartition dell = Part(5, 400 * GiB, 2 * GiB, DiskClonePlanner.RecoveryType, encrypted: true) with { Label = "DELLSUPPORT", VolumePath = string.Empty };
         Assert.Equal("Recovery (DELLSUPPORT)", dell.Title);
         Assert.Equal("Recovery", (dell with { Label = "Recovery" }).Title);
 

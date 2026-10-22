@@ -260,6 +260,14 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.86] - 2026-10-22
+
+### Added
+- Clone and migrate: **BitLocker partitions are cloned without turning BitLocker off.** An unlocked BitLocker
+  partition (Windows itself, or a data drive you have unlocked) is read through Windows, so it is copied readable:
+  BitLocker stays on where it is, and the copy on the new disk is not encrypted; turn BitLocker on there afterwards if
+  wanted. Only a locked partition, or one Windows gives no volume, still needs unlocking or the Decrypt button. "Make
+  this disk start Windows" accepts an unlocked BitLocker Windows partition too.
 ## [2.0.85] - 2026-10-22
 
 ### Changed
