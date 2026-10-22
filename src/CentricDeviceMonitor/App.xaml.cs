@@ -149,6 +149,7 @@ public partial class App : WpfApplication
             Window? window = tool switch
             {
                 ElevatedTool.DiskTools => new Dialogs.DiskPreparationWindow { Title = "Disk tools (administrator)" },
+                ElevatedTool.DiskClone => new Dialogs.DiskCloneWindow(),
                 ElevatedTool.ThermalTest => new Dialogs.ThermalLoadTestWindow(),
                 _ => null
             };

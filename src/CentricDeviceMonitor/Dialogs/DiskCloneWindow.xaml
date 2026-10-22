@@ -1,0 +1,126 @@
+<Window x:Class="CentricDeviceMonitor.Dialogs.DiskCloneWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Clone and migrate"
+        Width="1000"
+        Height="800"
+        MinWidth="760"
+        MinHeight="600"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,10">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Clone and migrate" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0"
+                           Text="Copy a whole disk to a new SSD (Windows keeps working on the new disk), or copy one partition. Partitions in use are copied from a Windows snapshot while Windows runs. The disk copied from is only read." />
+            </StackPanel>
+            <Button Grid.Column="1" x:Name="RefreshButton" Content="Refresh disks" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" VerticalAlignment="Top" Click="RefreshButton_Click" />
+        </Grid>
+
+        <TabControl Grid.Row="1" x:Name="ModeTabs">
+            <!-- Whole disk -->
+            <TabItem Header="Clone a whole disk">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="20" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="Copy from" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <ComboBox Grid.Column="1" x:Name="SourceDiskComboBox" DisplayMemberPath="DisplayText" SelectionChanged="CloneSelection_Changed" />
+                        <TextBlock Grid.Column="3" Text="Copy to (erased)" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <ComboBox Grid.Column="4" x:Name="TargetDiskComboBox" DisplayMemberPath="DisplayText" SelectionChanged="CloneSelection_Changed" />
+                    </Grid>
+
+                    <DockPanel Grid.Row="1" Margin="0,12,0,0">
+                        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                            <TextBlock x:Name="PlanProblemsText" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="PlanNotesText" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <DataGrid x:Name="PlanGrid" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" CanUserResizeRows="False" SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Partition" Binding="{Binding Partition}" Width="*" />
+                                <DataGridTextColumn Header="File system" Binding="{Binding FileSystem}" Width="100" />
+                                <DataGridTextColumn Header="Now" Binding="{Binding Now}" Width="90" />
+                                <DataGridTextColumn Header="On the new disk" Binding="{Binding Planned}" Width="130" />
+                                <DataGridTextColumn Header="How it is copied" Binding="{Binding How}" Width="230" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+
+                    <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                        <WrapPanel>
+                            <CheckBox x:Name="UsedOnlyCheck" Content="Copy only the used space (much faster)" IsChecked="True" Margin="0,0,20,6" Checked="CloneOption_Changed" Unchecked="CloneOption_Changed" />
+                            <CheckBox x:Name="BootableCheck" Content="Make the new disk start Windows" IsChecked="True" Margin="0,0,20,6" />
+                            <CheckBox x:Name="VerifyCheck" Content="Check the copy afterwards" IsChecked="True" Margin="0,0,20,6" />
+                        </WrapPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <TextBlock x:Name="ConfirmPromptText" Text="To start, type the number of the disk that will be erased:" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <TextBox x:Name="ConfirmDiskBox" Width="60" Height="32" Padding="6,2" VerticalContentAlignment="Center" TextChanged="ConfirmDiskBox_TextChanged" />
+                            <Button x:Name="StartCloneButton" Content="Start clone" Tag="&#xE8C8;" Style="{StaticResource IconPrimaryButton}" Margin="14,0,0,0" MinHeight="34" IsEnabled="False" Click="StartCloneButton_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- One partition -->
+            <TabItem Header="Copy one partition">
+                <StackPanel Margin="0,12,0,0">
+                    <TextBlock Text="Partition to copy" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <ComboBox x:Name="PartitionSourceComboBox" DisplayMemberPath="DisplayText" SelectionChanged="PartitionSelection_Changed" />
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Copy to disk" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <ComboBox x:Name="PartitionTargetDiskComboBox" DisplayMemberPath="DisplayText" SelectionChanged="PartitionTargetDisk_Changed" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Where on that disk" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <ComboBox x:Name="PartitionSpaceComboBox" DisplayMemberPath="DisplayText" SelectionChanged="PartitionSelection_Changed" />
+                        </StackPanel>
+                    </Grid>
+                    <WrapPanel Margin="0,14,0,0">
+                        <CheckBox x:Name="FillSpaceCheck" Content="Use all of that space (the copy is extended to fill it, NTFS only)" Margin="0,0,24,6" Checked="PartitionSelection_Changed" Unchecked="PartitionSelection_Changed" />
+                        <TextBlock Text="Drive letter" VerticalAlignment="Center" Margin="0,0,8,6" />
+                        <ComboBox x:Name="LetterComboBox" Width="150" Margin="0,0,0,6" />
+                    </WrapPanel>
+                    <TextBlock x:Name="PartitionPlanText" TextWrapping="Wrap" Margin="0,10,0,0" />
+                    <Button x:Name="StartPartitionButton" Content="Copy partition" Tag="&#xE8C8;" Style="{StaticResource IconPrimaryButton}" HorizontalAlignment="Left" Margin="0,14,0,0" MinHeight="34" IsEnabled="False" Click="StartPartitionButton_Click" />
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+
+        <!-- Progress -->
+        <Border Grid.Row="2" x:Name="ProgressPanel" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,12,0,0">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="StageText" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="1" x:Name="CancelButton" Content="Cancel" Tag="&#xE711;" Style="{StaticResource IconCompactButton}" Click="CancelButton_Click" />
+                </Grid>
+                <ProgressBar x:Name="CopyProgress" Height="8" Maximum="1" Margin="0,8,0,0" />
+                <TextBlock x:Name="DetailText" Foreground="{DynamicResource MutedTextBrush}" Margin="0,6,0,0" />
+                <TextBox x:Name="LogBox" IsReadOnly="True" Height="110" Margin="0,8,0,0" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusLine" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Tip: do the first clone with a spare disk, and keep the old disk until the new one starts Windows." />
+            <Button Grid.Column="1" x:Name="CloseButton" Content="Close" Tag="&#xE711;" Style="{StaticResource IconButton}" Width="100" MinHeight="36" Click="CloseButton_Click" Margin="12,0,0,0" />
+        </Grid>
+    </Grid>
+</Window>

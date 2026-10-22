@@ -15,6 +15,7 @@ public static class ElevatedTool
 {
     public const string Argument = "--tool";
     public const string DiskTools = "disk-tools";
+    public const string DiskClone = "disk-clone";
     public const string ThermalTest = "thermal-test";
     public const string ApplyAdapterSettings = "apply-adapter";
 

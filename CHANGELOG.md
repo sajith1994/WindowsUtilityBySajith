@@ -260,6 +260,24 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.79] - 2026-10-22
+
+### Added
+- **Clone and migrate** (Storage > Clone & migrate; needs an administrator, a standard user's dashboard asks for the
+  password and opens it in its own window):
+  - **Clone a whole disk to a new SSD.** Every partition is copied (EFI, Windows, recovery, data) and the new disk is
+    made to start Windows: new boot files (bcdboot) and Windows keeps its C: letter on the new disk. A plan lists
+    every partition before anything starts. On a bigger SSD the Windows partition gets the extra space and recovery
+    moves to the end; on a smaller SSD Windows' own shrink is offered first when the data fits.
+  - **Copy one partition** into free space or over another partition (same or another disk), optionally extended to
+    fill the space, with a drive letter of your choice.
+  - Partitions in use are read from a **Volume Shadow Copy snapshot**, so Windows and programs keep running and the
+    copy is consistent. **Copy only the used space** (on by default) copies just the clusters NTFS uses (for example
+    120 GB of a 500 GB disk). The copy is **checked** against the original afterwards.
+  - Safety: the disk copied from is only read (apart from the shrink you confirm); the disk Windows runs from can never
+    be erased; the number of the disk to erase must be typed; BitLocker, dynamic disks, extended partitions and
+    different sector sizes are refused with an explanation. Live progress with speed and time left, Cancel, and the
+    PC stays awake meanwhile.
 ## [2.0.78] - 2026-10-22
 
 ### Changed (standard users)
