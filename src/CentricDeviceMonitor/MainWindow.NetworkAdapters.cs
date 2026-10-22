@@ -358,7 +358,9 @@ public partial class MainWindow
             : string.Empty;
 
         if (WpfMessageBox.Show(this,
-                $"Change \"{adapter.Name}\" to:\n\n{ipPlan}\n{dnsPlan}\n\nThe connection can drop for a few seconds while Windows applies the change.{remoteWarning}\n\nApply these settings?",
+                $"Change \"{adapter.Name}\" to:\n\n{ipPlan}\n{dnsPlan}\n\nThe connection can drop for a few seconds while Windows applies the change.{remoteWarning}"
+                + (PrivilegedOperations.IsAdministrator ? string.Empty : "\n\nWindows asks for an administrator password next.")
+                + "\n\nApply these settings?",
                 "Network adapter settings", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
         {
             return;
@@ -369,9 +371,27 @@ public partial class MainWindow
         StatusText.Text = $"Applying network settings to {adapter.Name}...";
         try
         {
-            string result = await _adapterConfigService.ApplyAsync(
-                adapter, useDhcp, AdapterIpTextBox.Text, AdapterMaskTextBox.Text, AdapterGatewayTextBox.Text,
-                dns.IsAutomatic, PrimaryDnsTextBox.Text, SecondaryDnsTextBox.Text);
+            AdapterSettingsRequest request = new(adapter.Name, adapter.DhcpEnabled, adapter.DnsFromDhcp, useDhcp, AdapterIpTextBox.Text,
+                AdapterMaskTextBox.Text, AdapterGatewayTextBox.Text, dns.IsAutomatic, PrimaryDnsTextBox.Text, SecondaryDnsTextBox.Text);
+            string result;
+            if (PrivilegedOperations.IsAdministrator)
+            {
+                result = await _adapterConfigService.ApplyAsync(request);
+            }
+            else
+            {
+                // Changing an adapter is kept behind an administrator password: an elevated helper applies it.
+                MaintenanceResult? elevated = await ElevatedTool.RunAsync<AdapterSettingsRequest, MaintenanceResult>(
+                    ElevatedTool.ApplyAdapterSettings, request, TimeSpan.FromMinutes(2));
+                if (elevated is null)
+                {
+                    StatusText.Text = "Network settings were not changed (the administrator prompt was cancelled).";
+                    return;
+                }
+
+                result = elevated.Ok ? elevated.Message : throw new InvalidOperationException(elevated.Message);
+            }
+
             ApplicationLogService.WriteMessage("Network adapter settings", result);
             StatusText.Text = $"Applied. {result}";
 

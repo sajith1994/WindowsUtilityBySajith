@@ -25,26 +25,23 @@ public partial class App : WpfApplication
     {
         base.OnStartup(e);
 
+        int toolIndex = Array.FindIndex(e.Args, argument => string.Equals(argument, ElevatedTool.Argument, StringComparison.OrdinalIgnoreCase));
+        if (toolIndex >= 0 && toolIndex + 1 < e.Args.Length)
+        {
+            // A second, elevated copy opened for one administrator-only tool; the dashboard keeps running.
+            await RunToolAsync(e.Args[toolIndex + 1], toolIndex + 2 < e.Args.Length ? e.Args[toolIndex + 2] : null);
+            return;
+        }
+
         bool startedByWindows = e.Args.Any(argument =>
             string.Equals(argument, "--startup", StringComparison.OrdinalIgnoreCase));
         bool replacingExistingInstance = e.Args.Any(argument =>
             string.Equals(argument, "--elevated-restart", StringComparison.OrdinalIgnoreCase));
 
-        WindowsUtilityService privilegeService = new();
-        if (!privilegeService.IsRunningAsAdministrator())
-        {
-            ApplicationLogService.WriteMessage(
-                "Startup",
-                "Dashboard startup was blocked because the process did not have administrator privileges.");
-            WpfMessageBox.Show(
-                "Windows Utility must run with Administrator privileges. " +
-                "Use the installed shortcut or the elevated startup task.",
-                "Administrator privileges required",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            Shutdown();
-            return;
-        }
+        // Runs as the signed-in user. Administrator-only work goes through the background service (allowed for
+        // standard users by the administrator's policy) or asks for elevation only for the tool that needs it.
+        ApplicationLogService.WriteMessage("Startup",
+            new WindowsUtilityService().IsRunningAsAdministrator() ? "Dashboard started with administrator rights." : "Dashboard started as a standard user.");
 
         if (startedByWindows)
         {
@@ -120,6 +117,80 @@ public partial class App : WpfApplication
                 MessageBoxImage.Error);
             Shutdown();
         }
+    }
+
+    /// <summary>Opens only the requested tool (no tray icon, no single-instance check), then exits with it.</summary>
+    private async Task RunToolAsync(string tool, string? argument)
+    {
+        try
+        {
+            _safeInputLanguageSource = new SafeWpfInputLanguageSource();
+            InputLanguageManager.Current.RegisterInputLanguageSource(_safeInputLanguageSource);
+            Models.AppSettings settings = await new AppSettingsService().LoadAsync();
+            ThemeManager.UseWindowsAccent = settings.UseWindowsAccentColor;
+            ThemeManager.Apply(settings.UiThemePreference);
+            WindowFitter.Register();
+            ApplicationLogService.WriteMessage("Elevated tool", $"Opening {tool} as {Environment.UserName}.");
+
+            if (!PrivilegedOperations.IsAdministrator)
+            {
+                WpfMessageBox.Show("This tool needs administrator rights.", "Windows Utility", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Shutdown();
+                return;
+            }
+
+            if (tool == ElevatedTool.ApplyAdapterSettings && argument is not null)
+            {
+                await ApplyAdapterSettingsAsync(argument);
+                Shutdown();
+                return;
+            }
+
+            Window? window = tool switch
+            {
+                ElevatedTool.DiskTools => new Dialogs.DiskPreparationWindow { Title = "Disk tools (administrator)" },
+                ElevatedTool.ThermalTest => new Dialogs.ThermalLoadTestWindow(),
+                _ => null
+            };
+            if (window is null)
+            {
+                Shutdown();
+                return;
+            }
+
+            MainWindow = window;
+            ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose;
+            window.Show();
+        }
+        catch (Exception exception)
+        {
+            ApplicationLogService.WriteException($"Elevated tool {tool}", exception);
+            WpfMessageBox.Show($"The tool could not be opened.\n\n{exception.Message}", "Windows Utility", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+        }
+    }
+
+    /// <summary>The elevated half of changing an adapter's IP settings for a standard user's dashboard.</summary>
+    private static async Task ApplyAdapterSettingsAsync(string requestPath)
+    {
+        MaintenanceResult result;
+        try
+        {
+            AdapterSettingsRequest request = System.Text.Json.JsonSerializer.Deserialize<AdapterSettingsRequest>(await System.IO.File.ReadAllTextAsync(requestPath))
+                ?? throw new InvalidOperationException("The request was empty.");
+            IReadOnlyList<string> problems = NetworkAdapterConfigService.Validate(request.UseDhcp, request.Address, request.Mask, request.Gateway,
+                request.AutomaticDns ? NetworkAdapterConfigService.DnsPresets[0] : NetworkAdapterConfigService.DnsPresets[^1],
+                request.PrimaryDns, request.SecondaryDns);
+            result = problems.Count > 0
+                ? new MaintenanceResult(false, string.Join("\n", problems))
+                : new MaintenanceResult(true, await new NetworkAdapterConfigService().ApplyAsync(request));
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.IO.IOException or System.Text.Json.JsonException)
+        {
+            result = new MaintenanceResult(false, exception.Message);
+        }
+
+        await System.IO.File.WriteAllTextAsync(ElevatedTool.ResultPath(requestPath), System.Text.Json.JsonSerializer.Serialize(result));
     }
 
     private static void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

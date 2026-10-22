@@ -1,6 +1,6 @@
 ﻿#define MyAppName "Windows Utility"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.77"
+#define MyAppVersion "2.0.78"
 #endif
 #define MyAppExeName "WindowsUtilityBySajith.exe"
 #define MyLegacyAppExeName "CentricDeviceMonitor.exe"
@@ -64,26 +64,31 @@ Name: "{commonstartup}\Windows Utility Service Status"; Filename: "{app}\{#MyTra
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+Name: "standardusermaintenance"; Description: "Let standard users run maintenance tools without an administrator password (Print Spooler, printers, Windows Temp, network repair)"; GroupDescription: "People without administrator rights:"
+
+[Registry]
+; Read by the background service before it does maintenance for a standard user. HKLM, so only administrators can
+; change it (also later in the dashboard). Silent updates leave the current choice alone.
+Root: HKLM; Subkey: "SOFTWARE\Windows Utility"; ValueType: dword; ValueName: "StandardUserMaintenance"; ValueData: "1"; Tasks: standardusermaintenance; Check: not WizardSilent; Flags: uninsdeletekey
+Root: HKLM; Subkey: "SOFTWARE\Windows Utility"; ValueType: dword; ValueName: "StandardUserMaintenance"; ValueData: "0"; Tasks: not standardusermaintenance; Check: not WizardSilent; Flags: uninsdeletekey
 
 [Run]
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\Install-PawnIO.ps1"" -InstallerPath ""{tmp}\PawnIO_setup.exe"" -RebootMarkerPath ""{tmp}\CentricDeviceMonitor-PawnIO-RebootRequired.flag"""; StatusMsg: "Installing the CPU hardware sensor driver..."; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricService.ps1"" -Action Install -ServiceExe ""{app}\{#MyServiceExeName}"""; StatusMsg: "Installing Windows Utility background service..."; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricDashboardStartup.ps1"" -Action Install -ApplicationExe ""{app}\{#MyAppExeName}"""; StatusMsg: "Configuring elevated dashboard startup..."; Flags: runhidden waituntilterminated
-Filename: "{app}\{#MyTrayExeName}"; Description: "Start background service status icon"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyTrayExeName}"; Description: "Start background service status icon"; Flags: nowait postinstall skipifsilent runasoriginaluser
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricDashboardStartup.ps1"" -Action Run"; Description: "Launch {#MyAppName}"; Flags: runhidden nowait postinstall skipifsilent
-; Self-update: the app starts Setup with /SILENT /RELAUNCH (and leaves a marker file), so reopen the dashboard
-; when the update finishes. Setup already runs elevated as the same user, so start the dashboard directly rather
-; than through the startup task, which may not exist if dashboard startup was turned off.
-Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Check: IsRelaunchRequested; Flags: nowait
-; Update started from another PC (the background service runs this installer as SYSTEM): reopen the dashboard for
-; the signed-in user through its startup task, only if it was open before.
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricDashboardStartup.ps1"" -Action Run"; Check: IsRemoteRelaunchRequested; Flags: runhidden nowait
+; Self-update started from the dashboard without the background service (/SILENT /RELAUNCH plus a marker file):
+; reopen the dashboard as the user who started Setup, not with Setup's administrator rights. Updates installed by the
+; background service (/REMOTEUPDATE) are reopened by the new service in every session that had the dashboard open.
+Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Check: IsRelaunchRequested; Flags: nowait runasoriginaluser
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/c taskkill /IM {#MyTrayExeName} /F >nul 2>&1"; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricDashboardStartup.ps1"" -Action Uninstall"; Flags: runhidden waituntilterminated
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Manage-CentricService.ps1"" -Action Uninstall"; Flags: runhidden waituntilterminated
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Windows Utility remote monitoring"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveRemoteMonitoringFirewallRule"
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Windows Utility remote monitoring (VPN)"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveRemoteMonitoringVpnFirewallRule"
 
 [Code]
 
@@ -100,22 +105,12 @@ begin
     end;
 end;
 
-function IsRemoteRelaunchRequested(): Boolean;
-var
-  Marker: String;
-begin
-  Marker := ExpandConstant('{commonappdata}\CentricDeviceMonitor\remote-update-relaunch.flag');
-  Result := IsRemoteUpdate() and FileExists(Marker);
-  if Result then
-    DeleteFile(Marker);
-end;
-
 function IsRelaunchRequested(): Boolean;
 var
   I: Integer;
 begin
   { Never start the dashboard directly when the background service (SYSTEM) runs the update: it would open in
-    the invisible SYSTEM session. IsRemoteRelaunchRequested reopens it for the signed-in user instead. }
+    the invisible SYSTEM session. The new service reopens it for the signed-in users instead. }
   Result := False;
   if IsRemoteUpdate() then
     Exit;

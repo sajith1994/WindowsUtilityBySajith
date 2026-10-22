@@ -98,7 +98,23 @@ public partial class MainWindow
         HubWindow hub = new("storage", "", "Storage & disks",
             "Drive health, speed and capacity tests, guarded disk tools, cleanup and the Windows disk consoles.");
         hub.AddWindowTab("Health & speed", new StorageDiagnosticsWindow());
-        hub.AddWindowTab("Disk tools", new DiskPreparationWindow());
+        if (PrivilegedOperations.IsAdministrator)
+        {
+            hub.AddWindowTab("Disk tools", new DiskPreparationWindow());
+        }
+        else
+        {
+            // Wiping, partitioning and formatting stay behind an administrator password.
+            hub.AddTab("Disk tools", ActionPanel(
+                ("Administrator", "Disk tools clean, initialize, partition and format disks, so they need an administrator. They open in their own window after Windows asks for an administrator password."),
+                null, null, new[]
+                {
+                    ActionButton("Open disk tools as administrator", "", "List disks and partitions, then clean, initialize, partition or format.", () =>
+                        StatusText.Text = ElevatedTool.Open(ElevatedTool.DiskTools)
+                            ? "Opened disk tools as administrator."
+                            : "Disk tools were not opened (the administrator prompt was cancelled).")
+                }));
+        }
         hub.AddTab("Cleanup & consoles", ActionPanel(null, null, null, new[]
         {
             ActionButton("Clear temporary files", "", "Clean user and Windows temp folders and show a report.", () => ClearTemporaryFilesButton_Click(this, new RoutedEventArgs())),

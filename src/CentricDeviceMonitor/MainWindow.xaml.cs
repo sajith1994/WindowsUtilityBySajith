@@ -208,6 +208,7 @@ public partial class MainWindow : Window
         _appliedDarkTheme = ThemeManager.Apply(_appSettings.UiThemePreference);
         SelectThemePreference(_appSettings.UiThemePreference);
         StartupCheckBox.IsChecked = _startupService.IsEnabled();
+        LoadMaintenancePolicy();
         AutomaticMonitoringCheckBox.IsChecked = _appSettings.AutomaticMonitoringEnabled;
         SelectPingIntervalItem(_appSettings.PingIntervalSeconds);
         CpuTemperatureAlertSlider.Value = _appSettings.CpuTemperatureAlertThresholdCelsius;
@@ -1460,6 +1461,7 @@ public partial class MainWindow : Window
     private void NetworkReleaseRenewButton_Click(object sender, RoutedEventArgs e) =>
         RunNetworkRepairCommand(
             "ipconfig /release\r\nipconfig /renew",
+            NetworkRepairKinds.ReleaseRenew,
             "Release and renew IP address",
             "This releases DHCP addresses and requests new ones. Network connectivity will be interrupted temporarily.",
             restartRequired: false);
@@ -1467,6 +1469,7 @@ public partial class MainWindow : Window
     private void NetworkFlushDnsButton_Click(object sender, RoutedEventArgs e) =>
         RunNetworkRepairCommand(
             "ipconfig /flushdns",
+            NetworkRepairKinds.FlushDns,
             "Flush DNS cache",
             "This clears the Windows DNS resolver cache. Active connections are not normally interrupted.",
             restartRequired: false);
@@ -1474,6 +1477,7 @@ public partial class MainWindow : Window
     private void NetworkResetStackButton_Click(object sender, RoutedEventArgs e) =>
         RunNetworkRepairCommand(
             "netsh winsock reset\r\nnetsh int ip reset",
+            NetworkRepairKinds.ResetStack,
             "Reset Winsock and TCP/IP",
             "This resets Windows networking components to their default state. A Windows restart is required afterwards.",
             restartRequired: true);
@@ -1481,6 +1485,7 @@ public partial class MainWindow : Window
     private void NetworkClearArpButton_Click(object sender, RoutedEventArgs e) =>
         RunNetworkRepairCommand(
             "arp -d *",
+            NetworkRepairKinds.ClearArp,
             "Clear ARP cache",
             "This removes cached local IP-to-MAC mappings. Windows will rebuild them automatically as devices are contacted.",
             restartRequired: false);
@@ -1488,11 +1493,31 @@ public partial class MainWindow : Window
     private void NetworkFullRepairButton_Click(object sender, RoutedEventArgs e) =>
         RunNetworkRepairCommand(
             "ipconfig /release\r\nipconfig /renew\r\nipconfig /flushdns\r\nnetsh winsock reset\r\nnetsh int ip reset\r\narp -d *",
+            NetworkRepairKinds.Full,
             "Run full network repair",
             "This runs Release/Renew, Flush DNS, Winsock reset, TCP/IP reset and ARP-cache clear in order. Connectivity can drop and Windows must be restarted when the commands finish.",
             restartRequired: true);
 
-    private void RunNetworkRepairCommand(string command, string title, string warning, bool restartRequired)
+    /// <summary>A standard user's network repair: the background service runs the same commands and sends back their output.</summary>
+    private async Task RunNetworkRepairThroughServiceAsync(string kind, string title)
+    {
+        StatusText.Text = $"{title}: running...";
+        try
+        {
+            MaintenanceResult result = await PrivilegedOperations.RunAsync<MaintenanceResult>(PrivilegedServiceActions.NetworkRepair,
+                new Dictionary<string, string> { ["kind"] = kind }, TimeSpan.FromMinutes(6));
+            StatusText.Text = $"{title}: {result.Message}";
+            string output = result.Output.Length > 2500 ? "..." + result.Output[^2500..] : result.Output;
+            WpfMessageBox.Show(this, $"{result.Message}\n\n{output}", title, MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or TimeoutException)
+        {
+            StatusText.Text = $"{title} failed: {exception.Message}";
+            WpfMessageBox.Show(this, exception.Message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void RunNetworkRepairCommand(string command, string kind, string title, string warning, bool restartRequired)
     {
         bool remoteSession = IsRemoteInteractiveSession();
         string remoteWarning = remoteSession
@@ -1504,7 +1529,7 @@ public partial class MainWindow : Window
 
         MessageBoxResult answer = WpfMessageBox.Show(
             this,
-            $"{warning}{remoteWarning}{restartWarning}\n\nRun this network repair command as Administrator?",
+            $"{warning}{remoteWarning}{restartWarning}\n\nRun this network repair now?",
             title,
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
@@ -1512,6 +1537,12 @@ public partial class MainWindow : Window
 
         if (answer != MessageBoxResult.Yes)
         {
+            return;
+        }
+
+        if (!PrivilegedOperations.IsAdministrator)
+        {
+            _ = RunNetworkRepairThroughServiceAsync(kind, title);
             return;
         }
 
@@ -1872,6 +1903,22 @@ public partial class MainWindow : Window
 
     private void OpenThermalLoadTestButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!PrivilegedOperations.IsAdministrator)
+        {
+            // The test reads the CPU and GPU sensors itself (it must stop on real temperatures), which needs
+            // administrator rights, so it opens in an elevated window.
+            if (WpfMessageBox.Show(this,
+                    "The thermal load test reads the CPU and GPU sensors directly, which needs administrator rights.\n\nOpen it as administrator? Windows asks for an administrator password.",
+                    "CPU & GPU thermal load test", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            {
+                StatusText.Text = ElevatedTool.Open(ElevatedTool.ThermalTest)
+                    ? "Opened the thermal load test as administrator."
+                    : "The thermal load test was not opened (the administrator prompt was cancelled).";
+            }
+
+            return;
+        }
+
         ThermalLoadTestWindow window = new() { Owner = this };
         window.ShowDialog();
         StatusText.Text = "Closed CPU & GPU Thermal Load Test.";
@@ -2111,13 +2158,26 @@ public partial class MainWindow : Window
         try
         {
             Progress<DownloadProgress> progress = new(value => UpdateBannerDetail.Text = value.Describe());
-            string installerPath = await UpdateService.DownloadAsync(manifest, progress, CancellationToken.None);
-
-            UpdateBannerTitle.Text = "Installing the update...";
-            UpdateBannerDetail.Text = "The dashboard will reopen when the install finishes.";
-            UpdateService.LaunchInstaller(installerPath);
-            _allowApplicationExit = true;
-            WpfApplication.Current.Shutdown();
+            SelfUpdateOutcome outcome = await SelfUpdateInstaller.InstallAsync(manifest, progress, automatic: true, CancellationToken.None);
+            switch (outcome.Route)
+            {
+                case SelfUpdateRoute.Installer:
+                    UpdateBannerTitle.Text = "Installing the update...";
+                    UpdateBannerDetail.Text = "The dashboard will reopen when the install finishes.";
+                    _allowApplicationExit = true;
+                    WpfApplication.Current.Shutdown();
+                    break;
+                case SelfUpdateRoute.Service:
+                    // The installer closes this dashboard; the new service opens it again.
+                    UpdateBannerTitle.Text = $"Installing Windows Utility {_availableUpdate.LatestVersion}...";
+                    UpdateBannerDetail.Text = outcome.Message;
+                    break;
+                default:
+                    _installingUpdate = false;
+                    UpdateBannerTitle.Text = $"Windows Utility {_availableUpdate.LatestVersion} is ready to install";
+                    UpdateBannerDetail.Text = outcome.Message;
+                    break;
+            }
         }
         catch (Exception exception)
         {
@@ -2349,7 +2409,28 @@ public partial class MainWindow : Window
         StatusText.Text = "Cleaning temporary files...";
         try
         {
-            TemporaryFileCleanupResult result = await _temporaryFileCleanupService.CleanAsync();
+            TemporaryFileCleanupResult result;
+            if (PrivilegedOperations.IsAdministrator)
+            {
+                result = await _temporaryFileCleanupService.CleanAsync();
+            }
+            else
+            {
+                // Windows Temp needs administrator rights: the background service cleans that part.
+                result = await _temporaryFileCleanupService.CleanAsync(includeUserTemp: true, includeWindowsTemp: false);
+                try
+                {
+                    TemporaryFileCleanupResult windowsTemp = await PrivilegedOperations.RunAsync<TemporaryFileCleanupResult>(
+                        PrivilegedServiceActions.ClearWindowsTemp, null, TimeSpan.FromMinutes(5));
+                    result = TemporaryFileCleanupService.Combine(result, windowsTemp);
+                }
+                catch (Exception exception) when (exception is InvalidOperationException or TimeoutException)
+                {
+                    StatusText.Text = $"Windows Temp was not cleaned: {exception.Message}";
+                    ApplicationLogService.WriteMessage("Temporary file cleanup", $"Windows Temp skipped: {exception.Message}");
+                }
+            }
+
             StatusText.Text = $"Temporary cleanup complete: {result.SizeDisplay} reclaimed, {result.FilesDeleted} file(s) deleted, {result.ItemsSkipped} item(s) skipped.";
 
             TemporaryFileCleanupReportWindow reportWindow = new(result) { Owner = this };
@@ -2885,12 +2966,10 @@ public partial class MainWindow : Window
             BackgroundServiceStatusText.Text = _backgroundServiceInfo.Status;
             BackgroundServiceStartupText.Text = _backgroundServiceInfo.StartupType;
             BackgroundServiceAccountText.Text = _backgroundServiceInfo.Account;
-            DashboardPrivilegeText.Text = _windowsUtilityService.IsRunningAsAdministrator()
-                ? "Administrator"
-                : "Standard user - restart required";
+            DashboardPrivilegeText.Text = PrivilegeDescription;
             DashboardPrivilegeText.Foreground = _windowsUtilityService.IsRunningAsAdministrator()
                 ? WpfBrushes.ForestGreen
-                : WarningCpuTemperatureBrush;
+                : GetThemeBrush("TextBrush", WpfBrushes.Black);
             ApplyBackgroundServiceActionButtonStates();
 
             bool snapshotIsFresh = _backgroundServiceSnapshot is not null &&
@@ -2929,9 +3008,7 @@ public partial class MainWindow : Window
             EnableBackgroundServiceButton.IsEnabled = false;
             DisableBackgroundServiceButton.IsEnabled = false;
             RestartBackgroundServiceButton.IsEnabled = false;
-            DashboardPrivilegeText.Text = _windowsUtilityService.IsRunningAsAdministrator()
-                ? "Administrator"
-                : "Standard user - restart required";
+            DashboardPrivilegeText.Text = PrivilegeDescription;
             UpdateTrayServiceStatus();
         }
         finally
@@ -4292,7 +4369,47 @@ public partial class MainWindow : Window
         return minutes == 1 ? "1 minute" : $"{minutes} minutes";
     }
 
-    private void StartupCheckBox_Changed(object sender, RoutedEventArgs e)
+    /// <summary>"Administrator" or "Standard user (administrator tools through the background service)".</summary>
+    private static string PrivilegeDescription => PrivilegedOperations.IsAdministrator
+        ? "Administrator"
+        : "Standard user (administrator tools go through the background service)";
+
+    private void LoadMaintenancePolicy()
+    {
+        bool wasLoading = _loadingSettings;
+        _loadingSettings = true;
+        MaintenancePolicyToggle.IsChecked = MaintenancePolicy.StandardUsersMayMaintain();
+        _loadingSettings = wasLoading;
+        MaintenancePolicyToggle.IsEnabled = PrivilegedOperations.IsAdministrator;
+        MaintenancePolicyText.Text = (PrivilegedOperations.IsAdministrator ? string.Empty : "Only an administrator can change this. ")
+            + "When on, people without administrator rights can restart the Print Spooler, add and remove printers, clean Windows Temp, run the network repairs and allow the speed-test port; the background service does them. "
+            + "Updates install without a password either way. Disk tools, the load test and adapter IP settings always ask for an administrator.";
+    }
+
+    private void MaintenancePolicyToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsInitialized || _loadingSettings)
+        {
+            return;
+        }
+
+        bool allowed = MaintenancePolicyToggle.IsChecked == true;
+        try
+        {
+            MaintenancePolicy.Set(allowed);
+            ApplicationLogService.WriteMessage("Maintenance policy", allowed ? "Standard users may run maintenance tools." : "Maintenance tools need an administrator.");
+            StatusText.Text = allowed
+                ? "Standard users can now run the maintenance tools without an administrator password."
+                : "Maintenance tools now need an administrator.";
+        }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            LoadMaintenancePolicy();
+            WpfMessageBox.Show(this, $"The setting could not be changed: {exception.Message}", "Maintenance tools", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void StartupCheckBox_Changed(object sender, RoutedEventArgs e)
     {
         if (!IsInitialized || _loadingSettings || StartupCheckBox is null || StatusText is null)
         {
@@ -4301,10 +4418,11 @@ public partial class MainWindow : Window
 
         try
         {
-            _startupService.SetEnabled(StartupCheckBox.IsChecked == true);
+            StartupCheckBox.IsEnabled = false;
+            string message = await _startupService.SetEnabledAsync(StartupCheckBox.IsChecked == true);
             StatusText.Text = StartupCheckBox.IsChecked == true
-                ? "Elevated dashboard startup enabled 20 seconds after sign-in. It will run with highest privileges; the background service starts independently at boot."
-                : "Elevated dashboard startup disabled. Background monitoring remains controlled by the LocalSystem Windows service.";
+                ? $"{message} It opens 20 seconds after sign-in (with administrator rights for administrators); the background service starts by itself at boot."
+                : $"{message} Background monitoring still runs in the Windows service.";
         }
         catch (Exception exception)
         {
@@ -4312,6 +4430,10 @@ public partial class MainWindow : Window
             StartupCheckBox.IsChecked = _startupService.IsEnabled();
             _loadingSettings = false;
             WpfMessageBox.Show(exception.Message, "Windows startup", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            StartupCheckBox.IsEnabled = true;
         }
     }
 

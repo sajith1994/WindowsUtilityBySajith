@@ -203,12 +203,21 @@ public partial class UpdateWindow : Window
                 }
             });
 
-            string installerPath = await UpdateService.DownloadAsync(_available, progress, _lifetime.Token);
-            ShowStatus(UpToDateIcon, "SuccessBrush", "Download verified. Installing...",
-                "The app will close now and reopen when the update has finished.");
+            SelfUpdateOutcome outcome = await SelfUpdateInstaller.InstallAsync(_available, progress, automatic: false, _lifetime.Token);
+            if (outcome.Route == SelfUpdateRoute.Installer)
+            {
+                ShowStatus(UpToDateIcon, "SuccessBrush", "Download verified. Installing...", outcome.Message);
+                System.Windows.Application.Current.Shutdown();
+                return;
+            }
 
-            UpdateService.LaunchInstaller(installerPath);
-            System.Windows.Application.Current.Shutdown();
+            // The background service installs it; the installer closes this app and the service reopens it.
+            DownloadProgress.Visibility = Visibility.Collapsed;
+            ShowStatus(UpToDateIcon, "SuccessBrush", outcome.Route == SelfUpdateRoute.UpToDate ? "Already up to date" : "Installing...", outcome.Message);
+            if (outcome.Route == SelfUpdateRoute.UpToDate)
+            {
+                SetBusy(false);
+            }
         }
         catch (OperationCanceledException)
         {

@@ -38,6 +38,22 @@ public sealed class WindowsStartupService
         }
     }
 
+    /// <summary>
+    /// Turns the sign-in task on or off. Creating a task that runs with the user's highest rights needs an
+    /// administrator, so a standard user's dashboard asks the background service (which sets it up for that user).
+    /// </summary>
+    public async Task<string> SetEnabledAsync(bool enabled)
+    {
+        if (!PrivilegedOperations.IsAdministrator)
+        {
+            return await PrivilegedOperations.RunAsync(CentricDeviceMonitor.Models.PrivilegedServiceActions.SetDashboardStartup,
+                new Dictionary<string, string> { ["enable"] = enabled ? "true" : "false" });
+        }
+
+        await Task.Run(() => SetEnabled(enabled));
+        return enabled ? "The dashboard now opens after sign-in." : "The dashboard no longer opens after sign-in.";
+    }
+
     public void SetEnabled(bool enabled)
     {
         RemoveLegacyRegistryStartup();

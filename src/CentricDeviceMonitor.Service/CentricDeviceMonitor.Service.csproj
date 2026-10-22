@@ -52,5 +52,8 @@
     <Compile Include="..\CentricDeviceMonitor\Services\ApplicationLogService.cs" Link="Services\ApplicationLogService.cs" />
     <Compile Include="..\CentricDeviceMonitor\Services\SystemPowerService.cs" Link="Services\SystemPowerService.cs" />
     <Compile Include="..\CentricDeviceMonitor\Services\SharedDataPaths.cs" Link="Services\SharedDataPaths.cs" />
+    <Compile Include="..\CentricDeviceMonitor\Services\PrinterOperations.cs" Link="Services\PrinterOperations.cs" />
+    <Compile Include="..\CentricDeviceMonitor\Services\MaintenanceOperations.cs" Link="Services\MaintenanceOperations.cs" />
+    <Compile Include="..\CentricDeviceMonitor\Services\TemporaryFileCleanupService.cs" Link="Services\TemporaryFileCleanupService.cs" />
   </ItemGroup>
 </Project>

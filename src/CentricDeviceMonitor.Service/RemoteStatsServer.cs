@@ -66,8 +66,10 @@ internal sealed class RemoteStatsServer : IDisposable
     /// <param name="history">This PC's recorded readings for the history graphs.</param>
     /// <param name="phoneDataFilePath">Phone page data written by the dashboard; tests use a temporary file.</param>
     public RemoteStatsServer(Func<BackgroundServiceSnapshot?> snapshotProvider, string listenHost = "+", string? viewersFilePath = null,
-        Func<RemoteActionRequest, Task<RemoteActionResult>>? actionRunner = null, HistoryRecorder? history = null, string? phoneDataFilePath = null)
+        Func<RemoteActionRequest, Task<RemoteActionResult>>? actionRunner = null, HistoryRecorder? history = null, string? phoneDataFilePath = null,
+        RemoteUpdater? updater = null)
     {
+        _updater = updater ?? new RemoteUpdater();
         _snapshotProvider = snapshotProvider;
         _listenHost = listenHost;
         _viewersFilePath = viewersFilePath ?? SharedDataPaths.RemoteViewersFilePath;
@@ -544,7 +546,7 @@ internal sealed class RemoteStatsServer : IDisposable
     });
 
     private readonly SemaphoreSlim _internetTestGate = new(1, 1);
-    private readonly RemoteUpdater _updater = new();
+    private readonly RemoteUpdater _updater;
     private readonly DeviceDetailsProvider _deviceDetails = new();
     private readonly SecurityStatusProvider _security = new();
     private readonly PcDetailsProvider _details = new();

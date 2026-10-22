@@ -260,6 +260,39 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.78] - 2026-10-22
+
+### Changed (standard users)
+- **No administrator password to open Windows Utility.** The dashboard now runs as the signed-in user. Before, a
+  standard user had to type an administrator's name and password at every start, and the dashboard never opened by
+  itself at sign-in for them.
+- **Administrator work goes through the background service** (which already runs as LocalSystem), with no prompt:
+  updates, the Print Spooler buttons, adding and removing printers (also forced removal), cleaning Windows Temp,
+  network repair (flush DNS, release/renew, Winsock/TCP-IP reset, clear ARP, full repair; the output is shown
+  afterwards), allowing the LAN speed-test port, the "open after sign-in" switch and finding the Windows drive.
+- **Risky tools still ask for an administrator, only when used:** disk tools (they open in their own administrator
+  window), the CPU & GPU thermal load test, and changing an adapter's IP or DNS settings. The command prompts, SFC,
+  DISM, CHKDSK, BootRec, DiskPart and the other "(Admin)" tools ask as before.
+- **An administrator decides:** "Let standard users run maintenance tools without an administrator password" (on
+  by default) is a choice in Setup and a switch on the Background Monitoring tile, changeable only by an administrator.
+  Updates and the Print Spooler buttons work either way.
+
+### Fixed
+- **Automatic updates for standard users:** the background service downloads the official release, checks its
+  fingerprint and installs it; Windows Utility closes for about a minute and opens again by itself. An unattended
+  update never starts something that would ask for a password.
+- **After any update installed by the service** (also from another PC), the dashboard and the tray icon reopen for
+  each signed-in user who had them open, as that user. Before, only the dashboard reopened (through its sign-in task)
+  and the tray icon stayed closed until the next sign-in.
+- **Updates started from the dashboard without the service** reopen it as the user who started them, not with Setup's
+  administrator rights.
+- **Requests to the background service** now record who asked (from the request file's owner, set by Windows), are
+  handled within a second instead of waiting for the monitoring loop, judge a request's age by the file's own time
+  (not a time the sender writes), and old unanswered responses are cleared.
+- Uninstalling also removes the VPN firewall rule added in 2.0.77.
+
+### Notes
+- Install 2.0.78 once with an administrator (Setup asks); from then on updates need no password.
 ## [2.0.77] - 2026-10-21
 
 ### Added (Network PCs)

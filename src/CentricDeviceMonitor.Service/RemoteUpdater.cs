@@ -5,14 +5,13 @@ using CentricDeviceMonitor.Services;
 namespace CentricDeviceMonitor.ServiceHost;
 
 /// <summary>
-/// Updates this PC when the primary PC asks. The request only says "update": this PC checks the official release
-/// itself, downloads the installer from GitHub and verifies its SHA-256 (the same checks as the dashboard's own
-/// updater), then runs it silently. The installer stops and replaces this service, and reopens the dashboard for
-/// the signed-in user if it was open.
+/// Updates this PC when the primary PC asks, or when the dashboard on this PC asks (so a standard user's dashboard can
+/// update without an administrator password). The request only says "update": the service checks the official release
+/// itself, downloads the installer from GitHub and verifies its SHA-256, then runs it silently. The installer stops
+/// and replaces this service; the new service reopens the dashboard and tray icon for whoever had them open.
 /// </summary>
 internal sealed class RemoteUpdater
 {
-    private const string DashboardProcessName = "WindowsUtilityBySajith";
     private int _running;
 
     /// <summary>Shown on the primary PC's tile while an update runs, or why the last one failed.</summary>
@@ -64,16 +63,9 @@ internal sealed class RemoteUpdater
             string installer = await UpdateService.DownloadAsync(manifest, null, CancellationToken.None);
             Status = $"Installing {latest}...";
 
-            // Reopen the dashboard afterwards only if someone had it open.
-            string marker = Path.Combine(SharedDataPaths.RootDirectory, "remote-update-relaunch.flag");
-            if (Process.GetProcessesByName(DashboardProcessName).Length > 0)
-            {
-                File.WriteAllText(marker, DateTime.Now.ToString("O"));
-            }
-            else if (File.Exists(marker))
-            {
-                File.Delete(marker);
-            }
+            // The installer closes the dashboard and tray icon everywhere; the new service reopens them for whoever
+            // had them open.
+            SessionLauncher.RememberOpenApps();
 
             ServiceLog.Write("Remote update", $"Starting the verified installer for {latest}; this service restarts when it finishes.");
             Process.Start(new ProcessStartInfo(installer, "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /REMOTEUPDATE")

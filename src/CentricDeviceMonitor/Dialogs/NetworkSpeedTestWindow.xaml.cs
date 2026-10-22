@@ -382,16 +382,16 @@ public partial class NetworkSpeedTestWindow : Window
             return;
         }
 
-        string ruleName = $"Windows Utility LAN Speed Test TCP {port}";
         try
         {
-            await RunNetshAsync($"advfirewall firewall delete rule name=\"{ruleName}\"");
-            (int exitCode, string output, string error) = await RunNetshAsync(
-                $"advfirewall firewall add rule name=\"{ruleName}\" dir=in action=allow protocol=TCP localport={port} profile=private,domain");
-
-            if (exitCode != 0)
+            // Firewall rules need administrator rights: a standard user's dashboard asks the background service.
+            MaintenanceResult result = PrivilegedOperations.IsAdministrator
+                ? await MaintenanceOperations.AllowSpeedTestPortAsync(port)
+                : await PrivilegedOperations.RunAsync<MaintenanceResult>(PrivilegedServiceActions.AllowSpeedTestPort,
+                    new Dictionary<string, string> { ["port"] = port.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+            if (!result.Ok)
             {
-                throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? output : error);
+                throw new InvalidOperationException(result.Message);
             }
 
             StatusText.Text = $"Windows Firewall now allows TCP {port} on Private/Domain profiles.";
@@ -677,23 +677,5 @@ public partial class NetworkSpeedTestWindow : Window
                int.TryParse(item.Tag?.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out int value)
             ? value
             : fallback;
-    }
-
-    private static async Task<(int ExitCode, string Output, string Error)> RunNetshAsync(string arguments)
-    {
-        ProcessStartInfo startInfo = new("netsh.exe", arguments)
-        {
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-
-        using Process process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("netsh.exe could not be started.");
-        string output = await process.StandardOutput.ReadToEndAsync();
-        string error = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return (process.ExitCode, output.Trim(), error.Trim());
     }
 }

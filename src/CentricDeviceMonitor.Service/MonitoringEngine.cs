@@ -18,7 +18,9 @@ internal sealed class MonitoringEngine : IDisposable
     private readonly SystemHealthLogService _systemHealthLogService = new();
     private readonly SystemResourceMonitorService _systemResourceMonitor = new();
     private readonly BackgroundServiceRuntimeStore _runtimeStore = new();
-    private readonly PrivilegedCommandProcessor _privilegedCommandProcessor = new();
+    private readonly RemoteUpdater _updater = new();
+    private readonly PrivilegedCommandProcessor _privilegedCommandProcessor;
+    private Task? _commandTask;
     private readonly SystemPowerService _systemPowerService = new();
     private readonly NetworkDeviceService _networkService = new();
     private readonly HardwareMonitorService _hardwareMonitor = new();
@@ -105,7 +107,8 @@ internal sealed class MonitoringEngine : IDisposable
 
     public MonitoringEngine()
     {
-        _remoteServer = new RemoteStatsServer(() => _lastSnapshot, history: _history);
+        _remoteServer = new RemoteStatsServer(() => _lastSnapshot, history: _history, updater: _updater);
+        _privilegedCommandProcessor = new PrivilegedCommandProcessor(_updater);
     }
 
     public void Start()
@@ -124,6 +127,10 @@ internal sealed class MonitoringEngine : IDisposable
         _nextPingAt = DateTime.Now.AddSeconds(3);
         _cancellationTokenSource = new CancellationTokenSource();
         _runTask = Task.Run(() => RunAsync(_cancellationTokenSource.Token));
+        // Requests from the dashboard get their own loop, so a long ping cycle does not keep them waiting.
+        _commandTask = Task.Run(() => _privilegedCommandProcessor.RunAsync(_cancellationTokenSource.Token));
+        // After an update the installer closed the dashboard and tray icon; open them again for whoever had them.
+        _ = Task.Run(SessionLauncher.RelaunchAfterUpdate);
         ServiceLog.Write("Service", $"Started as {Environment.UserName}. Version {typeof(MonitoringEngine).Assembly.GetName().Version}.");
     }
 
@@ -140,6 +147,10 @@ internal sealed class MonitoringEngine : IDisposable
         try
         {
             await runTask.WaitAsync(TimeSpan.FromSeconds(15));
+            if (_commandTask is not null)
+            {
+                await _commandTask.WaitAsync(TimeSpan.FromSeconds(5));
+            }
         }
         catch (OperationCanceledException)
         {
@@ -190,7 +201,6 @@ internal sealed class MonitoringEngine : IDisposable
                             : "Automatic ping monitoring disabled.");
                 }
 
-                await _privilegedCommandProcessor.ProcessPendingAsync(cancellationToken);
                 await ProcessPowerScheduleAsync(settings);
                 await ReadSystemResourcesAsync();
 

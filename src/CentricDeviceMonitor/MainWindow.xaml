@@ -637,14 +637,24 @@
                                         <TextBlock Grid.Row="4" Text="Dashboard" Style="{StaticResource InfoLabelStyle}" Margin="0,3"/><TextBlock Grid.Row="4" Grid.Column="1" x:Name="DashboardPrivilegeText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,3"/>
                                     </Grid>
                                     <ToggleButton x:Name="StartupCheckBox"
-                                                  Content="Open elevated dashboard after sign-in"
+                                                  Content="Open the dashboard after sign-in"
                                                   Style="{StaticResource ToggleSwitch}"
                                                   FontSize="11"
                                                   Checked="StartupCheckBox_Changed"
                                                   Unchecked="StartupCheckBox_Changed" />
-                                    <TextBlock Text="Uses a 20-second startup delay. Background monitoring remains service-based."
+                                    <TextBlock Text="Uses a 20-second startup delay. Administrators get it with administrator rights, other users without a prompt. Background monitoring remains service-based."
                                                Style="{StaticResource CardDescriptionStyle}"
-                                               Margin="0,5,0,8" />
+                                               TextWrapping="Wrap" Margin="0,5,0,8" />
+
+                                    <ToggleButton x:Name="MaintenancePolicyToggle"
+                                                  Content="Let standard users run maintenance tools without an administrator password"
+                                                  Style="{StaticResource ToggleSwitch}"
+                                                  FontSize="11"
+                                                  Checked="MaintenancePolicyToggle_Changed"
+                                                  Unchecked="MaintenancePolicyToggle_Changed" />
+                                    <TextBlock x:Name="MaintenancePolicyText"
+                                               Style="{StaticResource CardDescriptionStyle}"
+                                               TextWrapping="Wrap" Margin="0,5,0,8" />
 
                                     <ToggleButton x:Name="TrayIconToggle"
                                                   Content="Show notification area icon"
@@ -1048,7 +1058,7 @@
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE839;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="Network Adapter Settings (Administrator)" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock Text="Network Adapter Settings" Style="{StaticResource CardTitleStyle}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                                         <Button Content="Windows adapters" Tag="&#xE8A7;" Style="{StaticResource IconCompactButton}" Click="OpenWindowsNetworkConnectionsButton_Click" Margin="0,0,8,0" ToolTip="Open Windows Network Connections (ncpa.cpl) to enable, disable, rename or configure adapters." />
@@ -1280,7 +1290,7 @@
                                 <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,16,0,14"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                                     <TextBlock Text="&#xE777;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource WarningBrush}" />
-                                    <TextBlock Text="Network Repair (Administrator)" Style="{StaticResource CardTitleStyle}" />
+                                    <TextBlock Text="Network Repair" Style="{StaticResource CardTitleStyle}" />
                                 </StackPanel>
                                 <TextBlock Text="Repair shortcuts change the local network stack. Release/Renew and Full repair can interrupt RDP, VPN or remote-support sessions."
                                            Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,12" />

@@ -87,16 +87,40 @@ public sealed class TemporaryFileCleanupService
         "temporary-file-cleanup.csv");
 
     public Task<TemporaryFileCleanupResult> CleanAsync(CancellationToken cancellationToken = default) =>
-        Task.Run(() => Clean(cancellationToken), cancellationToken);
+        CleanAsync(includeUserTemp: true, includeWindowsTemp: true, cancellationToken);
 
-    private static TemporaryFileCleanupResult Clean(CancellationToken cancellationToken)
+    /// <summary>
+    /// The user's own temporary folder needs no administrator rights; Windows' own one does (a standard user's
+    /// dashboard asks the background service for that part).
+    /// </summary>
+    public Task<TemporaryFileCleanupResult> CleanAsync(bool includeUserTemp, bool includeWindowsTemp, CancellationToken cancellationToken = default) =>
+        Task.Run(() => Clean(includeUserTemp, includeWindowsTemp, cancellationToken), cancellationToken);
+
+    /// <summary>Two cleanups (the user's part and the service's part) shown as one.</summary>
+    public static TemporaryFileCleanupResult Combine(TemporaryFileCleanupResult first, TemporaryFileCleanupResult second) => new(
+        first.FilesDeleted + second.FilesDeleted,
+        first.DirectoriesDeleted + second.DirectoriesDeleted,
+        first.ItemsSkipped + second.ItemsSkipped,
+        first.BytesFreed + second.BytesFreed,
+        first.Items.Concat(second.Items).ToArray(),
+        first.Volumes.Concat(second.Volumes)
+            .GroupBy(volume => volume.Volume, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new TemporaryFileCleanupVolumeResult(group.Key, group.Min(volume => volume.FreeBefore), group.Max(volume => volume.FreeAfter)))
+            .ToList(),
+        first.LogFilePath);
+
+    private static TemporaryFileCleanupResult Clean(bool includeUserTemp, bool includeWindowsTemp, CancellationToken cancellationToken)
     {
         CleanupAccumulator accumulator = new();
         HashSet<string> roots = new(StringComparer.OrdinalIgnoreCase);
 
-        AddRoot(roots, Path.GetTempPath());
+        if (includeUserTemp)
+        {
+            AddRoot(roots, Path.GetTempPath());
+        }
+
         string windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        if (!string.IsNullOrWhiteSpace(windowsDirectory))
+        if (includeWindowsTemp && !string.IsNullOrWhiteSpace(windowsDirectory))
         {
             AddRoot(roots, Path.Combine(windowsDirectory, "Temp"));
         }

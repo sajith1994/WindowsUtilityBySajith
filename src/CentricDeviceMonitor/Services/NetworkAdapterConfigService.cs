@@ -39,6 +39,19 @@ public sealed record NetworkAdapterInfo(
 }
 
 /// <summary>A DNS choice offered in the adapter settings card. Null servers mean "automatic from DHCP".</summary>
+/// <summary>What to change on one adapter (also the request an elevated helper receives).</summary>
+public sealed record AdapterSettingsRequest(
+    string AdapterName,
+    bool AdapterUsesDhcp,
+    bool AdapterDnsFromDhcp,
+    bool UseDhcp,
+    string Address,
+    string Mask,
+    string Gateway,
+    bool AutomaticDns,
+    string PrimaryDns,
+    string SecondaryDns);
+
 public sealed record DnsPreset(string Name, string? Primary, string? Secondary, string Note)
 {
     public bool IsAutomatic => Primary is null && Name.StartsWith("Automatic", StringComparison.Ordinal);
@@ -289,10 +302,22 @@ public sealed class NetworkAdapterConfigService
     }
 
     /// <summary>Applies the settings with netsh. Returns a description of what changed.</summary>
-    public async Task<string> ApplyAsync(NetworkAdapterInfo adapter, bool useDhcp, string address, string mask, string gateway,
-        bool automaticDns, string primaryDns, string secondaryDns)
+    public Task<string> ApplyAsync(NetworkAdapterInfo adapter, bool useDhcp, string address, string mask, string gateway,
+        bool automaticDns, string primaryDns, string secondaryDns) =>
+        ApplyAsync(new AdapterSettingsRequest(adapter.Name, adapter.DhcpEnabled, adapter.DnsFromDhcp, useDhcp, address, mask, gateway,
+            automaticDns, primaryDns, secondaryDns));
+
+    /// <summary>
+    /// Applies the settings with netsh (needs administrator rights: a standard user's dashboard runs this in an
+    /// elevated helper). Returns a description of what changed.
+    /// </summary>
+    public async Task<string> ApplyAsync(AdapterSettingsRequest settings)
     {
-        string adapterName = adapter.Name;
+        string adapterName = settings.AdapterName;
+        bool useDhcp = settings.UseDhcp;
+        bool automaticDns = settings.AutomaticDns;
+        string address = settings.Address, mask = settings.Mask, gateway = settings.Gateway;
+        string primaryDns = settings.PrimaryDns, secondaryDns = settings.SecondaryDns;
         if (string.IsNullOrWhiteSpace(adapterName) || adapterName.Contains('"'))
         {
             throw new InvalidOperationException("The selected adapter name is not usable.");
@@ -303,7 +328,7 @@ public sealed class NetworkAdapterConfigService
 
         if (useDhcp)
         {
-            if (!adapter.DhcpEnabled)
+            if (!settings.AdapterUsesDhcp)
             {
                 await RunNetshAsync($"interface ipv4 set address {name} source=dhcp", tolerateAlreadyDhcp: true);
             }
@@ -321,7 +346,7 @@ public sealed class NetworkAdapterConfigService
 
         if (automaticDns)
         {
-            if (!adapter.DnsFromDhcp)
+            if (!settings.AdapterDnsFromDhcp)
             {
                 await RunNetshAsync($"interface ipv4 set dnsservers {name} source=dhcp", tolerateAlreadyDhcp: true);
             }

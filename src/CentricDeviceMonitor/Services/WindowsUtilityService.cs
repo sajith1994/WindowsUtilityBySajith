@@ -96,37 +96,22 @@ public sealed class WindowsUtilityService
     public bool IsBootRecAvailable() =>
         File.Exists(Path.Combine(Environment.SystemDirectory, "bootrec.exe"));
 
+    /// <summary>The Windows drive from the boot configuration. Reading it needs administrator rights, so a standard user's dashboard asks the background service.</summary>
     public async Task<string?> TryDetectBcdOsDriveAsync()
     {
-        ProcessStartInfo startInfo = new("cmd.exe", "/d /c bcdedit | findstr /i osdevice")
+        try
         {
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-
-        using Process process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Unable to start BCDEdit drive detection.");
-
-        string output = await process.StandardOutput.ReadToEndAsync();
-        string error = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        Match match = Regex.Match(output, @"partition\s*=\s*([A-Za-z]:)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        if (match.Success)
-        {
-            return match.Groups[1].Value.ToUpperInvariant();
+            MaintenanceResult result = PrivilegedOperations.IsAdministrator
+                ? await MaintenanceOperations.DetectWindowsDriveAsync()
+                : await PrivilegedOperations.RunAsync<MaintenanceResult>(PrivilegedServiceActions.DetectWindowsDrive, null, TimeSpan.FromSeconds(30));
+            return result.Ok ? result.Message : null;
         }
-
-        if (process.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
+        catch (Exception exception) when (exception is InvalidOperationException or TimeoutException)
         {
-            throw new InvalidOperationException($"BCDEdit could not determine the Windows OS drive. {error.Trim()}");
+            ApplicationLogService.WriteMessage("Windows drive detection", exception.Message);
+            return null;
         }
-
-        return null;
     }
-
     public void RunCommandPromptCommand(string command, bool elevated)
     {
         if (string.IsNullOrWhiteSpace(command))
