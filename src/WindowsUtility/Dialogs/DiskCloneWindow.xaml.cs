@@ -588,9 +588,10 @@ public partial class DiskCloneWindow : Window
                   + string.Join("\n", image.Partitions.Where(partition => !partition.Partition.IsMsr).Select(partition =>
                       $"  •  {partition.Partition.Title}: {DiskClonePlanner.FormatSize(partition.Partition.Size)} {partition.Partition.FileSystem}"
                       + (partition.BytesCopied > 0 ? $", {DiskClonePlanner.FormatSize((ulong)partition.BytesCopied)} backed up" : string.Empty)))
+                  + (image.IsIncremental ? $"\nIncremental: holds the changes since {image.ParentImageFileName}; the {image.Chain().Count - 1} earlier image{(image.Chain().Count == 2 ? "" : "s")} of its chain {(image.ChainComplete() ? "are in the folder too." : "are NOT all in the folder, so it cannot be used.")}" : string.Empty)
                   + (File.Exists(image.ImagePath) ? string.Empty : $"\nThe image file {image.ImageFileName} is missing next to the description.")
                 : "This is not a backup made by this program (no matching .backup.json next to it), so it cannot be restored here. Windows can still attach a .vhdx in Disk Management.";
-            if (_restoreImage is { } loaded && !File.Exists(loaded.ImagePath))
+            if (_restoreImage is { } loaded && (!File.Exists(loaded.ImagePath) || !loaded.ChainComplete()))
             {
                 _restoreImage = null;
             }

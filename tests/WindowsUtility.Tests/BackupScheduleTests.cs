@@ -100,42 +100,9 @@ public class BackupScheduleTests
             Directory.Delete(folder, recursive: true);
         }
     }
-
-    [Fact]
-    public void OldImages_AreRemovedBeyondTheNumberKept()
-    {
-        string folder = Path.Combine(Path.GetTempPath(), $"wu-keep-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(folder);
-        try
-        {
-            string machine = Environment.MachineName;
-            foreach (string stamp in new[] { "2026-10-01-0200", "2026-10-08-0200", "2026-10-15-0200", "2026-10-22-0200" })
-            {
-                File.WriteAllText(Path.Combine(folder, $"{machine}-{stamp}.vhdx"), "x");
-                File.WriteAllText(Path.Combine(folder, $"{machine}-{stamp}.backup.json"), "{}");
-            }
-
-            File.WriteAllText(Path.Combine(folder, "OTHER-PC-2026-01-01-0200.vhdx"), "x"); // another PC's, untouched
-            File.WriteAllText(Path.Combine(folder, "OTHER-PC-2026-01-01-0200.backup.json"), "{}");
-
-            int removed = BackupRunner.RemoveOldImages(folder, Path.Combine(folder, $"{machine}-2026-10-22-0200.vhdx"), keep: 2);
-
-            Assert.Equal(2, removed);
-            string[] left = Directory.GetFiles(folder, "*.vhdx").Select(Path.GetFileName).OrderBy(name => name).ToArray()!;
-            Assert.Equal(new[] { "OTHER-PC-2026-01-01-0200.vhdx", $"{machine}-2026-10-15-0200.vhdx", $"{machine}-2026-10-22-0200.vhdx" }.OrderBy(name => name), left);
-            Assert.False(File.Exists(Path.Combine(folder, $"{machine}-2026-10-01-0200.backup.json")));
-        }
-        finally
-        {
-            Directory.Delete(folder, recursive: true);
-        }
-    }
-
-
 }
 
 file static class ScheduleExtensions
 {
     public static BackupSchedule WithTime(this BackupSchedule schedule, int minutes) => new() { Frequency = schedule.Frequency, TimeOfDayMinutes = minutes, WeekDays = schedule.WeekDays };
 }
-

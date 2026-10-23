@@ -23,8 +23,21 @@ public sealed record BackupImage(
     string DiskStyle,
     int SectorSize,
     bool Verified,
-    IReadOnlyList<BackupPartition> Partitions)
+    IReadOnlyList<BackupPartition> Partitions,
+    string ParentImageFileName = "",
+    string BaseImageFileName = "")
 {
+    /// <summary>
+    /// An incremental image holds only what changed since its parent (a VHDX differencing disk): it needs its parent,
+    /// and the parent's parent down to the full image, in the same folder. Windows joins them when it is attached.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsIncremental => ParentImageFileName.Length > 0;
+
+    /// <summary>The full image this one builds on (itself, for a full image or one made before 2.0.91).</summary>
+    [JsonIgnore]
+    public string ChainBase => BaseImageFileName.Length > 0 ? BaseImageFileName : ImageFileName;
+
     public const int CurrentFormatVersion = 1;
     public const string ImageExtension = ".vhdx";
     public const string DescriptionExtension = ".backup.json";
@@ -37,6 +50,33 @@ public sealed record BackupImage(
 
     [JsonIgnore]
     public string Title => $"{ComputerName}, {CreatedUtc.ToLocalTime():yyyy-MM-dd HH:mm}";
+
+    /// <summary>This image and every image it builds on, nearest first; stops where one is missing.</summary>
+    public List<BackupImage> Chain()
+    {
+        List<BackupImage> chain = new() { this };
+        BackupImage current = this;
+        while (current.IsIncremental && chain.Count < 1000)
+        {
+            BackupImage? parent = Load(Path.Combine(Path.GetDirectoryName(current.ImagePath) ?? string.Empty, current.ParentImageFileName));
+            if (parent is null)
+            {
+                break;
+            }
+
+            chain.Add(parent);
+            current = parent;
+        }
+
+        return chain;
+    }
+
+    /// <summary>True when every image this one needs is present in its folder.</summary>
+    public bool ChainComplete()
+    {
+        List<BackupImage> chain = Chain();
+        return !chain[^1].IsIncremental && chain.All(image => File.Exists(image.ImagePath));
+    }
 
     [JsonIgnore]
     public long BytesCopied => Partitions.Sum(partition => partition.BytesCopied);
@@ -63,10 +103,12 @@ public sealed record BackupImage(
         }
 
         BackupImage? image = JsonSerializer.Deserialize<BackupImage>(File.ReadAllText(descriptionPath));
-        if (image is null || image.FormatVersion > CurrentFormatVersion || image.Partitions.Count == 0)
+        if (image is null || image.FormatVersion > CurrentFormatVersion || image.Partitions is not { Count: > 0 } || string.IsNullOrEmpty(image.ImageFileName))
         {
             return null;
         }
+
+        image = image with { ParentImageFileName = image.ParentImageFileName ?? string.Empty, BaseImageFileName = image.BaseImageFileName ?? string.Empty };
 
         return image with { ImagePath = Path.Combine(Path.GetDirectoryName(descriptionPath) ?? string.Empty, image.ImageFileName) };
     }

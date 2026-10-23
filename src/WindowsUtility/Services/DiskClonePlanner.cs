@@ -341,9 +341,9 @@ public static class DiskClonePlanner
             .Where(partition => partition.IsMsr || partitions.Contains(partition))
             .Select(partition => new PlannedPartition(partition, partition.Offset, partition.Size, ModeFor(partition))).ToList();
         ulong bytes = planned.Aggregate(2 * MiB, (sum, partition) => sum + partition.BytesToCopy);
-        if (freeBytes is ulong free && free < bytes + bytes / 20)
+        if (SpaceProblem(bytes, freeBytes, incremental: false) is string space)
         {
-            problems.Add($"There is {FormatSize(free)} free where the backup would go; about {FormatSize(bytes)} is needed.");
+            problems.Add(space);
         }
 
         if (planned.Any(partition => partition.Mode == CopyMode.SnapshotUsed))
@@ -359,6 +359,27 @@ public static class DiskClonePlanner
         }
 
         return new BackupPlan(planned, problems, notes, bytes, disk.Size);
+    }
+
+    /// <summary>
+    /// Whether there is room where the image goes; null when there is. A full image needs about everything it copies.
+    /// An incremental one holds only what changed since the last image, which is not known until it is compared, so it
+    /// asks for a hundredth of the data (at least 1 GB) and stops with Windows' error if the changes do not fit.
+    /// </summary>
+    public static string? SpaceProblem(ulong bytes, ulong? freeBytes, bool incremental)
+    {
+        if (freeBytes is not ulong free)
+        {
+            return null;
+        }
+
+        if (incremental)
+        {
+            ulong least = Math.Max(GiB, bytes / 100);
+            return free < least ? $"There is {FormatSize(free)} free where the backup would go; the changes since the last backup need room there (at least {FormatSize(least)})." : null;
+        }
+
+        return free < bytes + bytes / 20 ? $"There is {FormatSize(free)} free where the backup would go; about {FormatSize(bytes)} is needed." : null;
     }
 
     /// <summary>A locked encrypted partition (or one without a volume) would be copied as unreadable data.</summary>
@@ -510,6 +531,42 @@ public static class DiskClonePlanner
 
         return ranges;
     }
+
+    /// <summary>The ranges with the excluded stretches cut out of them (both lists are in any order; the result is sorted).</summary>
+    public static List<(long Offset, long Length)> Subtract(IReadOnlyList<(long Offset, long Length)> ranges, IReadOnlyList<(long Offset, long Length)> excluded)
+    {
+        List<(long Offset, long Length)> cuts = excluded.Where(cut => cut.Length > 0).OrderBy(cut => cut.Offset).ToList();
+        List<(long Offset, long Length)> result = new();
+        int next = 0;
+        foreach ((long offset, long length) in ranges.Where(range => range.Length > 0).OrderBy(range => range.Offset))
+        {
+            long start = offset;
+            long end = offset + length;
+            while (next < cuts.Count && cuts[next].Offset + cuts[next].Length <= start)
+            {
+                next++; // Cuts entirely before this range are done with (the ranges are sorted too).
+            }
+
+            for (int index = next; index < cuts.Count && cuts[index].Offset < end && start < end; index++)
+            {
+                (long cutOffset, long cutLength) = cuts[index];
+                if (cutOffset > start)
+                {
+                    result.Add((start, cutOffset - start));
+                }
+
+                start = Math.Max(start, cutOffset + cutLength);
+            }
+
+            if (start < end)
+            {
+                result.Add((start, end - start));
+            }
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// The MountedDevices value that gives a volume its drive letter, so the cloned Windows starts as C:. GPT:
     /// "DMIO:ID:" and the partition's GUID. MBR: the disk signature and the partition's byte offset.

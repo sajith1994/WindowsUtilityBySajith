@@ -260,6 +260,32 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.91] - 2026-10-23
+
+### Added
+- **Incremental system image backups.** After a full image, each run saves only what changed since the previous
+  one: the disk is compared with the last image and only the changed parts are written, so a daily backup is small
+  and quick. Each incremental image is a Windows differencing disk that builds on the one before, down to the full
+  image; Windows joins them when one is restored or opened, so any run can be restored on its own as long as its chain
+  stays together in the folder. A new full image starts every N runs (7 by default, "New full image every"), and
+  "Full backups to keep" now counts chains: a full image and its incremental ones are removed together. If the disk's
+  partitions changed, a full image is made instead. On by default for new and existing schedules; untick
+  "Incremental" to keep making full images. Every piece written into an incremental image is read back and written
+  again if the image did not keep it (Windows was seen to drop a piece written just past where the parent image's
+  data ends), so the image always holds what was compared.
+- **Images are made with 1 MB blocks.** Windows makes virtual disks with 32 MB blocks, and an incremental image grows by a
+  whole block for every block that changed, so a few scattered changes cost gigabytes (seen on a real disk: 21 GB
+  written after a third of it was compared, until the destination was full). Full and incremental images are now
+  made with 1 MB blocks, and the comparison works in 1 MB slices, so an incremental image grows by about what
+  changed. An incremental
+  backup on an image made before 2.0.91 (32 MB blocks) makes a new full image instead.
+- **The page, hibernation and swap files and the storage of other snapshots are left out** of images and clones.
+  Windows rebuilds the first three, and the storage of restore points is of no use on another disk; all of them change
+  with every write, so they also bloated every incremental image. Images get smaller by their size (often 10 GB or
+  more).
+- An incremental backup needs room only for the changes; before, it was refused unless the destination had room for a
+  full image.
+
 ## [2.0.90] - 2026-10-23
 
 ### Added

@@ -12,6 +12,14 @@ namespace WindowsUtility.Services;
 
 public sealed record CloneOptions(bool UsedSpaceOnly, bool MakeBootable, bool Verify);
 
+/// <summary>An incremental backup cannot build on the image chosen; a full backup is the way out.</summary>
+public sealed class IncrementalNotPossibleException : InvalidOperationException
+{
+    public IncrementalNotPossibleException(string message) : base(message)
+    {
+    }
+}
+
 public sealed record CloneProgress(string Stage, long Done, long Total, double BytesPerSecond, string? LogLine = null)
 {
     public double Fraction => Total <= 0 ? 0 : Math.Clamp(Done / (double)Total, 0, 1);
@@ -312,8 +320,9 @@ public sealed class DiskCloneService
     }
 
     /// <param name="useSnapshots">False for a source nothing writes to (an attached backup image), which is read directly.</param>
+    /// <param name="onlyChanged">Write only the pieces that differ from what the target already holds (an incremental image).</param>
     private static async Task CopyPartitionsAsync(CloneDisk source, int targetDisk, IReadOnlyList<PlannedPartition> partitions, IReadOnlyList<TargetPartition> created,
-        CloneOptions options, IProgress<CloneProgress> progress, CancellationToken cancellationToken, bool useSnapshots = true)
+        CloneOptions options, IProgress<CloneProgress> progress, CancellationToken cancellationToken, bool useSnapshots = true, bool onlyChanged = false)
     {
         List<(PlannedPartition Planned, TargetPartition Target)> work = partitions.Zip(created).Where(pair => pair.First.Mode != CopyMode.Skip).ToList();
         CopyTracker tracker = new(work.Sum(pair => (long)(options.UsedSpaceOnly ? pair.Planned.BytesToCopy : Math.Min(pair.Planned.Source.Size, pair.Planned.Size))));
@@ -326,7 +335,7 @@ public sealed class DiskCloneService
                 using CopySource from = OpenSource(source, planned, options.UsedSpaceOnly, useSnapshots, snapshots, tracker, progress);
                 (SafeFileHandle writer, long targetBase) = OpenTarget(target, targetDisk);
                 using SafeFileHandle targetHandle = writer;
-                await CopyAndCheckAsync(planned.Source.Title, from, writer, targetBase, options.Verify, tracker, progress, cancellationToken);
+                await CopyAndCheckAsync(planned.Source.Title, from, writer, targetBase, options.Verify, tracker, progress, cancellationToken, onlyChanged);
             }
         }
         finally
@@ -384,6 +393,9 @@ public sealed class DiskCloneService
             Report(progress, $"Taking a snapshot of {planned.Source.Title}...", tracker.Done, tracker.Total, tracker.Clock);
             try
             {
+                // Files written moments ago may still be partly in Windows' cache; the snapshot would carry the old
+                // sectors. Writing the cache out first makes the snapshot show what the files hold now.
+                Native.FlushVolume(planned.Source.VolumePath);
                 shot = Snapshot.Create(planned.Source.VolumePath);
                 snapshots.Add(shot);
                 Log(progress, $"Snapshot of {planned.Source.Title} taken.");
@@ -416,6 +428,40 @@ public sealed class DiskCloneService
         if (usedOnly && planned.Mode == CopyMode.SnapshotUsed && Native.TryGetUsedRanges(reader, length, out List<(long, long)> used))
         {
             ranges = used;
+            // Only when copying from a running Windows: a restore copies an image as it is, so what the image holds
+            // in those files' place (nothing) lands on the disk, not what the disk held there before.
+            int bytesPerCluster = useSnapshots ? Native.BytesPerCluster(reader) : 0;
+            if (bytesPerCluster > 0)
+            {
+                Native.EnableBackupPrivilege(); // the hibernation file and the snapshot storage are otherwise SYSTEM's alone
+                List<(long Offset, long Length)> leftOut = new();
+                List<string> problems = new();
+                List<string> files = FilesLeftOut(sourcePath, out string? listing);
+                foreach (string file in files)
+                {
+                    leftOut.AddRange(Native.ExtentsOf(file, bytesPerCluster, out string? problem));
+                    if (problem is not null)
+                    {
+                        problems.Add($"{Path.GetFileName(file)} {problem}");
+                    }
+                }
+
+                if (listing is not null)
+                {
+                    problems.Add(listing);
+                }
+
+                if (leftOut.Count > 0)
+                {
+                    ranges = DiskClonePlanner.Subtract(ranges, leftOut);
+                    Log(progress, $"{planned.Source.Title}: {DiskClonePlanner.FormatSize((ulong)leftOut.Sum(extent => extent.Length))} of page, hibernation, swap and snapshot-storage files left out.");
+                }
+
+                if (problems.Count > 0)
+                {
+                    Log(progress, $"{planned.Source.Title}: copied although not needed: {string.Join("; ", problems)}.");
+                }
+            }
         }
 
         return new CopySource(reader, sourceBase, shot, ranges);
@@ -440,24 +486,26 @@ public sealed class DiskCloneService
 
     /// <summary>Copies one partition's ranges and, when asked, compares samples of the copy with the original.</summary>
     private static async Task CopyAndCheckAsync(string title, CopySource from, SafeFileHandle writer, long targetBase, bool verify, CopyTracker tracker,
-        IProgress<CloneProgress> progress, CancellationToken cancellationToken)
+        IProgress<CloneProgress> progress, CancellationToken cancellationToken, bool onlyChanged = false)
     {
         long partitionDone = 0;
         long partitionTotal = from.Ranges.Sum(range => range.Length);
         long lastReport = 0;
-        await Task.Run(() => CopyRanges(from.Reader, from.Base, writer, targetBase, from.Ranges, copied =>
+        long written = await Task.Run(() => CopyRanges(from.Reader, from.Base, writer, targetBase, from.Ranges, copied =>
         {
             partitionDone += copied;
             // At most four updates a second, so the window stays responsive.
             if (tracker.Clock.ElapsedMilliseconds - lastReport >= 250 || partitionDone >= partitionTotal)
             {
                 lastReport = tracker.Clock.ElapsedMilliseconds;
-                Report(progress, $"Copying {title}", tracker.Done + Math.Min(partitionDone, partitionTotal), tracker.Total, tracker.Clock);
+                Report(progress, $"{(onlyChanged ? "Comparing" : "Copying")} {title}", tracker.Done + Math.Min(partitionDone, partitionTotal), tracker.Total, tracker.Clock);
             }
-        }, cancellationToken), cancellationToken);
+        }, cancellationToken, onlyChanged), cancellationToken);
 
         tracker.Done += partitionTotal;
-        Log(progress, $"{title}: {DiskClonePlanner.FormatSize((ulong)partitionTotal)} copied.");
+        Log(progress, onlyChanged
+            ? $"{title}: {DiskClonePlanner.FormatSize((ulong)partitionTotal)} compared, {DiskClonePlanner.FormatSize((ulong)written)} changed and copied."
+            : $"{title}: {DiskClonePlanner.FormatSize((ulong)partitionTotal)} copied.");
         if (verify)
         {
             Report(progress, $"Checking the copy of {title}...", tracker.Done, tracker.Total, tracker.Clock);
@@ -480,28 +528,69 @@ public sealed class DiskCloneService
     /// disk, which grows only with the data written), it is attached as a disk, and the partitions are cloned onto
     /// it exactly as onto a new SSD. Returns the backup.
     /// </summary>
+    /// <param name="parent">
+    /// For an incremental backup: the image to build on. The new image is a differencing disk that stores only what
+    /// changed since; it needs the parent (and the parent's chain) in the same folder. Throws
+    /// <see cref="IncrementalNotPossibleException"/> when the disk's partitions no longer match the parent's, so the
+    /// caller can make a full backup instead.
+    /// </param>
+    /// <summary>
+    /// Makes the image file with 1 MB blocks (see <see cref="Vhdx.ImageBlockSize"/>) instead of diskpart's 32 MB ones,
+    /// so an incremental image built on it grows only by about what changed. False when Windows refused (it then is
+    /// made by diskpart as before), with the reason logged.
+    /// </summary>
+    private static bool TryCreateWithSmallBlocks(string imagePath, ulong virtualSize, IProgress<CloneProgress> progress, string? parentPath = null)
+    {
+        try
+        {
+            Vhdx.Create(imagePath, virtualSize, parentPath: parentPath);
+            return true;
+        }
+        catch (IOException exception)
+        {
+            Log(progress, $"The image could not be made with small blocks ({exception.Message}); it is made the usual way, and incremental backups built on it will be larger.");
+            TryDelete(imagePath);
+            return false;
+        }
+    }
+
     public async Task<BackupImage> BackupAsync(CloneDisk source, BackupPlan plan, string folder, bool verify, IProgress<CloneProgress> progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, BackupImage? parent = null)
     {
         if (!plan.CanStart)
         {
             throw new InvalidOperationException(string.Join("\n", plan.Problems));
         }
 
+        if (parent is not null && !parent.ChainComplete())
+        {
+            throw new IncrementalNotPossibleException($"{parent.ImageFileName} or an image it builds on is missing.");
+        }
+
         Directory.CreateDirectory(folder);
-        string baseName = $"{Environment.MachineName}-{DateTime.Now:yyyy-MM-dd-HHmm}";
+        string baseName = $"{Environment.MachineName}-{DateTime.Now:yyyy-MM-dd-HHmm}" + (parent is null ? string.Empty : "-inc");
         string imagePath = Path.Combine(folder, baseName + BackupImage.ImageExtension);
         for (int attempt = 2; File.Exists(imagePath) || File.Exists(BackupImage.DescriptionPathFor(imagePath)); attempt++)
         {
             imagePath = Path.Combine(folder, $"{baseName}-{attempt}{BackupImage.ImageExtension}");
         }
 
-        Log(progress, $"Backing up Disk {source.Number} ({source.Name}) to {imagePath}.");
+        Log(progress, parent is null
+            ? $"Backing up Disk {source.Number} ({source.Name}) to {imagePath}."
+            : $"Backing up what changed on Disk {source.Number} ({source.Name}) since {parent.Title} to {imagePath}.");
         Report(progress, "Creating the image file...", 0, 1);
         ulong megabytes = (source.Size + DiskClonePlanner.MiB - 1) / DiskClonePlanner.MiB;
+        string create = parent is null
+            ? $"create vdisk file=\"{imagePath}\" maximum={megabytes} type=expandable"
+            : $"create vdisk file=\"{imagePath}\" parent=\"{parent.ImagePath}\"";
+        if (TryCreateWithSmallBlocks(imagePath, megabytes * DiskClonePlanner.MiB, progress, parent?.ImagePath))
+        {
+            create = $"select vdisk file=\"{imagePath}\"";
+        }
+
         try
         {
-            await RunDiskPartAsync($"create vdisk file=\"{imagePath}\" maximum={megabytes} type=expandable\nattach vdisk", cancellationToken);
+            await RunDiskPartAsync($"{create}\nattach vdisk", cancellationToken);
         }
         catch (InvalidOperationException exception) when (imagePath.StartsWith(@"\\", StringComparison.Ordinal))
         {
@@ -514,8 +603,19 @@ public sealed class DiskCloneService
             int number = await FindVirtualDiskNumberAsync(imagePath, source.Size, cancellationToken);
             CloneDisk virtualDisk = (await GetDisksAsync(cancellationToken)).First(disk => disk.Number == number);
             Log(progress, $"Image created and attached as Disk {number}.");
-            List<TargetPartition> partitions = await PrepareTargetAsync(virtualDisk, source.Style, plan.Partitions, eraseDisk: true, cancellationToken);
-            await CopyPartitionsAsync(source, number, plan.Partitions, partitions, new CloneOptions(true, false, verify), progress, cancellationToken);
+            List<TargetPartition> partitions;
+            if (parent is null)
+            {
+                partitions = await PrepareTargetAsync(virtualDisk, source.Style, plan.Partitions, eraseDisk: true, cancellationToken);
+            }
+            else
+            {
+                // The differencing image already holds the parent's partitions; they must be the ones to copy into.
+                partitions = MatchPartitions(virtualDisk, plan.Partitions)
+                    ?? throw new IncrementalNotPossibleException($"the partitions of Disk {source.Number} have changed since {parent.Title}.");
+            }
+
+            await CopyPartitionsAsync(source, number, plan.Partitions, partitions, new CloneOptions(true, false, verify), progress, cancellationToken, onlyChanged: parent is not null);
         }
         catch
         {
@@ -528,12 +628,38 @@ public sealed class DiskCloneService
         await RunDiskPartAsync($"select vdisk file=\"{imagePath}\"\ndetach vdisk", cancellationToken);
         BackupImage image = new(BackupImage.CurrentFormatVersion, created, Environment.MachineName, Path.GetFileName(imagePath), source.Name, source.Size,
             source.Style, source.LogicalSectorSize, verify,
-            plan.Partitions.Select(planned => new BackupPartition(planned.Source with { IsEncrypted = false, IsLocked = false }, (long)planned.BytesToCopy)).ToList())
+            plan.Partitions.Select(planned => new BackupPartition(planned.Source with { IsEncrypted = false, IsLocked = false }, (long)planned.BytesToCopy)).ToList(),
+            parent?.ImageFileName ?? string.Empty, parent?.ChainBase ?? Path.GetFileName(imagePath))
         { ImagePath = imagePath };
         image.Save(BackupImage.DescriptionPathFor(imagePath));
         Report(progress, "Done", 1, 1);
-        Log(progress, $"Backup finished: {imagePath} ({DiskClonePlanner.FormatSize((ulong)new FileInfo(imagePath).Length)} on disk). Keep the .backup.json file next to it.");
+        Log(progress, $"Backup finished: {imagePath} ({DiskClonePlanner.FormatSize((ulong)new FileInfo(imagePath).Length)} on disk). Keep the .backup.json file next to it"
+            + (parent is null ? "." : $", and keep {parent.ImageFileName} and the images it builds on in the same folder."));
         return image;
+    }
+
+    /// <summary>The attached image's partitions for the planned ones (same place, size and kind), or null when they differ.</summary>
+    private static List<TargetPartition>? MatchPartitions(CloneDisk attached, IReadOnlyList<PlannedPartition> planned)
+    {
+        if (attached.Partitions.Count != planned.Count)
+        {
+            return null;
+        }
+
+        List<TargetPartition> matched = new();
+        foreach (PlannedPartition plan in planned)
+        {
+            ClonePartition? partition = attached.Partitions.FirstOrDefault(each => each.Offset == plan.Offset && each.Size == plan.Source.Size
+                && each.GptType.Equals(plan.Source.GptType, StringComparison.OrdinalIgnoreCase) && each.MbrType == plan.Source.MbrType);
+            if (partition is null)
+            {
+                return null;
+            }
+
+            matched.Add(new TargetPartition(partition.Number, partition.VolumePath, partition.Guid, partition.Offset));
+        }
+
+        return matched;
     }
 
     /// <summary>
@@ -740,11 +866,20 @@ public sealed class DiskCloneService
     }
 
 
-    /// <summary>Copies the ranges in 4 MB pieces through a sector-aligned buffer.</summary>
-    internal static void CopyRanges(SafeFileHandle reader, long sourceBase, SafeFileHandle writer, long targetBase, IReadOnlyList<(long Offset, long Length)> ranges,
-        Action<long> copied, CancellationToken cancellationToken)
+    /// <summary>
+    /// Copies the ranges in 4 MB pieces through a sector-aligned buffer. With <paramref name="onlyChanged"/>, each
+    /// piece is first read from the target and written only when it differs, so a differencing image stores only the
+    /// changes. Returns the bytes written.
+    /// </summary>
+    /// <summary>Set by tests to trace the pieces compared: offset, length, and whether they were written.</summary>
+    internal static Action<long, int, bool>? TraceChunk;
+
+    internal static long CopyRanges(SafeFileHandle reader, long sourceBase, SafeFileHandle writer, long targetBase, IReadOnlyList<(long Offset, long Length)> ranges,
+        Action<long> copied, CancellationToken cancellationToken, bool onlyChanged = false)
     {
         using AlignedIoBuffer buffer = new(ChunkSize);
+        using AlignedIoBuffer existing = new(onlyChanged ? ChunkSize : 4096);
+        long written = 0;
         foreach ((long offset, long length) in ranges)
         {
             long position = offset;
@@ -753,26 +888,108 @@ public sealed class DiskCloneService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 int count = (int)Math.Min(ChunkSize, end - position);
-                int read = 0;
-                while (read < count)
+                ReadFully(reader, buffer.Memory.Span[..count], sourceBase + position);
+                if (onlyChanged)
                 {
-                    int got = RandomAccess.Read(reader, buffer.Memory.Span[read..count], sourceBase + position + read);
-                    if (got <= 0)
+                    // Compared in slices that end on the image's block boundaries, so a small change costs one block.
+                    int have = ReadUpTo(writer, existing.Memory.Span[..count], targetBase + position);
+                    for (int start = 0; start < count;)
                     {
-                        throw new IOException($"The source ended early at {DiskClonePlanner.FormatSize((ulong)(position + read))}.");
-                    }
+                        int slice = (int)Math.Min(count - start, SliceSize - (targetBase + position + start) % SliceSize);
+                        bool same = have >= start + slice && existing.Memory.Span.Slice(start, slice).SequenceEqual(buffer.Memory.Span.Slice(start, slice));
+                        TraceChunk?.Invoke(position + start, slice, !same);
+                        if (!same)
+                        {
+                            WriteAndCheck(writer, buffer.Memory.Span.Slice(start, slice), existing.Memory.Span.Slice(start, slice), targetBase + position + start);
+                            written += slice;
+                        }
 
-                    read += got;
+                        start += slice;
+                    }
+                }
+                else
+                {
+                    TraceChunk?.Invoke(position, count, true);
+                    RandomAccess.Write(writer, (ReadOnlySpan<byte>)buffer.Memory.Span[..count], targetBase + position);
+                    written += count;
                 }
 
-                RandomAccess.Write(writer, (ReadOnlySpan<byte>)buffer.Memory.Span[..count], targetBase + position);
                 position += count;
                 copied(count);
             }
         }
+
+        return written;
+    }
+
+    /// <summary>The slices an incremental copy compares and writes: the block size of the images.</summary>
+    private const int SliceSize = (int)Vhdx.ImageBlockSize;
+
+    /// <summary>
+    /// Writes a slice into a differencing image and reads it back: such an image has been seen to drop part of a piece
+    /// written just past where its parent's data ends, so the slice is written again until it holds.
+    /// </summary>
+    private static void WriteAndCheck(SafeFileHandle writer, ReadOnlySpan<byte> data, Span<byte> readBack, long position)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            RandomAccess.Write(writer, data, position);
+            if (ReadUpTo(writer, readBack, position) == data.Length && readBack.SequenceEqual(data))
+            {
+                return;
+            }
+
+            if (attempt == 3)
+            {
+                throw new IOException($"The image did not keep what was written at {DiskClonePlanner.FormatSize((ulong)position)}; the backup is not usable. Try again, or make a full backup.");
+            }
+        }
+    }
+
+    /// <summary>Reads as much as there is (a short read at the end of a volume is not an error here).</summary>
+    private static int ReadUpTo(SafeFileHandle handle, Span<byte> buffer, long position)
+    {
+        int read = 0;
+        while (read < buffer.Length)
+        {
+            int got = RandomAccess.Read(handle, buffer[read..], position + read);
+            if (got <= 0)
+            {
+                break;
+            }
+
+            read += got;
+        }
+
+        return read;
     }
 
     private const string VssStoreId = "{3808876b-c176-4e48-b7ae-04046e6cc752}";
+
+    /// <summary>
+    /// Files on a volume not worth copying: Windows rebuilds the page, hibernation and swap files, and the storage of
+    /// other snapshots (restore points) is of no use on another disk and changes with every write. Their clusters are
+    /// left out of a copy, which keeps an image smaller and an incremental image free of their constant changes.
+    /// </summary>
+    internal static List<string> FilesLeftOut(string volumeRoot, out string? problem)
+    {
+        problem = null;
+        List<string> files = new() { Path.Combine(volumeRoot, "pagefile.sys"), Path.Combine(volumeRoot, "hiberfil.sys"), Path.Combine(volumeRoot, "swapfile.sys") };
+        string storage = Path.Combine(volumeRoot, "System Volume Information");
+        try
+        {
+            if (Directory.Exists(storage))
+            {
+                files.AddRange(Directory.EnumerateFiles(storage).Where(path => Path.GetFileName(path).Contains(VssStoreId, StringComparison.OrdinalIgnoreCase)));
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            problem = $"the snapshot storage cannot be listed ({exception.Message.TrimEnd('.')})";
+        }
+
+        return files;
+    }
 
     /// <summary>
     /// Files a snapshot does not freeze: reading them from a snapshot gives what Windows writes there now, so their copy
@@ -1239,6 +1456,48 @@ public sealed class DiskCloneService
         private const uint FsctlGetNtfsVolumeData = 0x00090064;
         private const uint FsctlGetVolumeBitmap = 0x0009006F;
         private const uint FsctlLookupStreamFromCluster = 0x000901FC;
+        private const uint FsctlGetRetrievalPointers = 0x00090073;
+        private const uint FileReadAttributes = 0x80;
+        private const uint FileShareDelete = 0x4;
+        private const uint FileFlagBackupSemantics = 0x02000000;
+        private const int ErrorMoreData = 234;
+        private const int ErrorFileNotFound = 2;
+        private const int ErrorPathNotFound = 3;
+        private const int ErrorHandleEof = 38;
+        private const uint TokenAdjustPrivileges = 0x20;
+        private const uint TokenQuery = 0x8;
+        private const uint SePrivilegeEnabled = 0x2;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Luid
+        {
+            public uint Low;
+            public int High;
+        }
+
+        /// <summary>TOKEN_PRIVILEGES with one LUID_AND_ATTRIBUTES.</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct TokenPrivileges
+        {
+            public uint PrivilegeCount;
+            public Luid Luid;
+            public uint Attributes;
+        }
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetCurrentProcess();
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool OpenProcessToken(IntPtr process, uint desiredAccess, out SafeFileHandle token);
+
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool LookupPrivilegeValue(string? systemName, string name, out Luid luid);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool AdjustTokenPrivileges(SafeFileHandle token, bool disableAll, ref TokenPrivileges newState, uint bufferLength, IntPtr previousState, IntPtr returnLength);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool FlushFileBuffers(SafeFileHandle handle);
+
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern bool GetDiskFreeSpaceEx(string path, out ulong freeBytesAvailable, out ulong totalBytes, out ulong totalFreeBytes);
 
@@ -1258,6 +1517,16 @@ public sealed class DiskCloneService
             }
 
             return handle;
+        }
+
+        /// <summary>Writes everything Windows still holds in its cache for a volume to the disk (best effort).</summary>
+        public static void FlushVolume(string volumePath)
+        {
+            using SafeFileHandle volume = CreateFile(volumePath.TrimEnd('\\'), GenericRead | GenericWrite, FileShareRead | FileShareWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            if (!volume.IsInvalid)
+            {
+                FlushFileBuffers(volume);
+            }
         }
 
         /// <summary>Takes the new partition for this copy alone, so Windows does not mount or touch it while it is written.</summary>
@@ -1313,6 +1582,107 @@ public sealed class DiskCloneService
             byte[] bitmap = output[16..];
             ranges = DiskClonePlanner.UsedRanges(bitmap, bitmapClusters, bytesPerCluster, partitionSize);
             return true;
+        }
+
+        private static bool _backupPrivilegeTried;
+
+        /// <summary>
+        /// Switches on this process's backup privilege (administrators and SYSTEM hold it, switched off). With it, files
+        /// opened for backup can be read whatever their permissions say, such as the hibernation file and the snapshot
+        /// storage, which only SYSTEM may otherwise touch. Best effort, once per process.
+        /// </summary>
+        public static void EnableBackupPrivilege()
+        {
+            if (_backupPrivilegeTried)
+            {
+                return;
+            }
+
+            _backupPrivilegeTried = true;
+            if (!OpenProcessToken(GetCurrentProcess(), TokenAdjustPrivileges | TokenQuery, out SafeFileHandle token))
+            {
+                return;
+            }
+
+            using (token)
+            {
+                if (LookupPrivilegeValue(null, "SeBackupPrivilege", out Luid luid))
+                {
+                    TokenPrivileges privileges = new() { PrivilegeCount = 1, Luid = luid, Attributes = SePrivilegeEnabled };
+                    AdjustTokenPrivileges(token, false, ref privileges, 0, IntPtr.Zero, IntPtr.Zero);
+                }
+            }
+        }
+
+        /// <summary>The cluster size of an NTFS volume; 0 when it is not NTFS or cannot be read.</summary>
+        public static int BytesPerCluster(SafeFileHandle volume)
+        {
+            byte[] volumeData = new byte[512];
+            return DeviceIoControl(volume, FsctlGetNtfsVolumeData, IntPtr.Zero, 0, volumeData, volumeData.Length, out _, IntPtr.Zero)
+                ? Math.Max(0, BitConverter.ToInt32(volumeData, 44))
+                : 0;
+        }
+
+        /// <summary>
+        /// Where a file's data lies on its volume, as byte ranges from the volume's start (FSCTL_GET_RETRIEVAL_POINTERS);
+        /// empty when the file is missing, cannot be opened, or keeps its data inside the file table. The file is opened
+        /// for its attributes only, which works even for the page file Windows holds open.
+        /// </summary>
+        public static List<(long Offset, long Length)> ExtentsOf(string filePath, int bytesPerCluster, out string? problem)
+        {
+            problem = null;
+            List<(long Offset, long Length)> extents = new();
+            using SafeFileHandle file = CreateFile(filePath, FileReadAttributes, FileShareRead | FileShareWrite | FileShareDelete, IntPtr.Zero, OpenExisting, FileFlagBackupSemantics, IntPtr.Zero);
+            if (file.IsInvalid)
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (error is not (ErrorFileNotFound or ErrorPathNotFound))
+                {
+                    problem = $"cannot be opened ({new Win32Exception(error).Message.TrimEnd('.')})";
+                }
+
+                return extents;
+            }
+
+            byte[] input = new byte[8]; // STARTING_VCN_INPUT_BUFFER
+            byte[] output = new byte[64 * 1024];
+            while (true)
+            {
+                bool complete = DeviceIoControl(file, FsctlGetRetrievalPointers, input, input.Length, output, output.Length, out int returned, IntPtr.Zero);
+                if (!complete && Marshal.GetLastWin32Error() is int error && error != ErrorMoreData)
+                {
+                    if (error != ErrorHandleEof) // ERROR_HANDLE_EOF: the file has no clusters of its own.
+                    {
+                        problem = $"its place on the disk cannot be read ({new Win32Exception(error).Message.TrimEnd('.')})";
+                    }
+
+                    break;
+                }
+
+                // RETRIEVAL_POINTERS_BUFFER: ExtentCount, StartingVcn, then NextVcn and Lcn per extent (Lcn -1: not stored).
+                int count = BitConverter.ToInt32(output, 0);
+                long vcn = BitConverter.ToInt64(output, 8);
+                for (int index = 0; index < count && 32 + 16 * index <= returned; index++)
+                {
+                    long nextVcn = BitConverter.ToInt64(output, 16 + 16 * index);
+                    long lcn = BitConverter.ToInt64(output, 24 + 16 * index);
+                    if (lcn >= 0 && nextVcn > vcn)
+                    {
+                        extents.Add((lcn * bytesPerCluster, (nextVcn - vcn) * bytesPerCluster));
+                    }
+
+                    vcn = nextVcn;
+                }
+
+                if (complete || count == 0)
+                {
+                    break;
+                }
+
+                BitConverter.TryWriteBytes(input, vcn);
+            }
+
+            return extents;
         }
 
         /// <summary>

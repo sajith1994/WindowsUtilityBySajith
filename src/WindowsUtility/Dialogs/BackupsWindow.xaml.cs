@@ -68,6 +68,7 @@ public partial class BackupsWindow : Window
         MonthDayComboBox.ItemsSource = Enumerable.Range(1, 28).ToList();
         KeepComboBox.ItemsSource = Enumerable.Range(1, 10).ToList();
         HistoryComboBox.ItemsSource = HistoryChoices;
+        FullEveryComboBox.ItemsSource = new[] { 3, 5, 7, 10, 14, 30 };
         Loaded += (_, _) =>
         {
             // Folder backups 2.0.88 kept in the shared file move into this user's own list.
@@ -480,6 +481,10 @@ public partial class BackupsWindow : Window
         bool folder = schedule.Kind == BackupKind.Folder;
         HistoryPanel.Visibility = folder ? Visibility.Visible : Visibility.Collapsed;
         HistoryComboBox.SelectedItem = HistoryChoices.FirstOrDefault(choice => choice.Days == schedule.HistoryDays) ?? HistoryChoices[2];
+        IncrementalPanel.Visibility = folder ? Visibility.Collapsed : Visibility.Visible;
+        IncrementalCheck.IsChecked = schedule.Incremental;
+        FullEveryComboBox.SelectedItem = ((int[])FullEveryComboBox.ItemsSource).Contains(schedule.FullEvery) ? schedule.FullEvery : 7;
+        Incremental_Changed(this, null!);
         bool existing = (folder ? _folderSchedules : _imageSchedules).Any(each => each.Id == schedule.Id);
         EditorTitle.Text = (existing ? "Edit " : "New ") + (folder ? "folder backup" : "automatic system image backup");
         NameBox.Text = schedule.Name;
@@ -521,7 +526,7 @@ public partial class BackupsWindow : Window
         SelectInterval(schedule.IntervalMinutes);
         EditorNote.Text = folder
             ? "Runs as you while you are signed in. The copy, in a folder of the same name at the destination, follows the folder; files it replaces or removes are kept with their date in its _History folder, for Restore from a date."
-            : "Made by the background service with administrator rights, also when nobody is signed in; only the newest backups are kept in the destination.";
+            : "Made by the background service with administrator rights, also when nobody is signed in. Incremental runs are small and quick (the disk is compared with the last image and only the changed parts are written) but need the earlier images of their chain; each full image starts a new chain, and only the newest chains are kept.";
         Editor.Visibility = Visibility.Visible;
 
         if (!folder)
@@ -574,6 +579,9 @@ public partial class BackupsWindow : Window
         }
     }
 
+    private void Incremental_Changed(object sender, RoutedEventArgs e) =>
+        FullEveryPanel.Visibility = IncrementalCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+
     private void Destination_Changed(object sender, TextChangedEventArgs e) =>
         SharePanel.Visibility = DestinationBox.Text.TrimStart().StartsWith(@"\\", StringComparison.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
 
@@ -600,6 +608,8 @@ public partial class BackupsWindow : Window
         schedule.WeekDays = (WeekDaysList.ItemsSource as IEnumerable<DayPick> ?? Array.Empty<DayPick>()).Where(pick => pick.IsChecked).Select(pick => pick.Day).ToList();
         schedule.Keep = KeepComboBox.SelectedItem as int? ?? 3;
         schedule.HistoryDays = (HistoryComboBox.SelectedItem as HistoryChoice)?.Days ?? 30;
+        schedule.Incremental = IncrementalCheck.IsChecked == true;
+        schedule.FullEvery = FullEveryComboBox.SelectedItem as int? ?? 7;
         DiskChoice? disk = DiskComboBox.SelectedItem as DiskChoice;
         schedule.WindowsDisk = disk?.Disk is null;
         schedule.DiskName = disk?.Disk?.Name ?? string.Empty;

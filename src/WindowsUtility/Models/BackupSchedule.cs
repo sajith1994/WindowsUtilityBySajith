@@ -35,8 +35,14 @@ public sealed class BackupSchedule
     public string DiskName { get; set; } = string.Empty;
     public ulong DiskSize { get; set; }
 
-    /// <summary>System image: how many backups to keep in the destination; older ones made by this PC are deleted.</summary>
+    /// <summary>System image: how many full backups (each with its incremental ones) to keep; older ones made by this PC are deleted.</summary>
     public int Keep { get; set; } = 3;
+
+    /// <summary>System image: after a full image, the following runs save only what changed since the previous run.</summary>
+    public bool Incremental { get; set; } = true;
+
+    /// <summary>System image, incremental: a new full image every this many runs (the chain's length).</summary>
+    public int FullEvery { get; set; } = 7;
 
     /// <summary>Folder backup: the folder copied.</summary>
     public string SourceFolder { get; set; } = string.Empty;

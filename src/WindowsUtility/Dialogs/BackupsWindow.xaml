@@ -228,8 +228,16 @@
                         <ComboBox x:Name="MonthDayComboBox" Width="70" />
                     </StackPanel>
                     <StackPanel x:Name="KeepPanel" Margin="0,0,16,6">
-                        <TextBlock Text="Backups to keep" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <TextBlock Text="Full backups to keep" FontWeight="SemiBold" Margin="0,0,0,6" />
                         <ComboBox x:Name="KeepComboBox" Width="70" />
+                    </StackPanel>
+                    <StackPanel x:Name="IncrementalPanel" Margin="0,0,16,6">
+                        <CheckBox x:Name="IncrementalCheck" Content="Incremental: after a full image, save only what changed" Margin="0,0,0,8" Checked="Incremental_Changed" Unchecked="Incremental_Changed" />
+                        <StackPanel x:Name="FullEveryPanel" Orientation="Horizontal">
+                            <TextBlock Text="New full image every" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox x:Name="FullEveryComboBox" Width="70" />
+                            <TextBlock Text="runs" VerticalAlignment="Center" Margin="8,0,0,0" />
+                        </StackPanel>
                     </StackPanel>
                     <StackPanel x:Name="HistoryPanel" Margin="0,0,16,6" Visibility="Collapsed">
                         <TextBlock Text="Keep replaced and removed files for" FontWeight="SemiBold" Margin="0,0,0,6" />

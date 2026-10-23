@@ -70,6 +70,7 @@
     <Compile Include="..\WindowsUtility\Services\LocalIpScannerService.cs" Link="Services\LocalIpScannerService.cs" />
     <Compile Include="..\WindowsUtility\Models\IpScanResult.cs" Link="Models\IpScanResult.cs" />
     <Compile Include="..\WindowsUtility\Services\DiskCloneService.cs" Link="Services\DiskCloneService.cs" />
+    <Compile Include="..\WindowsUtility\Services\Vhdx.cs" Link="Services\Vhdx.cs" />
     <Compile Include="..\WindowsUtility\Services\DiskClonePlanner.cs" Link="Services\DiskClonePlanner.cs" />
     <Compile Include="..\WindowsUtility\Services\DiskBackupImage.cs" Link="Services\DiskBackupImage.cs" />
     <Compile Include="..\WindowsUtility\Services\AlignedIoBuffer.cs" Link="Services\AlignedIoBuffer.cs" />

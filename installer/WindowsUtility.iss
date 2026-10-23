@@ -1,13 +1,13 @@
 ﻿#define MyAppName "Windows Utility"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.90"
+#define MyAppVersion "2.0.91"
 #endif
 #define MyAppExeName "WindowsUtilityBySajith.exe"
 #define MyServiceName "WindowsUtilityService"
 #define MyServiceExeName "WindowsUtilityService.exe"
 #define MyTrayExeName "WindowsUtilityTray.exe"
 #define MyDataFolder "WindowsUtility"
-; Names from before 2.0.90, kept only to stop, move and remove what older versions left behind.
+; Names from before 2.0.85, kept only to stop, move and remove what older versions left behind.
 #define MyLegacyAppExeName "CentricDeviceMonitor.exe"
 #define MyLegacyServiceName "CentricDeviceMonitorService"
 #define MyLegacyTrayExeName "CentricDeviceMonitorTray.exe"
@@ -54,7 +54,7 @@ Name: "{commonappdata}\{#MyDataFolder}\service"; Permissions: users-modify
 Type: files; Name: "{autoprograms}\Windows Utility by Sajith.lnk"
 Type: files; Name: "{autoprograms}\Uninstall Windows Utility by Sajith.lnk"
 Type: files; Name: "{autodesktop}\Windows Utility by Sajith.lnk"
-; The background service, status icon and scripts under their names from before 2.0.90.
+; The background service, status icon and scripts under their names from before 2.0.85.
 Type: files; Name: "{app}\CentricDeviceMonitor*"
 Type: files; Name: "{app}\Manage-Centric*.ps1"
 
@@ -125,7 +125,7 @@ begin
     Exit;
 
   { The app also writes this marker before starting a self-update, in case the switch is lost. }
-  { The old folder too: a dashboard from before 2.0.90 wrote it there (it is moved before this is read, if possible). }
+  { The old folder too: a dashboard from before 2.0.85 wrote it there (it is moved before this is read, if possible). }
   Result := FileExists(ExpandConstant('{commonappdata}\{#MyDataFolder}\update-relaunch.flag'))
     or FileExists(ExpandConstant('{commonappdata}\{#MyLegacyDataFolder}\update-relaunch.flag'));
   if Result then
@@ -204,7 +204,7 @@ begin
     ResultCode);
 end;
 
-{ Before 2.0.90 the shared data folder had another name. Renamed in one step when possible; otherwise what is
+{ Before 2.0.85 the shared data folder had another name. Renamed in one step when possible; otherwise what is
   missing is copied (with its permissions) and the old folder removed. The new service copies anything left. }
 procedure MoveLegacyData();
 var
@@ -322,7 +322,7 @@ begin
   end
   else
   begin
-    { Upgrading from before 2.0.90: the service is installed again under its new name. }
+    { Upgrading from before 2.0.85: the service is installed again under its new name. }
     RemoveService('{#MyLegacyServiceName}');
     MoveLegacyData();
   end;

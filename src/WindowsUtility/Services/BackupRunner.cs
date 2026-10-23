@@ -36,16 +36,40 @@ public sealed class BackupRunner
 
             string? volume = DiskCloneService.VolumePathOf(schedule.Destination);
             ClonePartition? destinationOn = volume is null ? null : disks.SelectMany(each => each.Partitions).FirstOrDefault(partition => partition.VolumePath.Equals(volume, StringComparison.OrdinalIgnoreCase));
-            BackupPlan plan = DiskClonePlanner.PlanBackup(disk, disk.Partitions.Where(partition => !partition.IsMsr).ToList(), destinationOn, DiskCloneService.FreeSpace(schedule.Destination));
+            // Room is checked after the kind of backup is known: an incremental image needs far less than a full one.
+            ulong? free = DiskCloneService.FreeSpace(schedule.Destination);
+            BackupPlan plan = DiskClonePlanner.PlanBackup(disk, disk.Partitions.Where(partition => !partition.IsMsr).ToList(), destinationOn, freeBytes: null);
             if (!plan.CanStart)
             {
                 return new BackupRunResult(false, string.Join(" ", plan.Problems));
             }
 
-            BackupImage image = await _disks.BackupAsync(disk, plan, schedule.Destination, verify: true, progress, cancellationToken);
+            BackupImage? parent = schedule.Incremental ? ChooseParent(ImagesIn(schedule.Destination), plan, Math.Max(2, schedule.FullEvery)) : null;
+            if (DiskClonePlanner.SpaceProblem(plan.BytesToCopy, free, incremental: parent is not null) is string space)
+            {
+                return new BackupRunResult(false, space);
+            }
+
+            BackupImage image;
+            try
+            {
+                image = await _disks.BackupAsync(disk, plan, schedule.Destination, verify: true, progress, cancellationToken, parent);
+            }
+            catch (IncrementalNotPossibleException exception) when (parent is not null)
+            {
+                if (DiskClonePlanner.SpaceProblem(plan.BytesToCopy, free, incremental: false) is string fullSpace)
+                {
+                    return new BackupRunResult(false, $"A full backup is needed because {exception.Message} {fullSpace}");
+                }
+
+                progress.Report(new CloneProgress(string.Empty, -1, -1, 0, $"A full backup is made instead: {exception.Message}"));
+                image = await _disks.BackupAsync(disk, plan, schedule.Destination, verify: true, progress, cancellationToken);
+            }
+
             int removed = RemoveOldImages(schedule.Destination, image.ImagePath, Math.Max(1, schedule.Keep));
             long size = new FileInfo(image.ImagePath).Length;
-            return new BackupRunResult(true, $"Backup saved: {image.ImageFileName} ({DiskClonePlanner.FormatSize((ulong)size)})" + (removed > 0 ? $"; {removed} older backup{(removed == 1 ? "" : "s")} removed." : "."));
+            string what = image.IsIncremental ? $"Changes since the last backup saved: {image.ImageFileName}" : $"Full backup saved: {image.ImageFileName}";
+            return new BackupRunResult(true, $"{what} ({DiskClonePlanner.FormatSize((ulong)size)})" + (removed > 0 ? $"; {removed} older backup{(removed == 1 ? "" : "s")} removed." : "."));
         }
         catch (OperationCanceledException)
         {
@@ -59,21 +83,69 @@ public sealed class BackupRunner
         }
     }
 
-    /// <summary>Deletes this PC's older images in the folder beyond the number kept (newest first by name, which carries the date).</summary>
+    /// <summary>This PC's images in a folder (those with a description), newest first by name, which carries the date.</summary>
+    public static List<BackupImage> ImagesIn(string folder)
+    {
+        if (!Directory.Exists(folder))
+        {
+            return new List<BackupImage>();
+        }
+
+        return Directory.GetFiles(folder, $"{Environment.MachineName}-*{BackupImage.ImageExtension}")
+            .OrderByDescending(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .Select(path => { try { return BackupImage.Load(path); } catch (Exception exception) when (exception is IOException or System.Text.Json.JsonException) { return null; } })
+            .Where(image => image is not null)
+            .Select(image => image!)
+            .ToList();
+    }
+
+    /// <summary>
+    /// The image an incremental backup builds on: the newest one, when its chain is shorter than the full-image
+    /// interval, is complete, and holds the same partitions as the disk has now. Null means a full backup.
+    /// </summary>
+    public static BackupImage? ChooseParent(IReadOnlyList<BackupImage> images, BackupPlan plan, int fullEvery)
+    {
+        BackupImage? newest = images.FirstOrDefault();
+        if (newest is null || !newest.ChainComplete() || newest.Chain().Count >= fullEvery)
+        {
+            return null;
+        }
+
+        // An image made before 2.0.91 has Windows' 32 MB blocks: an incremental image built on it would grow by 32 MB
+        // for every changed 4 KB. A new full image with small blocks is made instead.
+        if (Vhdx.BlockSize(newest.ImagePath) is uint blockSize && blockSize > Vhdx.LargestParentBlockSize)
+        {
+            return null;
+        }
+
+        List<ClonePartition> stored = newest.Partitions.Select(partition => partition.Partition).OrderBy(partition => partition.Offset).ToList();
+        List<PlannedPartition> planned = plan.Partitions.OrderBy(partition => partition.Offset).ToList();
+        bool same = stored.Count == planned.Count && stored.Zip(planned).All(pair =>
+            pair.First.Offset == pair.Second.Offset && pair.First.Size == pair.Second.Source.Size
+            && pair.First.GptType.Equals(pair.Second.Source.GptType, StringComparison.OrdinalIgnoreCase) && pair.First.MbrType == pair.Second.Source.MbrType);
+        return same ? newest : null;
+    }
+
+    /// <summary>
+    /// Deletes this PC's older backups in the folder beyond the number of full images kept. Each full image goes with
+    /// the incremental images built on it, so a chain is only ever removed whole.
+    /// </summary>
     internal static int RemoveOldImages(string folder, string newestImagePath, int keep)
     {
-        List<string> images = Directory.GetFiles(folder, $"{Environment.MachineName}-*{BackupImage.ImageExtension}")
-            .Where(path => File.Exists(BackupImage.DescriptionPathFor(path)))
-            .OrderByDescending(path => string.Equals(path, newestImagePath, StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+        List<BackupImage> images = ImagesIn(folder);
+        List<string> chains = images.OrderByDescending(image => string.Equals(image.ImagePath, newestImagePath, StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(image => image.ChainBase, StringComparer.OrdinalIgnoreCase)
+            .Select(image => image.ChainBase)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        HashSet<string> kept = chains.Take(keep).ToHashSet(StringComparer.OrdinalIgnoreCase);
         int removed = 0;
-        foreach (string old in images.Skip(keep))
+        foreach (BackupImage old in images.Where(image => !kept.Contains(image.ChainBase)))
         {
             try
             {
-                File.Delete(old);
-                File.Delete(BackupImage.DescriptionPathFor(old));
+                File.Delete(old.ImagePath);
+                File.Delete(BackupImage.DescriptionPathFor(old.ImagePath));
                 removed++;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -111,6 +183,11 @@ public sealed class BackupRunner
         if (schedule.Frequency == BackupFrequency.Weekly && schedule.WeekDays.Count == 0)
         {
             return "Tick at least one day of the week.";
+        }
+
+        if (schedule.Incremental && schedule.FullEvery is < 2 or > 60)
+        {
+            return "A new full image every 2 to 60 runs.";
         }
 
         return schedule.Keep is < 1 or > 30 ? "Keep between 1 and 30 backups." : null;
