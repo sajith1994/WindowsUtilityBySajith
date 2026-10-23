@@ -20,7 +20,27 @@ public partial class DiskCloneWindow : Window
     private ClonePlan? _clonePlan;
     private ClonePlan? _partitionPlan;
     private BootSetupPlan? _bootPlan;
+    private BackupPlan? _backupPlan;
+    private BackupImage? _restoreImage;
+    private ClonePlan? _restorePlan;
+    private BackupImage? _openedBackup;
     private CancellationTokenSource? _running;
+
+    /// <summary>A partition ticked for a backup.</summary>
+    public sealed class PartitionPick
+    {
+        public PartitionPick(ClonePartition partition)
+        {
+            Partition = partition;
+            Text = $"{partition.Title}  •  {DiskClonePlanner.FormatSize(partition.Size)} {partition.FileSystem}"
+                + (partition.UsedBytes > 0 ? $" ({DiskClonePlanner.FormatSize(partition.UsedBytes)} used)" : string.Empty)
+                + (partition.IsBoot ? "  •  Windows" : partition.IsEfi ? "  •  needed to start Windows" : string.Empty);
+        }
+
+        public ClonePartition Partition { get; }
+        public string Text { get; }
+        public bool IsChecked { get; set; } = true;
+    }
 
     public sealed record PlanRow(string Partition, string FileSystem, string Now, string Planned, string How);
 
@@ -75,6 +95,15 @@ public partial class DiskCloneWindow : Window
             BootDiskComboBox.ItemsSource = bootDisks;
             BootDiskComboBox.SelectedItem = bootDisks.FirstOrDefault(disk => disk.Number == bootDisk) ?? bootDisks.FirstOrDefault();
 
+            int? backupDisk = (BackupDiskComboBox.SelectedItem as CloneDisk)?.Number;
+            BackupDiskComboBox.ItemsSource = _disks;
+            BackupDiskComboBox.SelectedItem = _disks.FirstOrDefault(disk => disk.Number == backupDisk) ?? _disks.FirstOrDefault(disk => disk.HasWindows) ?? _disks.FirstOrDefault();
+            FillBackupPartitions();
+            int? restoreDisk = (RestoreTargetComboBox.SelectedItem as CloneDisk)?.Number;
+            RestoreTargetComboBox.ItemsSource = TargetDiskComboBox.ItemsSource;
+            RestoreTargetComboBox.SelectedItem = ((IEnumerable<CloneDisk>)RestoreTargetComboBox.ItemsSource).FirstOrDefault(disk => disk.Number == restoreDisk)
+                ?? ((IEnumerable<CloneDisk>)RestoreTargetComboBox.ItemsSource).FirstOrDefault();
+
             List<LetterChoice> letters = new() { new("Next free letter", null), new("No letter", '-') };
             HashSet<char> used = DriveInfo.GetDrives().Select(drive => char.ToUpperInvariant(drive.Name[0])).ToHashSet();
             letters.AddRange(Enumerable.Range('D', 'Z' - 'D' + 1).Select(code => (char)code).Where(letter => !used.Contains(letter)).Select(letter => new LetterChoice($"{letter}:", letter)));
@@ -84,6 +113,8 @@ public partial class DiskCloneWindow : Window
             UpdateClonePlan();
             UpdatePartitionPlan();
             UpdateBootPlan();
+            UpdateBackupPlan();
+            UpdateRestorePlan();
         }
         catch (Exception exception) when (exception is InvalidOperationException or System.Text.Json.JsonException or KeyNotFoundException
             or Win32Exception or IOException)
@@ -162,13 +193,21 @@ public partial class DiskCloneWindow : Window
         MakeBootableButton.IsEnabled = idle && _bootPlan?.CanStart == true;
         DecryptButton.IsEnabled = idle;
         PartitionDecryptButton.IsEnabled = idle;
+        BackupDecryptButton.IsEnabled = idle;
+        StartBackupButton.IsEnabled = idle && _backupPlan?.CanStart == true;
+        StartRestoreButton.IsEnabled = idle && _restorePlan is { CanStart: true, ShrinkFirst: null } && RestoreTargetComboBox.SelectedItem is CloneDisk restoreTarget
+            && RestoreConfirmBox.Text.Trim() == restoreTarget.Number.ToString() && _openedBackup is null;
+        OpenBackupButton.IsEnabled = idle && _restoreImage is not null && _openedBackup is null;
+        CloseBackupButton.IsEnabled = idle && _openedBackup is not null;
     }
 
     private async void DecryptButton_Click(object sender, RoutedEventArgs e)
     {
         List<ClonePartition> encrypted = sender == DecryptButton
             ? (SourceDiskComboBox.SelectedItem as CloneDisk)?.Partitions.Where(partition => partition.NeedsDecrypting).ToList() ?? new()
-            : PartitionSourceComboBox.SelectedItem is PartitionChoice { Partition.NeedsDecrypting: true } choice ? new() { choice.Partition } : new();
+            : sender == BackupDecryptButton
+                ? ChosenBackupPartitions().Where(partition => partition.NeedsDecrypting).ToList()
+                : PartitionSourceComboBox.SelectedItem is PartitionChoice { Partition.NeedsDecrypting: true } choice ? new() { choice.Partition } : new();
         if (encrypted.Count == 0)
         {
             return;
@@ -366,6 +405,318 @@ public partial class DiskCloneWindow : Window
         await LoadDisksAsync();
     }
 
+    // ---- Back up to an image file ------------------------------------------------------------------------------
+
+    private void BackupDisk_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded)
+        {
+            FillBackupPartitions();
+            UpdateBackupPlan();
+        }
+    }
+
+    private void FillBackupPartitions()
+    {
+        BackupPartitionsList.ItemsSource = BackupDiskComboBox.SelectedItem is CloneDisk disk
+            ? disk.Partitions.Where(partition => !partition.IsMsr).OrderBy(partition => partition.Offset).Select(partition => new PartitionPick(partition)).ToList()
+            : new List<PartitionPick>();
+    }
+
+    private List<ClonePartition> ChosenBackupPartitions() =>
+        (BackupPartitionsList.ItemsSource as IEnumerable<PartitionPick> ?? Array.Empty<PartitionPick>()).Where(pick => pick.IsChecked).Select(pick => pick.Partition).ToList();
+
+    private void BackupSelection_Changed(object sender, RoutedEventArgs e) => UpdateBackupPlan();
+
+    private void BackupFolder_Changed(object sender, TextChangedEventArgs e)
+    {
+        SharePanel.Visibility = BackupFolderBox.Text.TrimStart().StartsWith(@"\\", StringComparison.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
+        UpdateBackupPlan();
+    }
+
+    private void BrowseBackupFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        using System.Windows.Forms.FolderBrowserDialog dialog = new()
+        {
+            Description = "Choose where to save the backup (another partition, an external disk or a network share)",
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = true
+        };
+        if (Directory.Exists(BackupFolderBox.Text.Trim()))
+        {
+            dialog.SelectedPath = BackupFolderBox.Text.Trim();
+        }
+
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            BackupFolderBox.Text = dialog.SelectedPath;
+        }
+    }
+
+    private void UpdateBackupPlan()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        if (BackupDiskComboBox.SelectedItem is not CloneDisk disk)
+        {
+            _backupPlan = null;
+            BackupPlanText.Text = "No disk to back up.";
+            BackupDecryptButton.Visibility = Visibility.Collapsed;
+            UpdateStartButtons();
+            return;
+        }
+
+        List<ClonePartition> chosen = ChosenBackupPartitions();
+        string folder = BackupFolderBox.Text.Trim();
+        string? volume = folder.Length > 0 ? DiskCloneService.VolumePathOf(folder) : null;
+        ClonePartition? destinationOn = volume is null ? null : _disks.SelectMany(each => each.Partitions).FirstOrDefault(partition => partition.VolumePath.Equals(volume, StringComparison.OrdinalIgnoreCase));
+        ulong? free = folder.Length > 0 ? DiskCloneService.FreeSpace(folder) : null;
+        BackupPlan plan = DiskClonePlanner.PlanBackup(disk, chosen, destinationOn, free);
+        if (folder.Length == 0)
+        {
+            plan = plan with { Problems = plan.Problems.Prepend("Choose where to save the backup.").ToList() };
+        }
+
+        _backupPlan = plan;
+        BackupPlanText.Text = plan.Problems.Count > 0
+            ? string.Join("\n", plan.Problems)
+            : string.Join("\n", plan.Notes.Append(
+                $"About {DiskClonePlanner.FormatSize(plan.BytesToCopy)} is written to {folder}" + (free is ulong available ? $" ({DiskClonePlanner.FormatSize(available)} free there)." : ".")));
+        BackupPlanText.SetResourceReference(TextBlock.ForegroundProperty, plan.Problems.Count > 0 ? "DangerBrush" : "TextBrush");
+        BackupDecryptButton.Visibility = chosen.Any(partition => partition.NeedsDecrypting) ? Visibility.Visible : Visibility.Collapsed;
+        UpdateStartButtons();
+    }
+
+    private async void StartBackupButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_backupPlan is not { CanStart: true } plan || BackupDiskComboBox.SelectedItem is not CloneDisk disk)
+        {
+            return;
+        }
+
+        string folder = BackupFolderBox.Text.Trim();
+        string user = BackupUserBox.Text.Trim();
+        string password = BackupPasswordBox.Password;
+        if (WpfMessageBox.Show(this, $"Back up Disk {disk.Number} ({disk.Name}) to {folder}?\n\nAbout {DiskClonePlanner.FormatSize(plan.BytesToCopy)} is written. Keep this PC switched on until it finishes.",
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        BackupImage? image = null;
+        bool ok = await RunAsync(async token =>
+        {
+            if (folder.StartsWith(@"\\", StringComparison.Ordinal) && user.Length > 0)
+            {
+                await DiskCloneService.ConnectShareAsync(folder, user, password, token);
+            }
+
+            image = await _service.BackupAsync(disk, plan, folder, VerifyBackupCheck.IsChecked == true, Progress(), token);
+        }, "Cancelled. The unfinished backup file was deleted; the disk backed up was not changed.");
+        if (ok && image is not null)
+        {
+            RestoreFileBox.Text = image.ImagePath;
+            WpfMessageBox.Show(this,
+                $"The backup is finished:\n{image.ImagePath}\n\nKeep the .backup.json file next to it. To recover: install Windows Utility on the PC that has the new SSD connected (or on the new SSD after a fresh Windows), open Restore a backup, choose this file and the SSD. To get single files back, Open backup shows it as a disk in Explorer.",
+                Title, MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        UpdateBackupPlan();
+    }
+
+    // ---- Restore from an image file ------------------------------------------------------------------------------
+
+    private void RestoreFile_Changed(object sender, TextChangedEventArgs e) => LoadRestoreImage();
+
+    private void BrowseRestoreFileButton_Click(object sender, RoutedEventArgs e)
+    {
+        Microsoft.Win32.OpenFileDialog dialog = new()
+        {
+            Title = "Choose a backup",
+            Filter = "Backups (*.vhdx, *.backup.json)|*.vhdx;*.backup.json|All files|*.*",
+            CheckFileExists = true
+        };
+        string current = RestoreFileBox.Text.Trim();
+        if (current.Length > 0 && Directory.Exists(Path.GetDirectoryName(current)))
+        {
+            dialog.InitialDirectory = Path.GetDirectoryName(current);
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            RestoreFileBox.Text = dialog.FileName;
+        }
+    }
+
+    private void LoadRestoreImage()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        string path = RestoreFileBox.Text.Trim();
+        _restoreImage = null;
+        if (path.Length == 0)
+        {
+            RestoreSummaryText.Text = "Choose a .vhdx backup made by this program; its .backup.json must be next to it.";
+        }
+        else if (!File.Exists(path))
+        {
+            RestoreSummaryText.Text = "That file was not found.";
+        }
+        else
+        {
+            try
+            {
+                _restoreImage = BackupImage.Load(path);
+            }
+            catch (Exception exception) when (exception is System.Text.Json.JsonException or IOException or UnauthorizedAccessException)
+            {
+                ApplicationLogService.WriteException("Disk backup: reading description", exception);
+            }
+
+            RestoreSummaryText.Text = _restoreImage is { } image
+                ? $"Backup of {image.Title}: {image.DiskName}, {DiskClonePlanner.FormatSize(image.DiskSize)} {image.DiskStyle}, {DiskClonePlanner.FormatSize((ulong)image.BytesCopied)} of data"
+                  + (image.Verified ? ", checked when made." : ".") + "\n"
+                  + string.Join("\n", image.Partitions.Where(partition => !partition.Partition.IsMsr).Select(partition =>
+                      $"  •  {partition.Partition.Title}: {DiskClonePlanner.FormatSize(partition.Partition.Size)} {partition.Partition.FileSystem}"
+                      + (partition.BytesCopied > 0 ? $", {DiskClonePlanner.FormatSize((ulong)partition.BytesCopied)} backed up" : string.Empty)))
+                  + (File.Exists(image.ImagePath) ? string.Empty : $"\nThe image file {image.ImageFileName} is missing next to the description.")
+                : "This is not a backup made by this program (no matching .backup.json next to it), so it cannot be restored here. Windows can still attach a .vhdx in Disk Management.";
+            if (_restoreImage is { } loaded && !File.Exists(loaded.ImagePath))
+            {
+                _restoreImage = null;
+            }
+        }
+
+        UpdateRestorePlan();
+    }
+
+    private void RestoreSelection_Changed(object sender, SelectionChangedEventArgs e) => UpdateRestorePlan();
+
+    private void UpdateRestorePlan()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        if (_restoreImage is not { } image || RestoreTargetComboBox.SelectedItem is not CloneDisk target)
+        {
+            _restorePlan = null;
+            RestorePlanText.Text = _restoreImage is null ? string.Empty
+                : RestoreTargetComboBox.Items.Count == 0 ? "No other disk is connected. Connect the new SSD (in a second slot, or with a USB adapter or enclosure), then select Refresh disks."
+                : "Choose the disk to restore to.";
+            RestorePlanText.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+            UpdateStartButtons();
+            return;
+        }
+
+        ClonePlan plan = DiskClonePlanner.PlanClone(image.ToDisk(), target);
+        if (plan.ShrinkFirst is { } shrink)
+        {
+            plan = plan with { Problems = plan.Problems.Append($"Disk {target.Number} ({DiskClonePlanner.FormatSize(target.Size)}) is smaller than the backed-up disk, and a backup cannot be shrunk; {shrink.Source.Title} needs its full {DiskClonePlanner.FormatSize(shrink.Source.Size)}.").ToList() };
+        }
+
+        _restorePlan = plan;
+        RestorePlanText.Text = plan.Problems.Count > 0
+            ? string.Join("\n", plan.Problems)
+            : string.Join("\n", plan.Partitions.Where(planned => planned.Mode != CopyMode.Skip).Select(planned =>
+                  $"{planned.Source.Title}: {DiskClonePlanner.FormatSize(planned.Source.Size)}" + (planned.Grows ? $" → {DiskClonePlanner.FormatSize(planned.Size)} (grows)" : string.Empty))
+                  .Concat(plan.Notes).Append($"Everything on Disk {target.Number} ({target.Name}, {DiskClonePlanner.FormatSize(target.Size)}) is erased first."));
+        RestorePlanText.SetResourceReference(TextBlock.ForegroundProperty, plan.Problems.Count > 0 ? "DangerBrush" : "TextBrush");
+        RestoreBootableCheck.IsEnabled = image.HasWindows;
+        RestoreBootableCheck.IsChecked = image.HasWindows && RestoreBootableCheck.IsChecked == true;
+        RestoreConfirmPromptText.Text = $"To start, type {target.Number} (the number of the disk that will be erased):";
+        UpdateStartButtons();
+    }
+
+    private async void StartRestoreButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_restorePlan is not { CanStart: true, ShrinkFirst: null } plan || _restoreImage is not { } image || RestoreTargetComboBox.SelectedItem is not CloneDisk target)
+        {
+            return;
+        }
+
+        if (WpfMessageBox.Show(this,
+                $"Erase Disk {target.Number} ({target.Name}, {DiskClonePlanner.FormatSize(target.Size)}) and restore the backup of {image.Title} onto it?\n\nEverything now on Disk {target.Number} is lost. Keep this PC switched on until it finishes.",
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        bool ok = await RunAsync(token => _service.RestoreAsync(image, target, plan, RestoreBootableCheck.IsChecked == true, RestoreVerifyCheck.IsChecked == true, Progress(), token),
+            "Cancelled. The disk restored to is incomplete: restore again, or clean it in Disk tools. The backup file was not changed.");
+        if (ok)
+        {
+            RestoreConfirmBox.Clear();
+            WpfMessageBox.Show(this,
+                image.HasWindows
+                    ? $"The backup was restored to Disk {target.Number}.\n\nNext:\n1. Shut down the PC.\n2. Put the disk in, or choose it first in the BIOS/UEFI boot menu.\n3. Start Windows from it.\n\nIf Windows Recovery shows as disabled (reagentc /info), run \"reagentc /disable\" and then \"reagentc /enable\" as administrator."
+                    : $"The backup was restored to Disk {target.Number}.",
+                Title, MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        await LoadDisksAsync();
+    }
+
+    private async void OpenBackupButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_restoreImage is not { } image)
+        {
+            return;
+        }
+
+        IReadOnlyList<string> letters = Array.Empty<string>();
+        bool ok = await RunAsync(async token => letters = await _service.OpenBackupAsync(image, token), "Cancelled.");
+        if (!ok)
+        {
+            return;
+        }
+
+        _openedBackup = image;
+        if (letters.Count > 0)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", letters[^1] + "\\") { UseShellExecute = true });
+            }
+            catch (Win32Exception exception)
+            {
+                ApplicationLogService.WriteException("Disk backup: opening Explorer", exception);
+            }
+
+            StatusLine.Text = $"The backup is open as {string.Join(", ", letters)}. Copy what you need, then select Close backup.";
+        }
+        else
+        {
+            StatusLine.Text = "The backup is attached as a disk but got no drive letter; see Disk Management. Select Close backup when done.";
+        }
+
+        await LoadDisksAsync();
+    }
+
+    private async void CloseBackupButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_openedBackup is not { } image)
+        {
+            return;
+        }
+
+        bool ok = await RunAsync(token => _service.CloseBackupAsync(image, token), "Cancelled.");
+        if (ok)
+        {
+            _openedBackup = null;
+            StatusLine.Text = "The backup is closed.";
+        }
+
+        await LoadDisksAsync();
+    }
+
     // ---- Running -------------------------------------------------------------------------------------------
 
     private IProgress<CloneProgress> Progress() => new Progress<CloneProgress>(update =>
@@ -448,6 +799,13 @@ public partial class DiskCloneWindow : Window
         {
             e.Cancel = true;
             WpfMessageBox.Show(this, "A copy is running. Cancel it first.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (_openedBackup is not null)
+        {
+            WpfMessageBox.Show(this, "The backup is still open as a disk. It stays attached until it is closed in Disk Management or the PC restarts; nothing in it is harmed.",
+                Title, MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 

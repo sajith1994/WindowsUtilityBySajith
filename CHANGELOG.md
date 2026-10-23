@@ -260,6 +260,22 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.87] - 2026-10-23
+
+### Added
+- **Back up Windows and restore it** (Storage > Clone, back up & restore):
+  - **Back up Windows** copies the chosen partitions of a disk (all of them by default) into one image file in a
+    folder of your choice: another partition, an external disk, or a network share (`\\nas\share\folder`, with a
+    user name and password when the share asks for one). The image is a .vhdx that only grows with the data, made
+    from a snapshot while Windows runs, checked afterwards, with a small .backup.json description next to it. The
+    plan shows what is backed up, how much is written and how much room there is, and refuses a folder on a partition
+    that is being backed up.
+  - **Restore a backup** to a disk: the whole backup goes onto the disk (erased first, number typed to confirm) and
+    the disk is made to start Windows when the backup holds it. This is how a PC is recovered to a new SSD: connect
+    the SSD, restore, start from it. The disk may be bigger (Windows gets the extra space), not smaller.
+  - **Copy files out of the backup**: Open backup shows the image as a disk in Explorer, for single folders or files;
+    Close backup detaches it again.
+- The window, hub tab and button are now called "Clone, back up & restore".
 ## [2.0.86] - 2026-10-22
 
 ### Added

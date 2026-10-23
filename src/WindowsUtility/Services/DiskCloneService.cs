@@ -311,108 +311,22 @@ public sealed class DiskCloneService
         return created;
     }
 
+    /// <param name="useSnapshots">False for a source nothing writes to (an attached backup image), which is read directly.</param>
     private static async Task CopyPartitionsAsync(CloneDisk source, int targetDisk, IReadOnlyList<PlannedPartition> partitions, IReadOnlyList<TargetPartition> created,
-        CloneOptions options, IProgress<CloneProgress> progress, CancellationToken cancellationToken)
+        CloneOptions options, IProgress<CloneProgress> progress, CancellationToken cancellationToken, bool useSnapshots = true)
     {
         List<(PlannedPartition Planned, TargetPartition Target)> work = partitions.Zip(created).Where(pair => pair.First.Mode != CopyMode.Skip).ToList();
-        long total = work.Sum(pair => (long)(options.UsedSpaceOnly ? pair.Planned.BytesToCopy : Math.Min(pair.Planned.Source.Size, pair.Planned.Size)));
-        long done = 0;
-        Stopwatch clock = Stopwatch.StartNew();
+        CopyTracker tracker = new(work.Sum(pair => (long)(options.UsedSpaceOnly ? pair.Planned.BytesToCopy : Math.Min(pair.Planned.Source.Size, pair.Planned.Size))));
         List<Snapshot> snapshots = new();
         try
         {
             foreach ((PlannedPartition planned, TargetPartition target) in work)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                long length = (long)Math.Min(planned.Source.Size, planned.Size);
-                string sourcePath;
-                long sourceBase = 0;
-                bool snapshot = planned.Mode is CopyMode.SnapshotUsed or CopyMode.SnapshotFull;
-                Snapshot? shot = null;
-                if (snapshot)
-                {
-                    Report(progress, $"Taking a snapshot of {planned.Source.Title}...", done, total, clock);
-                    try
-                    {
-                        shot = Snapshot.Create(planned.Source.VolumePath);
-                        snapshots.Add(shot);
-                        Log(progress, $"Snapshot of {planned.Source.Title} taken.");
-                    }
-                    catch (Exception exception) when (planned.Source.Letter is null && exception is InvalidOperationException or ManagementException)
-                    {
-                        // Small partitions without a letter (recovery) often have too little room for a snapshot; nothing
-                        // writes to them while Windows runs, so they are read directly.
-                        Log(progress, $"{planned.Source.Title}: no snapshot possible ({exception.Message}); reading it directly.");
-                    }
-                }
-
-                if (shot is not null)
-                {
-                    sourcePath = shot.DevicePath;
-                }
-                else if (planned.Source.VolumePath.Length > 0)
-                {
-                    sourcePath = planned.Source.VolumePath.TrimEnd('\\');
-                }
-                else
-                {
-                    sourcePath = $@"\\.\PhysicalDrive{source.Number}";
-                    sourceBase = (long)planned.Source.Offset;
-                }
-
-                using SafeFileHandle reader = Native.Open(sourcePath, write: false);
-                Native.AllowExtendedDasdIo(reader);
-                List<(long Offset, long Length)> ranges = new() { (0, length) };
-                if (options.UsedSpaceOnly && planned.Mode == CopyMode.SnapshotUsed && Native.TryGetUsedRanges(reader, length, out List<(long, long)> used))
-                {
-                    ranges = used;
-                }
-
-                // Normally through the new partition's own volume (locked); a partition Windows gives no volume (often
-                // an EFI partition) is written through the disk at its offset.
-                long targetBase = 0;
-                SafeFileHandle writer;
-                if (target.VolumePath.Length > 0)
-                {
-                    writer = Native.Open(target.VolumePath.TrimEnd('\\'), write: true);
-                    Native.LockAndDismount(writer);
-                    Native.AllowExtendedDasdIo(writer);
-                }
-                else
-                {
-                    writer = Native.Open($@"\\.\PhysicalDrive{targetDisk}", write: true);
-                    targetBase = (long)target.Offset;
-                }
-
+                using CopySource from = OpenSource(source, planned, options.UsedSpaceOnly, useSnapshots, snapshots, tracker, progress);
+                (SafeFileHandle writer, long targetBase) = OpenTarget(target, targetDisk);
                 using SafeFileHandle targetHandle = writer;
-                long partitionDone = 0;
-                long partitionTotal = ranges.Sum(range => range.Length);
-                long lastReport = 0;
-                await Task.Run(() => CopyRanges(reader, sourceBase, writer, targetBase, ranges, copied =>
-                {
-                    partitionDone += copied;
-                    // At most four updates a second, so the window stays responsive.
-                    if (clock.ElapsedMilliseconds - lastReport >= 250 || partitionDone >= partitionTotal)
-                    {
-                        lastReport = clock.ElapsedMilliseconds;
-                        Report(progress, $"Copying {planned.Source.Title}", done + Math.Min(partitionDone, partitionTotal), total, clock);
-                    }
-                }, cancellationToken), cancellationToken);
-
-                done += partitionTotal;
-                Log(progress, $"{planned.Source.Title}: {DiskClonePlanner.FormatSize((ulong)partitionTotal)} copied.");
-                if (options.Verify)
-                {
-                    Report(progress, $"Checking the copy of {planned.Source.Title}...", done, total, clock);
-                    Func<IReadOnlyList<long>, Dictionary<long, List<string>>?>? ownersOf = shot is not null ? Native.OwnerLookup(reader) : null;
-                    string? difference = await Task.Run(() => Verify(reader, sourceBase, writer, targetBase, ranges, ownersOf), cancellationToken);
-                    if (difference is not null)
-                    {
-                        throw new InvalidOperationException($"The copy of {planned.Source.Title} differs from the original ({difference}). Do not use the new disk; try again.");
-                    }
-
-                    Log(progress, $"{planned.Source.Title}: copy checked.");
-                }
+                await CopyAndCheckAsync(planned.Source.Title, from, writer, targetBase, options.Verify, tracker, progress, cancellationToken);
             }
         }
         finally
@@ -421,6 +335,407 @@ public sealed class DiskCloneService
             {
                 shot.Delete();
             }
+        }
+    }
+
+    /// <summary>Progress of a copy of several partitions: bytes done so far, the total, and the clock for the speed.</summary>
+    private sealed class CopyTracker
+    {
+        public CopyTracker(long total) => Total = total;
+
+        public long Total { get; }
+        public long Done { get; set; }
+        public Stopwatch Clock { get; } = Stopwatch.StartNew();
+    }
+
+    /// <summary>A partition opened for reading: the handle, the partition's offset in it, and the byte ranges to copy.</summary>
+    private sealed class CopySource : IDisposable
+    {
+        public CopySource(SafeFileHandle reader, long sourceBase, Snapshot? snapshot, List<(long Offset, long Length)> ranges)
+        {
+            Reader = reader;
+            Base = sourceBase;
+            Snapshot = snapshot;
+            Ranges = ranges;
+        }
+
+        public SafeFileHandle Reader { get; }
+        public long Base { get; }
+        public Snapshot? Snapshot { get; }
+        public List<(long Offset, long Length)> Ranges { get; }
+
+        public void Dispose() => Reader.Dispose();
+    }
+
+    /// <summary>
+    /// Opens a partition of a live disk for copying: through a snapshot when it is in use (so Windows keeps running),
+    /// through its volume, or through the disk at its offset when Windows gives it no volume. With used-only, the
+    /// ranges are the clusters NTFS has in use.
+    /// </summary>
+    private static CopySource OpenSource(CloneDisk source, PlannedPartition planned, bool usedOnly, bool useSnapshots, List<Snapshot> snapshots, CopyTracker tracker,
+        IProgress<CloneProgress> progress)
+    {
+        long length = (long)Math.Min(planned.Source.Size, planned.Size);
+        string sourcePath;
+        long sourceBase = 0;
+        Snapshot? shot = null;
+        if (useSnapshots && planned.Mode is CopyMode.SnapshotUsed or CopyMode.SnapshotFull)
+        {
+            Report(progress, $"Taking a snapshot of {planned.Source.Title}...", tracker.Done, tracker.Total, tracker.Clock);
+            try
+            {
+                shot = Snapshot.Create(planned.Source.VolumePath);
+                snapshots.Add(shot);
+                Log(progress, $"Snapshot of {planned.Source.Title} taken.");
+            }
+            catch (Exception exception) when (planned.Source.Letter is null && exception is InvalidOperationException or ManagementException)
+            {
+                // Small partitions without a letter (recovery) often have too little room for a snapshot; nothing
+                // writes to them while Windows runs, so they are read directly.
+                Log(progress, $"{planned.Source.Title}: no snapshot possible ({exception.Message}); reading it directly.");
+            }
+        }
+
+        if (shot is not null)
+        {
+            sourcePath = shot.DevicePath;
+        }
+        else if (planned.Source.VolumePath.Length > 0)
+        {
+            sourcePath = planned.Source.VolumePath.TrimEnd('\\');
+        }
+        else
+        {
+            sourcePath = $@"\\.\PhysicalDrive{source.Number}";
+            sourceBase = (long)planned.Source.Offset;
+        }
+
+        SafeFileHandle reader = Native.Open(sourcePath, write: false);
+        Native.AllowExtendedDasdIo(reader);
+        List<(long Offset, long Length)> ranges = new() { (0, length) };
+        if (usedOnly && planned.Mode == CopyMode.SnapshotUsed && Native.TryGetUsedRanges(reader, length, out List<(long, long)> used))
+        {
+            ranges = used;
+        }
+
+        return new CopySource(reader, sourceBase, shot, ranges);
+    }
+
+    /// <summary>
+    /// Opens a new partition for writing: normally through its own volume (locked); a partition Windows gives no
+    /// volume (often an EFI partition) is written through the disk at its offset.
+    /// </summary>
+    private static (SafeFileHandle Writer, long Base) OpenTarget(TargetPartition target, int targetDisk)
+    {
+        if (target.VolumePath.Length > 0)
+        {
+            SafeFileHandle writer = Native.Open(target.VolumePath.TrimEnd('\\'), write: true);
+            Native.LockAndDismount(writer);
+            Native.AllowExtendedDasdIo(writer);
+            return (writer, 0);
+        }
+
+        return (Native.Open($@"\\.\PhysicalDrive{targetDisk}", write: true), (long)target.Offset);
+    }
+
+    /// <summary>Copies one partition's ranges and, when asked, compares samples of the copy with the original.</summary>
+    private static async Task CopyAndCheckAsync(string title, CopySource from, SafeFileHandle writer, long targetBase, bool verify, CopyTracker tracker,
+        IProgress<CloneProgress> progress, CancellationToken cancellationToken)
+    {
+        long partitionDone = 0;
+        long partitionTotal = from.Ranges.Sum(range => range.Length);
+        long lastReport = 0;
+        await Task.Run(() => CopyRanges(from.Reader, from.Base, writer, targetBase, from.Ranges, copied =>
+        {
+            partitionDone += copied;
+            // At most four updates a second, so the window stays responsive.
+            if (tracker.Clock.ElapsedMilliseconds - lastReport >= 250 || partitionDone >= partitionTotal)
+            {
+                lastReport = tracker.Clock.ElapsedMilliseconds;
+                Report(progress, $"Copying {title}", tracker.Done + Math.Min(partitionDone, partitionTotal), tracker.Total, tracker.Clock);
+            }
+        }, cancellationToken), cancellationToken);
+
+        tracker.Done += partitionTotal;
+        Log(progress, $"{title}: {DiskClonePlanner.FormatSize((ulong)partitionTotal)} copied.");
+        if (verify)
+        {
+            Report(progress, $"Checking the copy of {title}...", tracker.Done, tracker.Total, tracker.Clock);
+            Func<IReadOnlyList<long>, Dictionary<long, List<string>>?>? ownersOf = from.Snapshot is not null ? Native.OwnerLookup(from.Reader) : null;
+            string? difference = await Task.Run(() => Verify(from.Reader, from.Base, writer, targetBase, from.Ranges, ownersOf), cancellationToken);
+            if (difference is not null)
+            {
+                throw new InvalidOperationException($"The copy of {title} differs from the original ({difference}). Do not use the copy; try again.");
+            }
+
+            Log(progress, $"{title}: copy checked.");
+        }
+    }
+
+    // ---- Backup to an image file -----------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Backs up the planned partitions of a disk into a new VHDX image in a folder (another partition, an external disk
+    /// or a network share) and writes the description file next to it. Windows makes the image (a dynamic virtual
+    /// disk, which grows only with the data written), it is attached as a disk, and the partitions are cloned onto
+    /// it exactly as onto a new SSD. Returns the backup.
+    /// </summary>
+    public async Task<BackupImage> BackupAsync(CloneDisk source, BackupPlan plan, string folder, bool verify, IProgress<CloneProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        if (!plan.CanStart)
+        {
+            throw new InvalidOperationException(string.Join("\n", plan.Problems));
+        }
+
+        Directory.CreateDirectory(folder);
+        string baseName = $"{Environment.MachineName}-{DateTime.Now:yyyy-MM-dd-HHmm}";
+        string imagePath = Path.Combine(folder, baseName + BackupImage.ImageExtension);
+        for (int attempt = 2; File.Exists(imagePath) || File.Exists(BackupImage.DescriptionPathFor(imagePath)); attempt++)
+        {
+            imagePath = Path.Combine(folder, $"{baseName}-{attempt}{BackupImage.ImageExtension}");
+        }
+
+        Log(progress, $"Backing up Disk {source.Number} ({source.Name}) to {imagePath}.");
+        Report(progress, "Creating the image file...", 0, 1);
+        ulong megabytes = (source.Size + DiskClonePlanner.MiB - 1) / DiskClonePlanner.MiB;
+        try
+        {
+            await RunDiskPartAsync($"create vdisk file=\"{imagePath}\" maximum={megabytes} type=expandable\nattach vdisk", cancellationToken);
+        }
+        catch (InvalidOperationException exception) when (imagePath.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"Windows could not create the image on the network share. Check that the share allows large files and that you can write there; otherwise back up to a local or external disk and copy the files to the share afterwards. ({exception.Message})");
+        }
+
+        DateTime created = DateTime.UtcNow;
+        try
+        {
+            int number = await FindVirtualDiskNumberAsync(imagePath, source.Size, cancellationToken);
+            CloneDisk virtualDisk = (await GetDisksAsync(cancellationToken)).First(disk => disk.Number == number);
+            Log(progress, $"Image created and attached as Disk {number}.");
+            List<TargetPartition> partitions = await PrepareTargetAsync(virtualDisk, source.Style, plan.Partitions, eraseDisk: true, cancellationToken);
+            await CopyPartitionsAsync(source, number, plan.Partitions, partitions, new CloneOptions(true, false, verify), progress, cancellationToken);
+        }
+        catch
+        {
+            await TryDetachAsync(imagePath);
+            TryDelete(imagePath);
+            throw;
+        }
+
+        Report(progress, "Closing the image...", 1, 1);
+        await RunDiskPartAsync($"select vdisk file=\"{imagePath}\"\ndetach vdisk", cancellationToken);
+        BackupImage image = new(BackupImage.CurrentFormatVersion, created, Environment.MachineName, Path.GetFileName(imagePath), source.Name, source.Size,
+            source.Style, source.LogicalSectorSize, verify,
+            plan.Partitions.Select(planned => new BackupPartition(planned.Source with { IsEncrypted = false, IsLocked = false }, (long)planned.BytesToCopy)).ToList())
+        { ImagePath = imagePath };
+        image.Save(BackupImage.DescriptionPathFor(imagePath));
+        Report(progress, "Done", 1, 1);
+        Log(progress, $"Backup finished: {imagePath} ({DiskClonePlanner.FormatSize((ulong)new FileInfo(imagePath).Length)} on disk). Keep the .backup.json file next to it.");
+        return image;
+    }
+
+    /// <summary>
+    /// Restores a backup onto a disk, which is erased: the image is attached read-only and cloned onto the disk, which
+    /// is then made to start Windows when the backup holds it. The plan given was made from the description; it is
+    /// made again from the attached image, which has the same partitions.
+    /// </summary>
+    public async Task RestoreAsync(BackupImage image, CloneDisk target, ClonePlan plan, bool makeBootable, bool verify, IProgress<CloneProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        if (!plan.CanStart)
+        {
+            throw new InvalidOperationException(string.Join("\n", plan.Problems));
+        }
+
+        if (plan.ShrinkFirst is not null)
+        {
+            throw new InvalidOperationException($"Disk {target.Number} is smaller than the backed-up disk; a backup cannot be shrunk. Restore to a disk of at least {DiskClonePlanner.FormatSize(image.DiskSize)}.");
+        }
+
+        if (!File.Exists(image.ImagePath))
+        {
+            throw new FileNotFoundException($"The backup image was not found: {image.ImagePath}");
+        }
+
+        Log(progress, $"Restoring the backup of {image.Title} to Disk {target.Number} ({target.Name}).");
+        Report(progress, "Opening the image...", 0, 1);
+        await RunDiskPartAsync($"select vdisk file=\"{image.ImagePath}\"\nattach vdisk readonly", cancellationToken);
+        try
+        {
+            int number = await FindVirtualDiskNumberAsync(image.ImagePath, image.DiskSize, cancellationToken);
+            CloneDisk attached = (await GetDisksAsync(cancellationToken)).First(disk => disk.Number == number);
+
+            // The image cannot tell which partition is Windows or what letter it had; the description can.
+            CloneDisk source = attached with
+            {
+                Name = $"backup of {image.Title}",
+                Partitions = attached.Partitions.Select(partition =>
+                {
+                    ClonePartition? described = image.Partitions.Select(stored => stored.Partition).FirstOrDefault(stored => stored.Offset == partition.Offset);
+                    return described is null ? partition : partition with
+                    {
+                        IsBoot = described.IsBoot, IsSystem = described.IsSystem, IsActive = described.IsActive, Letter = described.Letter,
+                        Label = partition.Label.Length > 0 ? partition.Label : described.Label
+                    };
+                }).ToList()
+            };
+            Log(progress, $"Image attached as Disk {number}.");
+
+            ClonePlan live = DiskClonePlanner.PlanClone(source, target);
+            if (!live.CanStart || live.ShrinkFirst is not null)
+            {
+                throw new InvalidOperationException(live.Problems.Count > 0 ? string.Join("\n", live.Problems) : "The attached image does not fit the disk.");
+            }
+
+            Report(progress, $"Preparing Disk {target.Number}...", 0, 1);
+            List<TargetPartition> created = await PrepareTargetAsync(target, source.Style, live.Partitions, eraseDisk: true, cancellationToken);
+            Log(progress, $"Disk {target.Number} erased and {created.Count} partitions created.");
+            await CopyPartitionsAsync(source, target.Number, live.Partitions, created, new CloneOptions(true, false, verify), progress, cancellationToken, useSnapshots: false);
+
+            foreach ((PlannedPartition planned, TargetPartition partition) in live.Partitions.Zip(created).Where(pair => pair.First.Grows))
+            {
+                Report(progress, $"Extending {planned.Source.Title} to {DiskClonePlanner.FormatSize(planned.Size)}...", 1, 1);
+                await RunPowerShellAsync($"Update-Disk -Number {target.Number}; Start-Sleep -Seconds 2; Resize-Partition -DiskNumber {target.Number} -PartitionNumber {partition.Number} -Size {planned.Size}", cancellationToken);
+                Log(progress, $"{planned.Source.Title} extended to {DiskClonePlanner.FormatSize(planned.Size)}.");
+            }
+
+            if (makeBootable && source.HasWindows)
+            {
+                Report(progress, "Making the disk start Windows...", 1, 1);
+                await MakeBootableAsync(source, target, live.Partitions, created, progress, cancellationToken);
+            }
+        }
+        finally
+        {
+            await TryDetachAsync(image.ImagePath);
+        }
+
+        Report(progress, "Done", 1, 1);
+        Log(progress, $"Restore finished. Disk {target.Number} ({target.Name}) now holds the backup of {image.Title}.");
+    }
+
+    /// <summary>
+    /// Attaches a backup image as a disk so its files can be copied out in Explorer. Returns the drive letters it
+    /// got. An image on a network share may have to be copied to a local disk first (Windows refuses some).
+    /// </summary>
+    public async Task<IReadOnlyList<string>> OpenBackupAsync(BackupImage image, CancellationToken cancellationToken)
+    {
+        await RunDiskPartAsync($"select vdisk file=\"{image.ImagePath}\"\nattach vdisk", cancellationToken);
+        int number = await FindVirtualDiskNumberAsync(image.ImagePath, image.DiskSize, cancellationToken);
+        string letters = await RunPowerShellAsync($$"""
+            $ErrorActionPreference = 'Stop'
+            $n = {{number}}
+            if ((Get-Disk -Number $n).IsReadOnly) { Set-Disk -Number $n -IsReadOnly $false }
+            foreach ($p in Get-Partition -DiskNumber $n -ErrorAction SilentlyContinue) {
+                if ($p.Type -in 'Basic','IFS' -and [string]$p.DriveLetter -eq '') { $p | Add-PartitionAccessPath -AssignDriveLetter -ErrorAction SilentlyContinue }
+            }
+            Start-Sleep -Seconds 1
+            (Get-Partition -DiskNumber $n | Where-Object { [string]$_.DriveLetter -ne '' -and [string]$_.DriveLetter -ne [string][char]0 } | ForEach-Object { "$($_.DriveLetter):" }) -join ' '
+            """, cancellationToken);
+        return letters.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    public Task CloseBackupAsync(BackupImage image, CancellationToken cancellationToken) =>
+        RunDiskPartAsync($"select vdisk file=\"{image.ImagePath}\"\ndetach vdisk", cancellationToken);
+
+    /// <summary>The disk number Windows gave an attached image (brought online if needed).</summary>
+    private static async Task<int> FindVirtualDiskNumberAsync(string imagePath, ulong diskSize, CancellationToken cancellationToken)
+    {
+        string number = await RunPowerShellAsync($$"""
+            $ErrorActionPreference = 'Stop'
+            $path = '{{imagePath.Replace("'", "''")}}'
+            $d = $null
+            for ($try = 0; $try -lt 15 -and -not $d; $try++) {
+                Start-Sleep -Seconds 1
+                $d = Get-Disk | Where-Object { [string]$_.Location -eq $path } | Select-Object -First 1
+                if (-not $d) { $d = Get-Disk | Where-Object { $_.FriendlyName -like '*Virtual*' -and [uint64]$_.Size -ge {{diskSize}} -and [uint64]$_.Size -le {{diskSize + 2 * DiskClonePlanner.MiB}} } | Sort-Object Number -Descending | Select-Object -First 1 }
+            }
+            if (-not $d) { throw 'Windows attached the image but it was not found among the disks.' }
+            if ($d.IsOffline) { Set-Disk -Number $d.Number -IsOffline $false }
+            Start-Sleep -Seconds 1
+            [string]$d.Number
+            """, cancellationToken);
+        return int.Parse(number.Trim(), CultureInfo.InvariantCulture);
+    }
+
+    private static async Task TryDetachAsync(string imagePath)
+    {
+        try
+        {
+            await RunDiskPartAsync($"select vdisk file=\"{imagePath}\"\ndetach vdisk", CancellationToken.None);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ApplicationLogService.WriteException("Disk backup: detaching the image", exception);
+        }
+    }
+
+    /// <summary>Signs in to a network share (\\server\share\...) with a name and password, for this elevated session.</summary>
+    public static async Task ConnectShareAsync(string path, string user, string password, CancellationToken cancellationToken)
+    {
+        string[] parts = path.TrimStart('\\').Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        if (!path.StartsWith(@"\\", StringComparison.Ordinal) || parts.Length < 2)
+        {
+            throw new InvalidOperationException(@"A network share looks like \\server\share\folder.");
+        }
+
+        string share = $@"\\{parts[0]}\{parts[1]}";
+        (int exitCode, string output) = await RunAsync("net.exe", $"use \"{share}\" \"{password}\" /user:\"{user}\" /persistent:no", cancellationToken);
+        // 1219: already connected with other credentials; that connection is used.
+        if (exitCode != 0 && !output.Contains("1219", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"Windows could not connect to {share}: {output}");
+        }
+    }
+
+    /// <summary>Free space of the drive or share a folder is on (the nearest folder that exists); null when unknown.</summary>
+    public static ulong? FreeSpace(string folder)
+    {
+        string? path = folder.TrimEnd('\\');
+        while (path is { Length: > 0 } && !Directory.Exists(path))
+        {
+            path = Path.GetDirectoryName(path);
+        }
+
+        if (string.IsNullOrEmpty(path))
+        {
+            return null;
+        }
+
+        return Native.GetDiskFreeSpaceEx(path + "\\", out ulong free, out _, out _) ? free : null;
+    }
+
+    /// <summary>The "\\?\Volume{...}\" a local folder is on; null for network paths and folders that do not exist yet.</summary>
+    public static string? VolumePathOf(string folder)
+    {
+        string? path = folder.TrimEnd('\\');
+        while (path is { Length: > 0 } && !Directory.Exists(path))
+        {
+            path = Path.GetDirectoryName(path);
+        }
+
+        if (string.IsNullOrEmpty(path) || path.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        StringBuilder mountPoint = new(260);
+        StringBuilder volume = new(60);
+        return Native.GetVolumePathName(path + "\\", mountPoint, mountPoint.Capacity) && Native.GetVolumeNameForVolumeMountPoint(mountPoint.ToString(), volume, volume.Capacity)
+            ? volume.ToString()
+            : null;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
         }
     }
 
@@ -924,6 +1239,14 @@ public sealed class DiskCloneService
         private const uint FsctlGetNtfsVolumeData = 0x00090064;
         private const uint FsctlGetVolumeBitmap = 0x0009006F;
         private const uint FsctlLookupStreamFromCluster = 0x000901FC;
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool GetDiskFreeSpaceEx(string path, out ulong freeBytesAvailable, out ulong totalBytes, out ulong totalFreeBytes);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool GetVolumePathName(string fileName, StringBuilder volumePathName, int length);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool GetVolumeNameForVolumeMountPoint(string mountPoint, StringBuilder volumeName, int length);
 
         public static SafeFileHandle Open(string path, bool write)
         {

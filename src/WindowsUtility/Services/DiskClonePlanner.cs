@@ -88,6 +88,17 @@ public sealed record ClonePlan(
     public ulong TotalBytes => Partitions.Aggregate(0UL, (sum, partition) => sum + partition.BytesToCopy);
 }
 
+/// <summary>What a backup copies into its image file, and whether it can start.</summary>
+public sealed record BackupPlan(
+    IReadOnlyList<PlannedPartition> Partitions,
+    IReadOnlyList<string> Problems,
+    IReadOnlyList<string> Notes,
+    ulong BytesToCopy,
+    ulong ImageSize)
+{
+    public bool CanStart => Problems.Count == 0 && Partitions.Any(partition => partition.Mode != CopyMode.Skip);
+}
+
 /// <summary>Where the boot files go to make a disk start the Windows on one of its partitions.</summary>
 public sealed record BootSetupPlan(ClonePartition? Windows, ClonePartition? Boot, bool SetActive, IReadOnlyList<string> Problems)
 {
@@ -282,6 +293,72 @@ public static class DiskClonePlanner
         ulong size = fillSpace ? AlignDown(space.Size) : source.Size;
         PlannedPartition planned = new(source, space.Offset, Math.Max(size, source.Size), ModeFor(source));
         return new ClonePlan(new[] { planned }, problems, notes, null);
+    }
+
+    /// <summary>
+    /// A backup of a disk's chosen partitions into an image file: the partitions keep their place in an image as large
+    /// as the disk (only the copied data takes room), so it can be restored like a clone or attached as a disk.
+    /// </summary>
+    public static BackupPlan PlanBackup(CloneDisk disk, IReadOnlyList<ClonePartition> chosen, ClonePartition? destinationOn, ulong? freeBytes)
+    {
+        List<string> problems = new();
+        List<string> notes = new();
+        if (disk.Style is not ("GPT" or "MBR"))
+        {
+            problems.Add($"Disk {disk.Number} has no partitions to back up.");
+        }
+
+        if (disk.Partitions.Any(partition => DynamicTypes.Contains(partition.GptType, StringComparer.OrdinalIgnoreCase) || partition.MbrType == 0x42))
+        {
+            problems.Add($"Disk {disk.Number} is a dynamic disk, which this backup does not copy.");
+        }
+
+        List<ClonePartition> partitions = chosen.Where(partition => !partition.IsMsr).OrderBy(partition => partition.Offset).ToList();
+        if (partitions.Count == 0)
+        {
+            problems.Add("Tick at least one partition to back up.");
+        }
+
+        foreach (ClonePartition partition in partitions)
+        {
+            if (partition.NeedsDecrypting)
+            {
+                problems.Add(EncryptedProblem(partition));
+            }
+            else if (partition.IsEncrypted)
+            {
+                notes.Add($"{partition.Title} is encrypted with BitLocker and unlocked, so it is backed up readable; the backup file itself is not encrypted.");
+            }
+        }
+
+        if (destinationOn is not null && partitions.Any(partition => partition.Guid.Length > 0 && partition.Guid == destinationOn.Guid))
+        {
+            problems.Add($"The backup cannot be saved on {destinationOn.Title}, a partition it backs up. Choose a folder on another partition, an external disk or a network share.");
+        }
+
+        // The MSR holds nothing but is recreated on a restore, so it is listed; the partition table is copied as well.
+        List<PlannedPartition> planned = disk.Partitions.OrderBy(partition => partition.Offset)
+            .Where(partition => partition.IsMsr || partitions.Contains(partition))
+            .Select(partition => new PlannedPartition(partition, partition.Offset, partition.Size, ModeFor(partition))).ToList();
+        ulong bytes = planned.Aggregate(2 * MiB, (sum, partition) => sum + partition.BytesToCopy);
+        if (freeBytes is ulong free && free < bytes + bytes / 20)
+        {
+            problems.Add($"There is {FormatSize(free)} free where the backup would go; about {FormatSize(bytes)} is needed.");
+        }
+
+        if (planned.Any(partition => partition.Mode == CopyMode.SnapshotUsed))
+        {
+            notes.Add("Partitions in use are backed up from a snapshot, so programs can stay open; changes made after the backup starts are not in it.");
+        }
+
+        ClonePartition? windows = disk.Partitions.FirstOrDefault(partition => partition.IsBoot);
+        ClonePartition? boot = disk.Style == "GPT" ? disk.Partitions.FirstOrDefault(partition => partition.IsEfi) : disk.Partitions.FirstOrDefault(partition => partition.IsActive);
+        if (windows is not null && (!partitions.Contains(windows) || (boot is not null && !partitions.Contains(boot))))
+        {
+            notes.Add($"Without {(partitions.Contains(windows) ? boot!.Title : windows.Title)} a disk restored from this backup will not start Windows; files can still be copied out of it.");
+        }
+
+        return new BackupPlan(planned, problems, notes, bytes, disk.Size);
     }
 
     /// <summary>A locked encrypted partition (or one without a volume) would be copied as unreadable data.</summary>

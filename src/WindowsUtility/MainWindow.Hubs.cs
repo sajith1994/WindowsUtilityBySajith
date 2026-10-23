@@ -115,13 +115,13 @@ public partial class MainWindow
                             : "Disk tools were not opened (the administrator prompt was cancelled).")
                 }));
         }
-        hub.AddTab("Clone & migrate", ActionPanel(
+        hub.AddTab("Clone, back up & restore", ActionPanel(
             ("Clone a disk", "Copy a whole disk to a new SSD: every partition is copied (Windows from a snapshot while it runs), the new disk is made to start Windows, and a bigger SSD's extra space goes to Windows. The old disk is only read."),
-            ("One partition", "Copy a single partition into free space or over another partition, on the same or another disk."),
+            ("Back up & restore", "Back up Windows to an image file on another partition, an external disk or a network share; restore it to a new SSD later, or open it as a disk to copy files out. A single partition can also be copied on its own."),
             ("Administrator", PrivilegedOperations.IsAdministrator ? "Opens in its own window." : "Opens in its own window after Windows asks for an administrator password."),
             new[]
             {
-                ActionButton("Open clone & migrate", "", "Plan and run a disk clone or a partition copy.", OpenDiskCloneWindow)
+                ActionButton("Open clone, back up & restore", "", "Plan and run a disk clone, a backup, a restore or a partition copy.", OpenDiskCloneWindow)
             }));
         hub.AddTab("Cleanup & consoles", ActionPanel(null, null, null, new[]
         {
@@ -156,7 +156,7 @@ public partial class MainWindow
 
         StatusText.Text = ElevatedTool.Open(ElevatedTool.DiskClone)
             ? "Opened clone & migrate as administrator."
-            : "Clone & migrate was not opened (the administrator prompt was cancelled).";
+            : "Clone, back up & restore was not opened (the administrator prompt was cancelled).";
     }
 
     private void OpenLogsHubButton_Click(object sender, RoutedEventArgs e) => OpenLogsHub();

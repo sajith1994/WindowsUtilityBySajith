@@ -1,7 +1,7 @@
 <Window x:Class="WindowsUtility.Dialogs.DiskCloneWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Clone and migrate"
+        Title="Clone, back up and restore"
         Width="1000"
         Height="800"
         MinWidth="760"
@@ -19,9 +19,9 @@
         <Grid Margin="0,0,0,10">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="Clone and migrate" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Text="Clone, back up and restore" FontSize="20" FontWeight="SemiBold" />
                 <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0"
-                           Text="Copy a whole disk to a new SSD (Windows keeps working on the new disk), or copy one partition. Partitions in use are copied from a Windows snapshot while Windows runs. The disk copied from is only read." />
+                           Text="Copy a whole disk to a new SSD, copy one partition, or back up Windows to an image file on another partition, an external disk or a network share, to restore later to a new SSD or to copy files out of. Partitions in use are copied from a Windows snapshot while Windows runs. The disk copied from is only read." />
             </StackPanel>
             <Button Grid.Column="1" x:Name="RefreshButton" Content="Refresh disks" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" VerticalAlignment="Top" Click="RefreshButton_Click" />
         </Grid>
@@ -120,6 +120,95 @@
                             </Grid>
                             <TextBlock x:Name="BootPlanText" TextWrapping="Wrap" Margin="0,10,0,0" />
                             <Button x:Name="MakeBootableButton" Content="Make this disk start Windows" Tag="&#xE7E8;" Style="{StaticResource IconCompactButton}" HorizontalAlignment="Left" Margin="0,10,0,0" IsEnabled="False" Click="MakeBootableButton_Click" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Backup to an image file -->
+            <TabItem Header="Back up Windows">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,12,8,0">
+                    <TextBlock Text="Disk to back up" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <ComboBox x:Name="BackupDiskComboBox" DisplayMemberPath="DisplayText" SelectionChanged="BackupDisk_Changed" />
+                    <TextBlock Text="Partitions" FontWeight="SemiBold" Margin="0,14,0,6" />
+                    <ItemsControl x:Name="BackupPartitionsList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Text}" IsChecked="{Binding IsChecked, Mode=TwoWay}" Margin="0,0,0,6" Checked="BackupSelection_Changed" Unchecked="BackupSelection_Changed" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="Save the backup in" FontWeight="SemiBold" Margin="0,10,0,6" />
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBox x:Name="BackupFolderBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" TextChanged="BackupFolder_Changed" />
+                        <Button Grid.Column="1" x:Name="BrowseBackupFolderButton" Content="Browse..." Tag="&#xE8B7;" Style="{StaticResource IconCompactButton}" Margin="8,0,0,0" Click="BrowseBackupFolderButton_Click" />
+                    </Grid>
+                    <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Text="A folder on another partition, an external disk, or a network share such as \\nas\backups\this-pc. The backup is one .vhdx image (only the used space takes room) plus a small .backup.json description; keep the two files together." />
+                    <Grid x:Name="SharePanel" Visibility="Collapsed" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="User name for the share (if it asks for one)" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <TextBox x:Name="BackupUserBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Password" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <PasswordBox x:Name="BackupPasswordBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                    <CheckBox x:Name="VerifyBackupCheck" Content="Check the backup afterwards" IsChecked="True" Margin="0,12,0,0" />
+                    <TextBlock x:Name="BackupPlanText" TextWrapping="Wrap" Margin="0,10,0,0" />
+                    <Button x:Name="BackupDecryptButton" Content="Decrypt" Tag="&#xE785;" Style="{StaticResource IconCompactButton}" HorizontalAlignment="Left" Margin="0,8,0,0" Visibility="Collapsed" Click="DecryptButton_Click" />
+                    <Button x:Name="StartBackupButton" Content="Start backup" Tag="&#xE8C8;" Style="{StaticResource IconPrimaryButton}" HorizontalAlignment="Left" Margin="0,14,0,8" MinHeight="34" IsEnabled="False" Click="StartBackupButton_Click" />
+                </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Restore from an image file -->
+            <TabItem Header="Restore a backup">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,12,8,0">
+                    <TextBlock Text="Backup" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBox x:Name="RestoreFileBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" TextChanged="RestoreFile_Changed" />
+                        <Button Grid.Column="1" x:Name="BrowseRestoreFileButton" Content="Browse..." Tag="&#xE8E5;" Style="{StaticResource IconCompactButton}" Margin="8,0,0,0" Click="BrowseRestoreFileButton_Click" />
+                    </Grid>
+                    <TextBlock x:Name="RestoreSummaryText" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Text="Choose a .vhdx backup made by this program; its .backup.json must be next to it." />
+
+                    <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Restore to a disk" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0"
+                                       Text="The whole backup goes onto the disk, which is erased first; when the backup holds Windows, the disk is made to start it. This is how a PC is recovered to a new SSD: connect the SSD (a second slot, or a USB enclosure), restore, then start from it." />
+                            <TextBlock Text="Disk (erased)" FontWeight="SemiBold" Margin="0,10,0,6" />
+                            <ComboBox x:Name="RestoreTargetComboBox" DisplayMemberPath="DisplayText" SelectionChanged="RestoreSelection_Changed" />
+                            <TextBlock x:Name="RestorePlanText" TextWrapping="Wrap" Margin="0,10,0,0" />
+                            <WrapPanel Margin="0,8,0,0">
+                                <CheckBox x:Name="RestoreBootableCheck" Content="Make the disk start Windows" IsChecked="True" Margin="0,0,20,6" />
+                                <CheckBox x:Name="RestoreVerifyCheck" Content="Check the copy afterwards" IsChecked="True" Margin="0,0,20,6" />
+                            </WrapPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <TextBlock x:Name="RestoreConfirmPromptText" Text="To start, type the number of the disk that will be erased:" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <TextBox x:Name="RestoreConfirmBox" Width="60" Height="32" Padding="6,2" VerticalContentAlignment="Center" TextChanged="ConfirmDiskBox_TextChanged" />
+                                <Button x:Name="StartRestoreButton" Content="Restore to disk" Tag="&#xE8C8;" Style="{StaticResource IconPrimaryButton}" Margin="14,0,0,0" MinHeight="34" IsEnabled="False" Click="StartRestoreButton_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,14,0,8">
+                        <StackPanel>
+                            <TextBlock Text="Copy files out of the backup" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0"
+                                       Text="Opens the backup as a disk in Explorer, so single folders or files can be copied back. Close it when done. A backup on a network share may have to be copied to this PC first; Windows refuses to open some from there." />
+                            <WrapPanel Margin="0,10,0,0">
+                                <Button x:Name="OpenBackupButton" Content="Open backup" Tag="&#xE8DA;" Style="{StaticResource IconCompactButton}" Margin="0,0,10,0" IsEnabled="False" Click="OpenBackupButton_Click" />
+                                <Button x:Name="CloseBackupButton" Content="Close backup" Tag="&#xE711;" Style="{StaticResource IconCompactButton}" IsEnabled="False" Click="CloseBackupButton_Click" />
+                            </WrapPanel>
                         </StackPanel>
                     </Border>
                 </StackPanel>
