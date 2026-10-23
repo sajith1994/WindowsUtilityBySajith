@@ -117,7 +117,7 @@ public partial class MainWindow
         }
         hub.AddTab("Clone, back up & restore", ActionPanel(
             ("Clone a disk", "Copy a whole disk to a new SSD: every partition is copied (Windows from a snapshot while it runs), the new disk is made to start Windows, and a bigger SSD's extra space goes to Windows. The old disk is only read."),
-            ("Back up & restore", "Back up Windows to an image file on another partition, an external disk or a network share; restore it to a new SSD later, or open it as a disk to copy files out. A single partition can also be copied on its own."),
+            ("Back up & restore", "Back up Windows to an image file on another partition, an external disk or a network share; restore it to a new SSD later, or open it as a disk to copy files out. Automatic backups (a system image or a folder) run every day, week or month. A single partition can also be copied on its own."),
             ("Administrator", PrivilegedOperations.IsAdministrator ? "Opens in its own window." : "Opens in its own window after Windows asks for an administrator password."),
             new[]
             {

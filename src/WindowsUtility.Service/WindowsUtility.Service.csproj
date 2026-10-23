@@ -23,6 +23,7 @@
     <PackageReference Include="Hwinfo.SharedMemory.Net" Version="2.1.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.2" />
     <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.2" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -55,5 +56,13 @@
     <Compile Include="..\WindowsUtility\Services\PrinterOperations.cs" Link="Services\PrinterOperations.cs" />
     <Compile Include="..\WindowsUtility\Services\MaintenanceOperations.cs" Link="Services\MaintenanceOperations.cs" />
     <Compile Include="..\WindowsUtility\Services\TemporaryFileCleanupService.cs" Link="Services\TemporaryFileCleanupService.cs" />
+    <!-- Automatic backups: the clone and backup code the dashboard uses, run here on schedule. -->
+    <Compile Include="..\WindowsUtility\Models\BackupSchedule.cs" Link="Models\BackupSchedule.cs" />
+    <Compile Include="..\WindowsUtility\Services\BackupScheduleStore.cs" Link="Services\BackupScheduleStore.cs" />
+    <Compile Include="..\WindowsUtility\Services\BackupRunner.cs" Link="Services\BackupRunner.cs" />
+    <Compile Include="..\WindowsUtility\Services\DiskCloneService.cs" Link="Services\DiskCloneService.cs" />
+    <Compile Include="..\WindowsUtility\Services\DiskClonePlanner.cs" Link="Services\DiskClonePlanner.cs" />
+    <Compile Include="..\WindowsUtility\Services\DiskBackupImage.cs" Link="Services\DiskBackupImage.cs" />
+    <Compile Include="..\WindowsUtility\Services\AlignedIoBuffer.cs" Link="Services\AlignedIoBuffer.cs" />
   </ItemGroup>
 </Project>

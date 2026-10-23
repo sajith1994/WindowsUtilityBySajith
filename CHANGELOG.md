@@ -260,6 +260,18 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.88] - 2026-10-23
+
+### Added
+- **Automatic backups** (Clone, back up & restore > Automatic backups). The background service runs them by itself,
+  with administrator rights and nobody signed in:
+  - a **system image** of a disk (all its partitions, the Windows disk by default), keeping only the newest N
+    backups in the destination;
+  - or a **folder**, copied to the destination with newer files only; nothing is deleted there.
+  - **Every day, every week on chosen days, or every month on a date**, at a chosen time. A backup missed while the
+    PC was off runs when it is on again. Destinations are a folder on another partition, an external disk or a
+    network share (user name and password kept encrypted on this PC).
+  - The list shows what, where, when, the last result and the next run; Edit, Turn off/on, Run now and Remove.
 ## [2.0.87] - 2026-10-23
 
 ### Added

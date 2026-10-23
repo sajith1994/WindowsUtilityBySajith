@@ -46,6 +46,11 @@ public static class SharedDataPaths
 
     public static string DashboardTrayReadyFilePath => Path.Combine(ServiceDirectory, "dashboard-tray.ready");
 
+    /// <summary>Automatic backups (written by the dashboard) and how their last runs went (written by whoever ran them).</summary>
+    public static string BackupSchedulesFilePath => Path.Combine(RootDirectory, "backup-schedules.json");
+
+    public static string BackupScheduleStatesFilePath => Path.Combine(ServiceDirectory, "backup-schedule-states.json");
+
     public static string PrivilegedCommandsDirectory => Path.Combine(ServiceDirectory, "commands");
 
     public static string PrivilegedCommandRequestsDirectory => Path.Combine(PrivilegedCommandsDirectory, "requests");
