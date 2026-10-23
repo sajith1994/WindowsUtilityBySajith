@@ -260,6 +260,17 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.92] - 2026-10-23
+
+### Fixed
+- **A cloned or restored disk starts in another PC and from a USB enclosure.** Windows keeps the disk-controller
+  drivers the original PC does not need from loading at start-up, and its USB storage drivers start on demand, so a
+  copy of that Windows stopped with INACCESSIBLE_BOOT_DEVICE on a PC with a different controller (for example an NVMe
+  slot instead of Intel RST/VMD) or in a USB enclosure. Clone, Restore and "Make this disk start Windows" now set
+  Windows' own SATA, NVMe, RAID, SD and USB storage drivers on the copied disk to start with Windows, as universal
+  restore tools do. A copy made before 2.0.92 is fixed by running "Make this disk start Windows" on it. A driver the
+  copied Windows does not have (such as Intel VMD on an older Windows) cannot be added this way.
+
 ## [2.0.91] - 2026-10-23
 
 ### Added

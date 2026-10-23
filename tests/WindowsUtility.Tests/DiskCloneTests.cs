@@ -337,6 +337,37 @@ public class DiskCopyTests
     }
 
     [Fact]
+    public void StorageDrivers_AreSetToStartOnAnyHardware()
+    {
+        string name = $@"Software\WindowsUtilityTests\{Guid.NewGuid():N}";
+        using (Microsoft.Win32.RegistryKey hive = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(name))
+        {
+            using (Microsoft.Win32.RegistryKey ahci = hive.CreateSubKey(@"ControlSet001\Services\storahci"))
+            {
+                ahci.SetValue("Start", 0);
+                using Microsoft.Win32.RegistryKey over = ahci.CreateSubKey("StartOverride");
+                over.SetValue("0", 3);
+            }
+
+            hive.CreateSubKey(@"ControlSet001\Services\USBSTOR").SetValue("Start", 3);
+            hive.CreateSubKey(@"ControlSet001\Services\disk").SetValue("Start", 0); // not a controller driver: untouched
+            hive.CreateSubKey(@"ControlSet002\Services\stornvme").SetValue("Start", 0); // already fine
+            hive.CreateSubKey(@"ControlSet001\Control").SetValue("BootDriverFlags", 8);
+
+            Assert.Equal(2, DiskCloneService.StartStorageDriversOnAnyHardware(hive));
+
+            Assert.Null(hive.OpenSubKey(@"ControlSet001\Services\storahci\StartOverride"));
+            Assert.Equal(0, hive.OpenSubKey(@"ControlSet001\Services\USBSTOR")!.GetValue("Start"));
+            Assert.Equal(0, hive.OpenSubKey(@"ControlSet002\Services\stornvme")!.GetValue("Start"));
+            Assert.Equal(8 | 0x14, hive.OpenSubKey(@"ControlSet001\Control")!.GetValue("BootDriverFlags"));
+            Assert.Null(hive.OpenSubKey(@"ControlSet002\Control")); // no Control key there: none is made
+            Assert.Equal(0, DiskCloneService.StartStorageDriversOnAnyHardware(hive)); // a second pass changes nothing
+        }
+
+        Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(name, throwOnMissingSubKey: false);
+    }
+
+    [Fact]
     public void FilesSnapshotsDoNotFreeze_AreKnown()
     {
         Assert.True(DiskCloneService.ChangesDuringSnapshot(@"\pagefile.sys::$DATA"));

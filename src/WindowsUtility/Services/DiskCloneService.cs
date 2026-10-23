@@ -6,6 +6,7 @@ using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 
 namespace WindowsUtility.Services;
@@ -1249,9 +1250,11 @@ public sealed class DiskCloneService
                 throw new InvalidOperationException($"The copied Windows registry could not be opened: {loadOutput.Trim()}");
             }
 
+            int drivers;
             try
             {
                 await RunAsync("reg.exe", $"add {hive}\\MountedDevices /v \"\\DosDevices\\{windowsLetter}:\" /t REG_BINARY /d {Convert.ToHexString(value)} /f", cancellationToken);
+                drivers = StartStorageDriversOnAnyHardware(hive[(hive.IndexOf('\\') + 1)..]);
             }
             finally
             {
@@ -1259,6 +1262,9 @@ public sealed class DiskCloneService
             }
 
             Log(progress, $"That Windows starts as {windowsLetter}: from this disk.");
+            Log(progress, drivers > 0
+                ? $"{drivers} disk-controller and USB drivers set to start with Windows, so the disk also starts in another PC or from a USB enclosure."
+                : "The disk-controller and USB drivers already start with Windows.");
         }
         finally
         {
@@ -1274,6 +1280,80 @@ public sealed class DiskCloneService
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Windows' own disk-controller drivers (SATA, NVMe, RAID, SD, virtual machines) and the USB storage stack. Windows
+    /// keeps those the PC it was installed on does not need from loading at start-up (a "StartOverride" entry, and
+    /// the USB ones start on demand), so a copy of that Windows cannot find its disk on another PC or in a USB
+    /// enclosure and stops with INACCESSIBLE_BOOT_DEVICE. Only the ones present in the copied Windows are touched.
+    /// </summary>
+    private static readonly string[] BootStorageDrivers =
+    {
+        "storahci", "stornvme", "storufs", "iaStorV", "iaStorAVC", "iaStorAC", "iaStorVD", "intelide", "pciide", "atapi", "amdsata", "amdxata", "nvstor",
+        "LSI_SAS", "LSI_SAS2i", "LSI_SAS3i", "megasas", "megasas2i", "megasas35i", "HpSAMD", "arcsas", "percsas2i", "percsas3i", "smartpqi",
+        "storvsc", "vmbus", "vioscsi", "sdbus", "sdstor", "USBSTOR", "UASPStor", "usbccgp", "USBHUB3", "USBXHCI", "usbehci", "usbhub", "usbohci", "usbuhci"
+    };
+
+    /// <summary>
+    /// In a copied Windows' SYSTEM hive (loaded under HKLM as <paramref name="hiveName"/>): makes every one of
+    /// <see cref="BootStorageDrivers"/> that is present start with Windows (Start 0, no StartOverride) in every control
+    /// set, and lets Windows start from USB and SD storage (BootDriverFlags, as Windows To Go sets). Returns how many
+    /// drivers were changed.
+    /// </summary>
+    internal static int StartStorageDriversOnAnyHardware(string hiveName)
+    {
+        using RegistryKey? hive = Registry.LocalMachine.OpenSubKey(hiveName, writable: true);
+        return hive is null ? 0 : StartStorageDriversOnAnyHardware(hive);
+    }
+
+    /// <summary>The work of <see cref="StartStorageDriversOnAnyHardware(string)"/> on an opened hive (or a key shaped like one).</summary>
+    internal static int StartStorageDriversOnAnyHardware(RegistryKey hive)
+    {
+        int changed = 0;
+        foreach (string controlSet in hive.GetSubKeyNames().Where(name => name.StartsWith("ControlSet", StringComparison.OrdinalIgnoreCase)))
+        {
+            using RegistryKey? services = hive.OpenSubKey($@"{controlSet}\Services", writable: true);
+            foreach (string driver in BootStorageDrivers)
+            {
+                using RegistryKey? service = services?.OpenSubKey(driver, writable: true);
+                if (service is null)
+                {
+                    continue;
+                }
+
+                bool touched = false;
+                if (service.GetValue("Start") is not 0)
+                {
+                    service.SetValue("Start", 0, RegistryValueKind.DWord);
+                    touched = true;
+                }
+
+                if (service.GetSubKeyNames().Contains("StartOverride", StringComparer.OrdinalIgnoreCase))
+                {
+                    service.DeleteSubKeyTree("StartOverride", throwOnMissingSubKey: false);
+                    touched = true;
+                }
+
+                if (touched)
+                {
+                    changed++;
+                }
+            }
+
+            using RegistryKey? control = hive.OpenSubKey($@"{controlSet}\Control", writable: true);
+            if (control is not null)
+            {
+                const int usbAndSdBoot = 0x14;
+                int flags = control.GetValue("BootDriverFlags") is int current ? current : 0;
+                if ((flags & usbAndSdBoot) != usbAndSdBoot)
+                {
+                    control.SetValue("BootDriverFlags", flags | usbAndSdBoot, RegistryValueKind.DWord);
+                }
+            }
+        }
+
+        return changed;
     }
 
     /// <summary>Drive letters the disk's partitions have now.</summary>

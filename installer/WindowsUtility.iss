@@ -1,6 +1,6 @@
 ﻿#define MyAppName "Windows Utility"
 #ifndef MyAppVersion
-#define MyAppVersion "2.0.91"
+#define MyAppVersion "2.0.92"
 #endif
 #define MyAppExeName "WindowsUtilityBySajith.exe"
 #define MyServiceName "WindowsUtilityService"
