@@ -26,27 +26,6 @@ public partial class DiskCloneWindow : Window
     private ClonePlan? _restorePlan;
     private BackupImage? _openedBackup;
     private CancellationTokenSource? _running;
-    private readonly BackupScheduleStore _scheduleStore = new();
-    private List<BackupSchedule> _schedules = new();
-    private BackupSchedule? _editingSchedule;
-    private readonly System.Windows.Threading.DispatcherTimer _scheduleRefresh = new() { Interval = TimeSpan.FromSeconds(20) };
-
-    public sealed record ScheduleRow(BackupSchedule Schedule, string Name, string What, string Where, string When, string LastRun, string NextRun);
-
-    public sealed record DiskChoice(string Text, CloneDisk? Disk);
-
-    public sealed class DayPick
-    {
-        public DayPick(DayOfWeek day, bool isChecked)
-        {
-            Day = day;
-            IsChecked = isChecked;
-        }
-
-        public DayOfWeek Day { get; }
-        public string Text => Day.ToString();
-        public bool IsChecked { get; set; }
-    }
 
     /// <summary>A partition ticked for a backup.</summary>
     public sealed class PartitionPick
@@ -78,17 +57,13 @@ public partial class DiskCloneWindow : Window
         public override string ToString() => Text;
     }
 
-    public DiskCloneWindow()
+    /// <param name="tab">0 clone a disk, 1 copy one partition, 2 back up Windows, 3 restore a backup.</param>
+    public DiskCloneWindow(int tab = 0)
     {
         InitializeComponent();
-        ScheduleHourComboBox.ItemsSource = Enumerable.Range(0, 24).Select(hour => hour.ToString("00")).ToList();
-        ScheduleMinuteComboBox.ItemsSource = new[] { "00", "15", "30", "45" };
-        ScheduleMonthDayComboBox.ItemsSource = Enumerable.Range(1, 28).ToList();
-        ScheduleKeepComboBox.ItemsSource = Enumerable.Range(1, 10).ToList();
+        ModeTabs.SelectedIndex = Math.Clamp(tab, 0, ModeTabs.Items.Count - 1);
         Loaded += async (_, _) => await LoadDisksAsync();
         Closing += Window_Closing;
-        _scheduleRefresh.Tick += (_, _) => RefreshSchedules();
-        _scheduleRefresh.Start();
     }
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await LoadDisksAsync();
@@ -143,7 +118,6 @@ public partial class DiskCloneWindow : Window
             UpdateBootPlan();
             UpdateBackupPlan();
             UpdateRestorePlan();
-            RefreshSchedules();
         }
         catch (Exception exception) when (exception is InvalidOperationException or System.Text.Json.JsonException or KeyNotFoundException
             or Win32Exception or IOException)
@@ -228,216 +202,6 @@ public partial class DiskCloneWindow : Window
             && RestoreConfirmBox.Text.Trim() == restoreTarget.Number.ToString() && _openedBackup is null;
         OpenBackupButton.IsEnabled = idle && _restoreImage is not null && _openedBackup is null;
         CloseBackupButton.IsEnabled = idle && _openedBackup is not null;
-        bool selected = SchedulesGrid.SelectedItem is ScheduleRow;
-        EditScheduleButton.IsEnabled = selected;
-        RemoveScheduleButton.IsEnabled = selected;
-        ToggleScheduleButton.IsEnabled = selected;
-        RunScheduleButton.IsEnabled = idle && selected;
-        ToggleScheduleButton.Content = SchedulesGrid.SelectedItem is ScheduleRow { Schedule.Enabled: false } ? "Turn on" : "Turn off";
-    }
-
-    // ---- Automatic backups ---------------------------------------------------------------------------------------
-
-    private void RefreshSchedules()
-    {
-        if (!IsLoaded)
-        {
-            return;
-        }
-
-        Guid? selected = (SchedulesGrid.SelectedItem as ScheduleRow)?.Schedule.Id;
-        _schedules = _scheduleStore.LoadSchedules();
-        List<BackupScheduleState> states = _scheduleStore.LoadStates();
-        DateTime now = DateTime.Now;
-        List<ScheduleRow> rows = _schedules.Select(schedule =>
-        {
-            BackupScheduleState? state = states.FirstOrDefault(each => each.Id == schedule.Id);
-            string lastRun = state is null || state.LastRunUtc is null ? "Never"
-                : state.Running ? $"Running since {state.LastRunUtc.Value.ToLocalTime():HH:mm}"
-                : $"{state.LastRunUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm}: {(state.LastSucceeded == true ? "OK" : "Failed")}. {state.LastMessage}";
-            string what = schedule.Kind == BackupKind.Folder ? $"Folder {schedule.SourceFolder}"
-                : schedule.WindowsDisk ? "System image of the Windows disk" : $"System image of {schedule.DiskName}";
-            return new ScheduleRow(schedule, schedule.Name + (schedule.Enabled ? string.Empty : " (off)"), what, schedule.Destination, BackupScheduling.Describe(schedule), lastRun,
-                schedule.Enabled ? BackupScheduling.NextRun(schedule, now).ToString("ddd yyyy-MM-dd HH:mm") : "Off");
-        }).ToList();
-        SchedulesGrid.ItemsSource = rows;
-        SchedulesGrid.SelectedItem = rows.FirstOrDefault(row => row.Schedule.Id == selected);
-        UpdateStartButtons();
-    }
-
-    private void SchedulesGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateStartButtons();
-
-    private void AddImageScheduleButton_Click(object sender, RoutedEventArgs e) => OpenScheduleEditor(new BackupSchedule { Kind = BackupKind.SystemImage, Name = "Windows image" });
-
-    private void AddFolderScheduleButton_Click(object sender, RoutedEventArgs e) => OpenScheduleEditor(new BackupSchedule { Kind = BackupKind.Folder, Name = "Documents", Frequency = BackupFrequency.Daily, TimeOfDayMinutes = 20 * 60 });
-
-    private void EditScheduleButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (SchedulesGrid.SelectedItem is ScheduleRow row)
-        {
-            OpenScheduleEditor(row.Schedule);
-        }
-    }
-
-    private void OpenScheduleEditor(BackupSchedule schedule)
-    {
-        _editingSchedule = schedule;
-        bool folder = schedule.Kind == BackupKind.Folder;
-        ScheduleEditorTitle.Text = (_schedules.Any(each => each.Id == schedule.Id) ? "Edit " : "New ") + (folder ? "folder backup" : "system image backup");
-        ScheduleNameBox.Text = schedule.Name;
-        ScheduleImagePanel.Visibility = folder ? Visibility.Collapsed : Visibility.Visible;
-        ScheduleFolderPanel.Visibility = folder ? Visibility.Visible : Visibility.Collapsed;
-        ScheduleKeepPanel.Visibility = folder ? Visibility.Collapsed : Visibility.Visible;
-        List<DiskChoice> disks = new() { new("The disk Windows runs from", null) };
-        disks.AddRange(_disks.Where(disk => !disk.IsBoot && disk.Style is "GPT" or "MBR").Select(disk => new DiskChoice(disk.DisplayText, disk)));
-        ScheduleDiskComboBox.ItemsSource = disks;
-        ScheduleDiskComboBox.SelectedItem = schedule.WindowsDisk ? disks[0] : disks.FirstOrDefault(choice => choice.Disk?.Name == schedule.DiskName) ?? disks[0];
-        ScheduleKeepComboBox.SelectedItem = Math.Clamp(schedule.Keep, 1, 10);
-        ScheduleSourceBox.Text = schedule.SourceFolder;
-        ScheduleDestinationBox.Text = schedule.Destination;
-        ScheduleUserBox.Text = schedule.ShareUser;
-        SchedulePasswordBox.Password = BackupScheduleStore.Unprotect(schedule.ShareSecret);
-        ScheduleFrequencyComboBox.SelectedIndex = (int)schedule.Frequency;
-        ScheduleHourComboBox.SelectedItem = (schedule.TimeOfDayMinutes / 60).ToString("00");
-        ScheduleMinuteComboBox.SelectedItem = (schedule.TimeOfDayMinutes % 60 / 15 * 15).ToString("00");
-        ScheduleMonthDayComboBox.SelectedItem = Math.Clamp(schedule.DayOfMonth, 1, 28);
-        ScheduleWeekDaysList.ItemsSource = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday }
-            .Select(day => new DayPick(day, schedule.WeekDays.Contains(day))).ToList();
-        ScheduleFrequency_Changed(this, null!);
-        ScheduleEditor.Visibility = Visibility.Visible;
-    }
-
-    private void ScheduleFrequency_Changed(object sender, SelectionChangedEventArgs e)
-    {
-        if (!IsLoaded)
-        {
-            return;
-        }
-
-        ScheduleWeekDaysList.Visibility = ScheduleFrequencyComboBox.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
-        ScheduleMonthDayPanel.Visibility = ScheduleFrequencyComboBox.SelectedIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void ScheduleDestination_Changed(object sender, TextChangedEventArgs e) =>
-        ScheduleSharePanel.Visibility = ScheduleDestinationBox.Text.TrimStart().StartsWith(@"\\", StringComparison.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
-
-    private void BrowseScheduleSourceButton_Click(object sender, RoutedEventArgs e) => BrowseFolder(ScheduleSourceBox, "Choose the folder to back up");
-
-    private void BrowseScheduleDestinationButton_Click(object sender, RoutedEventArgs e) => BrowseFolder(ScheduleDestinationBox, "Choose where to save the backups (another partition, an external disk or a network share)");
-
-    private static void BrowseFolder(System.Windows.Controls.TextBox box, string description)
-    {
-        using System.Windows.Forms.FolderBrowserDialog dialog = new() { Description = description, UseDescriptionForTitle = true, ShowNewFolderButton = true };
-        if (Directory.Exists(box.Text.Trim()))
-        {
-            dialog.SelectedPath = box.Text.Trim();
-        }
-
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-        {
-            box.Text = dialog.SelectedPath;
-        }
-    }
-
-    private void SaveScheduleButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_editingSchedule is not { } schedule)
-        {
-            return;
-        }
-
-        schedule.Name = ScheduleNameBox.Text.Trim();
-        schedule.Destination = ScheduleDestinationBox.Text.Trim();
-        schedule.SourceFolder = ScheduleSourceBox.Text.Trim();
-        schedule.ShareUser = schedule.Destination.StartsWith(@"\\", StringComparison.Ordinal) ? ScheduleUserBox.Text.Trim() : string.Empty;
-        schedule.ShareSecret = schedule.ShareUser.Length > 0 ? BackupScheduleStore.Protect(SchedulePasswordBox.Password) : string.Empty;
-        DiskChoice? disk = ScheduleDiskComboBox.SelectedItem as DiskChoice;
-        schedule.WindowsDisk = disk?.Disk is null;
-        schedule.DiskName = disk?.Disk?.Name ?? string.Empty;
-        schedule.DiskSize = disk?.Disk?.Size ?? 0;
-        schedule.Keep = ScheduleKeepComboBox.SelectedItem as int? ?? 3;
-        schedule.Frequency = (BackupFrequency)Math.Max(0, ScheduleFrequencyComboBox.SelectedIndex);
-        schedule.TimeOfDayMinutes = int.Parse((string?)ScheduleHourComboBox.SelectedItem ?? "2") * 60 + int.Parse((string?)ScheduleMinuteComboBox.SelectedItem ?? "0");
-        schedule.DayOfMonth = ScheduleMonthDayComboBox.SelectedItem as int? ?? 1;
-        schedule.WeekDays = (ScheduleWeekDaysList.ItemsSource as IEnumerable<DayPick> ?? Array.Empty<DayPick>()).Where(pick => pick.IsChecked).Select(pick => pick.Day).ToList();
-
-        string? problem = schedule.Name.Length == 0 ? "Give the backup a name."
-            : schedule.Destination.Length == 0 ? "Choose where to save the backup."
-            : schedule.Kind == BackupKind.Folder && !Directory.Exists(schedule.SourceFolder) ? "The folder to back up was not found."
-            : schedule.Kind == BackupKind.Folder && schedule.Destination.StartsWith(schedule.SourceFolder.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase) ? "The destination cannot be inside the folder it backs up."
-            : schedule.Frequency == BackupFrequency.Weekly && schedule.WeekDays.Count == 0 ? "Tick at least one day of the week."
-            : null;
-        if (problem is not null)
-        {
-            WpfMessageBox.Show(this, problem, Title, MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        if (!_schedules.Any(each => each.Id == schedule.Id))
-        {
-            _schedules.Add(schedule);
-        }
-
-        _scheduleStore.SaveSchedules(_schedules);
-        ScheduleEditor.Visibility = Visibility.Collapsed;
-        _editingSchedule = null;
-        RefreshSchedules();
-        StatusLine.Text = $"\"{schedule.Name}\" is saved; it next runs {BackupScheduling.NextRun(schedule, DateTime.Now):ddd yyyy-MM-dd HH:mm}. Run now tries it straight away.";
-    }
-
-    private void CancelScheduleButton_Click(object sender, RoutedEventArgs e)
-    {
-        ScheduleEditor.Visibility = Visibility.Collapsed;
-        _editingSchedule = null;
-    }
-
-    private void ToggleScheduleButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (SchedulesGrid.SelectedItem is ScheduleRow row)
-        {
-            row.Schedule.Enabled = !row.Schedule.Enabled;
-            _scheduleStore.SaveSchedules(_schedules);
-            RefreshSchedules();
-        }
-    }
-
-    private void RemoveScheduleButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (SchedulesGrid.SelectedItem is not ScheduleRow row || WpfMessageBox.Show(this, $"Remove the automatic backup \"{row.Schedule.Name}\"? Backups already made stay where they are.",
-                Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        _schedules.RemoveAll(each => each.Id == row.Schedule.Id);
-        _scheduleStore.SaveSchedules(_schedules);
-        _scheduleStore.RemoveState(row.Schedule.Id);
-        RefreshSchedules();
-    }
-
-    private async void RunScheduleButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (SchedulesGrid.SelectedItem is not ScheduleRow row)
-        {
-            return;
-        }
-
-        BackupSchedule schedule = row.Schedule;
-        DateTime started = DateTime.UtcNow;
-        _scheduleStore.UpdateState(new BackupScheduleState { Id = schedule.Id, LastRunUtc = started, Running = true, LastMessage = "Running from the dashboard..." });
-        RefreshSchedules();
-        BackupRunResult? result = null;
-        bool finished = await RunAsync(async token => result = await new BackupRunner().RunAsync(schedule, Progress(), token), "Cancelled.");
-        _scheduleStore.UpdateState(new BackupScheduleState
-        {
-            Id = schedule.Id, LastRunUtc = started, LastSucceeded = finished && result?.Succeeded == true,
-            LastMessage = result?.Message ?? (finished ? "Finished." : "Cancelled from the dashboard.")
-        });
-        RefreshSchedules();
-        if (finished && result is not null)
-        {
-            WpfMessageBox.Show(this, result.Message, Title, MessageBoxButton.OK, result.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
-        }
     }
 
     private async void DecryptButton_Click(object sender, RoutedEventArgs e)

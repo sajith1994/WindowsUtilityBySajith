@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 using WindowsUtility.Models;
 using WindowsUtility.Services;
 using Xunit;
@@ -28,6 +29,7 @@ public class BackupScheduleTests
         Assert.Equal(new DateTime(2026, 10, 25, 1, 0, 0), BackupScheduling.NextRun(schedule, Now)); // Sunday
         Assert.Equal(new DateTime(2026, 10, 26, 1, 0, 0), BackupScheduling.NextRun(schedule, new DateTime(2026, 10, 25, 1, 0, 0))); // then Monday
         Assert.Equal("Every Monday, Sunday at 01:00", BackupScheduling.Describe(schedule));
+        Assert.Equal("Every Sunday at 01:00", BackupScheduling.Describe(new BackupSchedule { Frequency = BackupFrequency.Weekly, TimeOfDayMinutes = 60, WeekDays = { DayOfWeek.Sunday } })); // the default Sunday plus Sunday again
 
         schedule.WeekDays.Clear();
         schedule.WeekDays.Add(DayOfWeek.Thursday);
@@ -72,10 +74,10 @@ public class BackupScheduleTests
         Directory.CreateDirectory(folder);
         try
         {
-            BackupScheduleStore store = new(Path.Combine(folder, "schedules.json"), Path.Combine(folder, "states.json"));
+            BackupScheduleStore store = new(Path.Combine(folder, "schedules.json"), Path.Combine(folder, "states.json"), DataProtectionScope.CurrentUser);
             BackupSchedule schedule = new()
             {
-                Name = "NAS", Kind = BackupKind.SystemImage, Destination = @"\\nas\backups\pc", ShareUser = "sajith", ShareSecret = BackupScheduleStore.Protect("s3cret"),
+                Name = "NAS", Kind = BackupKind.SystemImage, Destination = @"\\nas\backups\pc", ShareUser = "sajith", ShareSecret = store.Protect("s3cret"),
                 Frequency = BackupFrequency.Weekly, WeekDays = { DayOfWeek.Friday }
             };
             Assert.NotEqual("s3cret", schedule.ShareSecret);
@@ -84,8 +86,8 @@ public class BackupScheduleTests
             BackupSchedule loaded = Assert.Single(store.LoadSchedules());
             Assert.Equal(schedule.Id, loaded.Id);
             Assert.Equal(BackupFrequency.Weekly, loaded.Frequency);
-            Assert.Equal("s3cret", BackupScheduleStore.Unprotect(loaded.ShareSecret));
-            Assert.Equal(string.Empty, BackupScheduleStore.Unprotect("not-base64!"));
+            Assert.Equal("s3cret", store.Unprotect(loaded.ShareSecret));
+            Assert.Equal(string.Empty, store.Unprotect("not-base64!"));
 
             store.UpdateState(new BackupScheduleState { Id = schedule.Id, LastRunUtc = DateTime.UtcNow, LastSucceeded = true, LastMessage = "ok" });
             store.UpdateState(new BackupScheduleState { Id = schedule.Id, LastRunUtc = DateTime.UtcNow, LastSucceeded = false, LastMessage = "later" });
@@ -138,8 +140,8 @@ public class BackupScheduleTests
                Files :      1234        56      1176         0         2         0
                Bytes :   1.521 g   120.5 m   1.403 g         0    15.2 k         0
             """;
-        Assert.Equal("1234 files, 56 copied, 1176 unchanged, 2 failed, 120.5 mB copied", BackupRunner.Summarize(output));
-        Assert.Equal("no summary from robocopy", BackupRunner.Summarize("nothing"));
+        Assert.Equal("1234 files, 56 copied, 1176 unchanged, 2 failed, 120.5 mB copied", FolderBackupRunner.Summarize(output));
+        Assert.Equal("no summary from robocopy", FolderBackupRunner.Summarize("nothing"));
     }
 }
 

@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
+using WindowsUtility.Models;
 using WindowsUtility.Services;
 using WpfColor = System.Windows.Media.Color;
 using WpfComboBox = System.Windows.Controls.ComboBox;
@@ -39,10 +40,16 @@ public sealed class LiveGraphPanel : Grid, IDisposable
     private bool _sampling;
     private bool _started;
     private bool _disposed;
+    private readonly Func<BackgroundServiceSnapshot?>? _service;
 
-    public LiveGraphPanel(GraphComponent component)
+    /// <param name="service">
+    /// The background service's recent readings. The dashboard runs without the administrator rights most sensors
+    /// need, so readings it cannot take itself (CPU temperature and power, fan, GPU power) come from the service.
+    /// </param>
+    public LiveGraphPanel(GraphComponent component, Func<BackgroundServiceSnapshot?>? service = null)
     {
         _component = component;
+        _service = service;
         BuildSeries();
         BuildLayout();
         _timer.Tick += async (_, _) => await SampleAsync();
@@ -295,6 +302,7 @@ public sealed class LiveGraphPanel : Grid, IDisposable
         {
             case GraphComponent.Cpu:
             {
+                BackgroundServiceSnapshot? service = _service?.Invoke();
                 CpuTemperatureReading temperature = _hardware.GetCpuTemperatureReading();
                 CpuClockReading clock = _hardware.GetCpuClockReading();
                 CpuPackagePowerReading power = _hardware.GetCpuPackagePowerReading();
@@ -303,15 +311,18 @@ public sealed class LiveGraphPanel : Grid, IDisposable
                 return new double?[]
                 {
                     resources.CpuUsagePercent,
-                    temperature.IsAvailable ? temperature.ValueCelsius : null,
+                    // The service's CPU-specific reading first, as on the Processor tile.
+                    service is { CpuIsAvailable: true, CpuIsCpuSpecific: true, CpuTemperatureCelsius: double serviceCelsius } ? serviceCelsius
+                        : temperature.IsAvailable ? temperature.ValueCelsius : null,
                     clock.IsAvailable && clock.Megahertz.HasValue ? clock.Megahertz.Value / 1000.0 : null,
-                    power.IsAvailable ? power.Watts : null,
-                    FirstFanRpm(fans, FanGroup.Cpu)
+                    power.IsAvailable ? power.Watts : service?.CpuPackagePowerWatts,
+                    FirstFanRpm(fans, FanGroup.Cpu) ?? service?.CpuFanRpm
                 };
             }
 
             case GraphComponent.Gpu:
             {
+                BackgroundServiceSnapshot? service = _service?.Invoke();
                 GpuTemperatureReading temperature = _hardware.GetGpuTemperatureReading();
                 GpuUtilisationReading load = _hardware.GetGpuUtilisationReading();
                 GpuPowerReading power = _hardware.GetGpuPowerReading();
@@ -321,7 +332,7 @@ public sealed class LiveGraphPanel : Grid, IDisposable
                 {
                     load.IsAvailable ? load.LoadPercent : null,
                     temperature.IsAvailable ? temperature.ValueCelsius : null,
-                    power.IsAvailable ? power.Watts : null,
+                    power.IsAvailable ? power.Watts : service?.GpuPowerWatts,
                     memory.UsedMegabytes.HasValue ? memory.UsedMegabytes.Value / 1024.0 : null,
                     FirstFanRpm(fans, FanGroup.Gpu)
                 };

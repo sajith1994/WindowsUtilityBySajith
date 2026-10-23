@@ -23,5 +23,11 @@
     <Compile Include="..\WindowsUtility\Models\BackgroundServiceSnapshot.cs" Link="Models\BackgroundServiceSnapshot.cs" />
     <Compile Include="..\WindowsUtility\Models\RemoteMonitoring.cs" Link="Models\RemoteMonitoring.cs" />
     <Compile Include="..\WindowsUtility\Services\SharedDataPaths.cs" Link="Services\SharedDataPaths.cs" />
+    <!-- The signed-in user's folder backups run here, as the user (no administrator rights). -->
+    <Compile Include="..\WindowsUtility\Services\ApplicationLogService.cs" Link="Services\ApplicationLogService.cs" />
+    <Compile Include="..\WindowsUtility\Models\BackupSchedule.cs" Link="Models\BackupSchedule.cs" />
+    <Compile Include="..\WindowsUtility\Services\BackupScheduleStore.cs" Link="Services\BackupScheduleStore.cs" />
+    <Compile Include="..\WindowsUtility\Services\FolderBackupRunner.cs" Link="Services\FolderBackupRunner.cs" />
+    <Compile Include="..\WindowsUtility\Services\FolderBackupScheduler.cs" Link="Services\FolderBackupScheduler.cs" />
   </ItemGroup>
 </Project>

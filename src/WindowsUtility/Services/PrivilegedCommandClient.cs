@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.Json;
 using WindowsUtility.Models;
 
@@ -55,11 +57,15 @@ public sealed class PrivilegedCommandClient
         string responsePath = Path.Combine(_responsesDirectory, $"{requestId:N}.json");
         string temporaryPath = requestPath + ".tmp";
 
-        await using (FileStream stream = new(
-                         temporaryPath,
+        // Only the sender, SYSTEM and administrators may read a request: some carry a share password. (The commands
+        // folder lets every user write, so its own permissions would let other users read it too.)
+        await using (FileStream stream = new FileInfo(temporaryPath).Create(
                          FileMode.Create,
-                         FileAccess.Write,
-                         FileShare.Read))
+                         FileSystemRights.Write | FileSystemRights.ReadData | FileSystemRights.ReadPermissions,
+                         FileShare.Read,
+                         4096,
+                         FileOptions.None,
+                         SenderOnlySecurity()))
         {
             await JsonSerializer.SerializeAsync(stream, request, JsonOptions, cancellationToken);
         }
@@ -136,6 +142,19 @@ public sealed class PrivilegedCommandClient
         {
             return null;
         }
+    }
+
+    private static FileSecurity SenderOnlySecurity()
+    {
+        FileSecurity security = new();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        SecurityIdentifier sender = WindowsIdentity.GetCurrent().User ?? new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+        foreach (SecurityIdentifier sid in new[] { sender, new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null), new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null) })
+        {
+            security.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, AccessControlType.Allow));
+        }
+
+        return security;
     }
 
     private static void TryDelete(string path)

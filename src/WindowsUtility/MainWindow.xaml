@@ -1319,6 +1319,29 @@
                         <TextBlock Text="Everyday technician actions grouped by purpose. Administrator tools keep their existing elevation behavior."
                                    Style="{StaticResource SectionDescriptionStyle}" />
 
+                        <UniformGrid Columns="2" Margin="0,0,-12,0">
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE777;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="Back up &amp; restore" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                    <TextBlock Text="Back up the whole of Windows (to restore onto a new SSD if this one fails) or your folders, now or automatically: every few minutes or hours, daily, weekly, monthly or live. To another partition, an external disk or a network share. No administrator password needed." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,14"/>
+                                    <WrapPanel>
+                                        <Button Content="Open Back up &amp; restore" Tag="&#xE777;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenBackupsButton_Click" Margin="0,0,8,0" ToolTip="System image and folder backups, automatic backups, restore."/>
+                                        <Button Content="Restore a backup" Tag="&#xE8E5;" Style="{StaticResource IconCompactButton}" Click="OpenRestoreButton_Click" Margin="0" ToolTip="Put a backup back onto a disk, or copy files out of it (administrator)."/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource MetricCardStyle}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8C8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}"/><TextBlock Text="Clone &amp; migrate" Style="{StaticResource CardTitleStyle}"/></StackPanel>
+                                    <TextBlock Text="Move Windows to a new SSD while it runs: copy the whole disk (the new disk starts Windows, a bigger SSD's extra space goes to Windows), or copy single partitions. BitLocker can stay on. Needs an administrator." Style="{StaticResource CardDescriptionStyle}" Margin="0,8,0,14"/>
+                                    <WrapPanel>
+                                        <Button Content="Clone a disk" Tag="&#xE8C8;" Style="{StaticResource IconCompactPrimaryButton}" Click="OpenCloneButton_Click" Margin="0,0,8,0" ToolTip="Copy a whole disk to a new SSD."/>
+                                        <Button Content="Copy one partition" Tag="&#xE8C8;" Style="{StaticResource IconCompactButton}" Click="OpenPartitionCopyButton_Click" Margin="0" ToolTip="Copy a single partition into free space or over another partition."/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
                         <Border Style="{StaticResource CardStyle}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">

@@ -99,6 +99,7 @@ internal sealed class MonitoringEngine : IDisposable
     private readonly RemoteStatsServer _remoteServer;
     private readonly HistoryRecorder _history = new();
     private readonly BackupScheduler _backupScheduler = new();
+    private readonly PhoneViewPoller _phoneViewPoller = new();
     private volatile BackgroundServiceSnapshot? _lastSnapshot;
 
     /// <summary>Last real adapter address of each device, kept across restarts so an offline device can be woken.</summary>
@@ -109,7 +110,7 @@ internal sealed class MonitoringEngine : IDisposable
     public MonitoringEngine()
     {
         _remoteServer = new RemoteStatsServer(() => _lastSnapshot, history: _history, updater: _updater);
-        _privilegedCommandProcessor = new PrivilegedCommandProcessor(_updater);
+        _privilegedCommandProcessor = new PrivilegedCommandProcessor(_updater, backups: _backupScheduler);
     }
 
     public void Start()
@@ -132,6 +133,8 @@ internal sealed class MonitoringEngine : IDisposable
         _commandTask = Task.Run(() => _privilegedCommandProcessor.RunAsync(_cancellationTokenSource.Token));
         // Automatic backups run on their own too: an image backup takes a while.
         _ = Task.Run(() => _backupScheduler.RunAsync(_cancellationTokenSource.Token));
+        // The phone page stays current when the dashboard is not running (it checks the PCs only while it runs).
+        _ = Task.Run(() => _phoneViewPoller.RunAsync(_cancellationTokenSource.Token));
         // After an update the installer closed the dashboard and tray icon; open them again for whoever had them.
         _ = Task.Run(SessionLauncher.RelaunchAfterUpdate);
         ServiceLog.Write("Service", $"Started as {Environment.UserName}. Version {typeof(MonitoringEngine).Assembly.GetName().Version}.");

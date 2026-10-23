@@ -115,7 +115,7 @@ internal static class PhonePage
             var stale = document.getElementById("stale");
             var old = !updated || updated.getFullYear() < 2000 || Date.now() - updated.getTime() > 3 * 60 * 1000;
             stale.style.display = old ? "block" : "none";
-            stale.textContent = old ? "The Windows Utility dashboard on " + (data.mainPcName || "the main PC") + " has not checked the PCs recently. It must be running (it can stay in the notification area)." : "";
+            stale.textContent = old ? "The PCs have not been checked from " + (data.mainPcName || "the main PC") + " recently. Check that it is switched on and that the Windows Utility background service is running there." : "";
           }
           function load() {
             fetch("/wu/phone/data?k=" + encodeURIComponent(key), { cache: "no-store" })

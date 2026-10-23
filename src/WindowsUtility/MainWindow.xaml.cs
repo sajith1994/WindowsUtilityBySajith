@@ -3310,6 +3310,21 @@ public partial class MainWindow : Window
 
     private void ViewSystemHealthLogButton_Click(object sender, RoutedEventArgs e) => OpenLogsHub("System health events");
 
+    /// <summary>The background service's last reading when it is recent (under 15 seconds old) and the service runs.</summary>
+    private BackgroundServiceSnapshot? FreshServiceSnapshot() =>
+        IsBackgroundServiceRunning && _backgroundServiceSnapshot is { } snapshot && DateTime.Now - snapshot.UpdatedAt <= TimeSpan.FromSeconds(15)
+            ? snapshot
+            : null;
+
+    /// <summary>
+    /// The CPU temperature as the Processor tile shows it: from the background service when it has a CPU-specific
+    /// reading (the dashboard runs without the administrator rights most sensors need), otherwise read here.
+    /// </summary>
+    private CpuTemperatureReading CurrentCpuTemperatureReading() =>
+        FreshServiceSnapshot() is { CpuIsAvailable: true, CpuIsCpuSpecific: true, CpuTemperatureCelsius: double celsius } snapshot
+            ? new CpuTemperatureReading(true, celsius, snapshot.CpuDisplay, snapshot.CpuSensorName, snapshot.CpuDiagnostic, $"{snapshot.CpuSource} - LocalSystem service", true)
+            : _hardwareMonitorService.GetCpuTemperatureReading();
+
     private bool TryDisplayBackgroundServiceCpuReading()
     {
         if (!IsBackgroundServiceRunning ||
@@ -4531,7 +4546,7 @@ public partial class MainWindow : Window
         try
         {
             RefreshPcHealth(
-                await Task.Run(_hardwareMonitorService.GetCpuTemperatureReading),
+                await Task.Run(CurrentCpuTemperatureReading),
                 await Task.Run(_hardwareMonitorService.GetGpuTemperatureReading),
                 _lastFanInventory,
                 _lastMemoryUsagePercent,

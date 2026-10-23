@@ -40,7 +40,7 @@ public static class PhoneViewService
             RamPercent = view.Stats?.RamUsagePercent,
             Disks = view.Disks.Select(disk => new PhoneViewDisk { Name = disk.Name, UsedPercent = disk.UsedPercent, Free = disk.Detail.Split(" free")[0], Low = disk.IsLow }).ToList(),
             SignedIn = view.HasStats ? view.SessionsText : string.Empty,
-            Notes = DailySummaryService.Issues(view).Where(_ => view.IsOnline).Select(issue => issue.Text).ToList(),
+            Notes = PcIssues.For(view).Where(_ => view.IsOnline).Select(issue => issue.Text).ToList(),
             LastSeen = view.IsOnline ? string.Empty : view.LastSeen is DateTime seen ? $"Last seen {seen:ddd HH:mm}" : string.Empty
         }).ToList()
     };

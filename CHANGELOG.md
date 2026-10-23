@@ -260,6 +260,31 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.89] - 2026-10-23
+
+### Added
+- **Back up & restore** has its own window (Utility Tools, at the top, next to **Clone & migrate**; also in
+  Storage & disks) and asks for **no administrator password**:
+  - **System image:** "Back up now" and automatic system image backups are made by the background service (which
+    has the rights it needs); it accepts them from administrator accounts without a prompt. Progress and results
+    show in the list.
+  - **Folders:** your own folder backups, run as you by the Windows Utility status icon while you are signed in.
+  - **Restore & clone** opens the administrator window for the steps that write whole disks.
+- Backups can run **every few minutes or hours** (every 5, 10, 15, 20, 30 or 45 minutes; every 1-12 hours; a
+  system image at most hourly), besides daily, weekly and monthly.
+- **Live folder backup:** the folder is watched and changes are copied half a minute after they stop. New and
+  changed files only; nothing is ever deleted from the backup.
+- **Phone page without the dashboard:** when the dashboard is not running (after a restart, before anyone opens it),
+  the background service checks the PCs itself, so the phone page stays current.
+
+### Fixed
+- The CPU temperature showed on the Processor tile but not in "Worth a look" (Cooling: "Sensors unavailable") or
+  the CPU live graph: those read the sensor in the dashboard, which runs without the administrator rights the sensor
+  needs. They now use the background service's reading, like the tile (also package power, fan and GPU power).
+- **Security:** in 2.0.88 the automatic backups were kept in a file every user could change, so a standard user could
+  have made the service copy any folder anywhere. System image schedules now live where only SYSTEM and
+  administrators can open them and change only through the service, for administrator accounts; folder backups run
+  as the user. Requests to the service can be read only by their sender. 2.0.88's backups move across by themselves.
 ## [2.0.88] - 2026-10-23
 
 ### Added

@@ -21,6 +21,7 @@ public sealed class PrivilegedChannelTests : IDisposable
     private readonly List<(string Action, Dictionary<string, string> Arguments, string Requester)> _done = new();
     private readonly CancellationTokenSource _stop = new();
     private bool _maintenanceAllowed = true;
+    private bool _administrator = true;
     private Func<ServiceRequest, string>? _behaviour;
 
     private string Requests => Path.Combine(_root, "requests");
@@ -41,7 +42,8 @@ public sealed class PrivilegedChannelTests : IDisposable
 
             string message = _behaviour?.Invoke(request) ?? "done";
             return Task.FromResult((message, JsonSerializer.Serialize(new MaintenanceResult(true, message, "output"))));
-        });
+        },
+        sentByAdministrator: _ => _administrator);
 
     private PrivilegedCommandClient Client() => new(Requests, Responses);
 
@@ -88,6 +90,32 @@ public sealed class PrivilegedChannelTests : IDisposable
         Assert.Equal(action, Assert.Single(_done).Action);
     }
 
+    [Theory]
+    [InlineData(PrivilegedServiceActions.SaveImageBackup)]
+    [InlineData(PrivilegedServiceActions.RemoveImageBackup)]
+    [InlineData(PrivilegedServiceActions.BackUpImageNow)]
+    public async Task ImageBackups_AreSetUpOnlyForAdministratorAccounts(string action)
+    {
+        _administrator = false;
+        StartService();
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Client().SendAsync(action, null, TimeSpan.FromSeconds(10)));
+        Assert.Contains("administrator account", refused.Message);
+        Assert.Empty(_done);
+    }
+
+    [Fact]
+    public async Task AnyoneMayRunABackupAnAdministratorSetUp()
+    {
+        _administrator = false;
+        StartService();
+        await Client().SendAsync(PrivilegedServiceActions.RunImageBackup, new Dictionary<string, string> { ["id"] = Guid.NewGuid().ToString() }, TimeSpan.FromSeconds(10));
+        Assert.Equal(PrivilegedServiceActions.RunImageBackup, Assert.Single(_done).Action);
+    }
+
+    [Fact]
+    public void AnUnknownAccount_IsNotAnAdministrator() =>
+        Assert.False(service::WindowsUtility.ServiceHost.AdministratorAccounts.IsMember(@"NOSUCHDOMAIN\nobody-4711"));
     [Fact]
     public async Task AFailure_ComesBackWithItsReason()
     {

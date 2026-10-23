@@ -60,6 +60,14 @@
     <Compile Include="..\WindowsUtility\Models\BackupSchedule.cs" Link="Models\BackupSchedule.cs" />
     <Compile Include="..\WindowsUtility\Services\BackupScheduleStore.cs" Link="Services\BackupScheduleStore.cs" />
     <Compile Include="..\WindowsUtility\Services\BackupRunner.cs" Link="Services\BackupRunner.cs" />
+    <Compile Include="..\WindowsUtility\Services\FolderBackupRunner.cs" Link="Services\FolderBackupRunner.cs" />
+    <!-- The phone page when the dashboard is not running: the dashboard's own way of checking the PCs. -->
+    <Compile Include="..\WindowsUtility\Services\RemoteMonitorClient.cs" Link="Services\RemoteMonitorClient.cs" />
+    <Compile Include="..\WindowsUtility\Services\RemotePcView.cs" Link="Services\RemotePcView.cs" />
+    <Compile Include="..\WindowsUtility\Services\PhoneViewService.cs" Link="Services\PhoneViewService.cs" />
+    <Compile Include="..\WindowsUtility\Services\PcIssues.cs" Link="Services\PcIssues.cs" />
+    <Compile Include="..\WindowsUtility\Services\LocalIpScannerService.cs" Link="Services\LocalIpScannerService.cs" />
+    <Compile Include="..\WindowsUtility\Models\IpScanResult.cs" Link="Models\IpScanResult.cs" />
     <Compile Include="..\WindowsUtility\Services\DiskCloneService.cs" Link="Services\DiskCloneService.cs" />
     <Compile Include="..\WindowsUtility\Services\DiskClonePlanner.cs" Link="Services\DiskClonePlanner.cs" />
     <Compile Include="..\WindowsUtility\Services\DiskBackupImage.cs" Link="Services\DiskBackupImage.cs" />

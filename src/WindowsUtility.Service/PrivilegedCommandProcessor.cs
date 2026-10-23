@@ -30,18 +30,25 @@ internal sealed class PrivilegedCommandProcessor
     private readonly Func<bool> _standardUsersMayMaintain;
     private readonly Func<PrivilegedServiceCommandRequest, string, CancellationToken, Task<(string Message, string Data)>> _execute;
     private readonly RemoteUpdater? _updater;
+    private readonly BackupScheduler? _backups;
+    private readonly Func<string, bool> _sentByAdministrator;
 
     /// <param name="updater">Installs the verified official release (shared with updates started from another PC).</param>
+    /// <param name="backups">Runs the system image backups.</param>
     /// <param name="execute">Tests pass a stand-in so nothing is really installed or reset.</param>
+    /// <param name="sentByAdministrator">Whether a request file came from an administrator account; tests pass a stand-in.</param>
     public PrivilegedCommandProcessor(RemoteUpdater? updater = null, string? requestsDirectory = null, string? responsesDirectory = null,
         Func<bool>? standardUsersMayMaintain = null,
-        Func<PrivilegedServiceCommandRequest, string, CancellationToken, Task<(string Message, string Data)>>? execute = null)
+        Func<PrivilegedServiceCommandRequest, string, CancellationToken, Task<(string Message, string Data)>>? execute = null,
+        BackupScheduler? backups = null, Func<string, bool>? sentByAdministrator = null)
     {
         _updater = updater;
+        _backups = backups;
         _requestsDirectory = requestsDirectory ?? SharedDataPaths.PrivilegedCommandRequestsDirectory;
         _responsesDirectory = responsesDirectory ?? SharedDataPaths.PrivilegedCommandResponsesDirectory;
         _standardUsersMayMaintain = standardUsersMayMaintain ?? MaintenancePolicy.StandardUsersMayMaintain;
         _execute = execute ?? ExecuteAsync;
+        _sentByAdministrator = sentByAdministrator ?? AdministratorAccounts.SentByAdministrator;
     }
 
     /// <summary>Checks for requests every half second until the service stops (separate from the slower monitoring loop).</summary>
@@ -135,6 +142,15 @@ internal sealed class PrivilegedCommandProcessor
                 ServiceLog.Write("Command", $"{request.Action} requested by {requester} refused: maintenance is turned off for standard users.");
                 await WriteResponseAsync(request.Id, false,
                     "An administrator has turned off maintenance tools for standard users on this PC. Ask an administrator, or open Windows Utility as administrator.",
+                    string.Empty, cancellationToken);
+                return;
+            }
+
+            if (PrivilegedServiceActions.AdministratorAccountOnly.Contains(request.Action) && !_sentByAdministrator(requestPath))
+            {
+                ServiceLog.Write("Command", $"{request.Action} requested by {requester} refused: not an administrator account.");
+                await WriteResponseAsync(request.Id, false,
+                    "Only an administrator account can set up or start a system image backup (it holds every user's files). Ask an administrator.",
                     string.Empty, cancellationToken);
                 return;
             }
@@ -263,10 +279,31 @@ internal sealed class PrivilegedCommandProcessor
                 return (result.Message, JsonSerializer.Serialize(result));
             }
 
+            case PrivilegedServiceActions.SaveImageBackup:
+            {
+                BackupSchedule schedule = JsonSerializer.Deserialize<BackupSchedule>(Argument("schedule"), JsonOptions)
+                    ?? throw new InvalidOperationException("The backup settings could not be read.");
+                return (Backups.Save(schedule, Argument("password")), string.Empty);
+            }
+
+            case PrivilegedServiceActions.RemoveImageBackup:
+                return (Backups.Remove(Guid.TryParse(Argument("id"), out Guid removeId) ? removeId : Guid.Empty), string.Empty);
+
+            case PrivilegedServiceActions.RunImageBackup:
+                return (Backups.RunNow(Guid.TryParse(Argument("id"), out Guid runId) ? runId : Guid.Empty), string.Empty);
+
+            case PrivilegedServiceActions.BackUpImageNow:
+            {
+                Guid id = Backups.BackUpOnce(Limit(Argument("destination"), 260), Limit(Argument("user"), 120), Argument("password"));
+                return ("The backup starts now; its progress shows in the list.", id.ToString());
+            }
+
             default:
                 throw new InvalidOperationException($"The requested action \"{request.Action}\" is not supported by this version of the background service.");
         }
     }
+
+    private BackupScheduler Backups => _backups ?? throw new InvalidOperationException("Backups are not available in this service.");
 
     private static string Limit(string value, int length) => value.Length <= length ? value : value[..length];
 

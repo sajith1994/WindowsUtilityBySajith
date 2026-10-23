@@ -34,6 +34,24 @@ public static class PrivilegedServiceActions
     /// <summary>Reads the Windows drive from the boot configuration (read-only).</summary>
     public const string DetectWindowsDrive = "detect-windows-drive";
 
+    /// <summary>System image backups: adds or replaces a schedule. Arguments: schedule (JSON), password (empty keeps the saved one).</summary>
+    public const string SaveImageBackup = "backup-image-save";
+
+    /// <summary>Arguments: id.</summary>
+    public const string RemoveImageBackup = "backup-image-remove";
+
+    /// <summary>Arguments: id. Runs a backup an administrator set up, now; anyone may ask.</summary>
+    public const string RunImageBackup = "backup-image-run";
+
+    /// <summary>A one-time image of the Windows disk. Arguments: destination, user, password. Data: the run's id.</summary>
+    public const string BackUpImageNow = "backup-image-now";
+
+    /// <summary>
+    /// Actions only an administrator account may ask for (no administrator prompt: the service checks the account).
+    /// An image holds every user's files, so a standard user may not choose where one goes.
+    /// </summary>
+    public static readonly string[] AdministratorAccountOnly = { SaveImageBackup, RemoveImageBackup, BackUpImageNow };
+
     /// <summary>
     /// Actions an administrator can turn off for standard users ("Let standard users run maintenance tools without
     /// an administrator password"). The others are always allowed: the Print Spooler buttons as before, installing

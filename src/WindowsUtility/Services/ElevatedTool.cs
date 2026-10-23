@@ -22,11 +22,12 @@ public static class ElevatedTool
     private const int Cancelled = 1223;
 
     /// <summary>Opens a tool window elevated. Returns false when the administrator prompt was cancelled.</summary>
-    public static bool Open(string tool)
+    /// <param name="argument">Passed to the tool, e.g. which tab of the clone window to open.</param>
+    public static bool Open(string tool, string argument = "")
     {
         try
         {
-            using Process? process = Start(tool, string.Empty);
+            using Process? process = Start(tool, argument);
             return process is not null;
         }
         catch (Win32Exception exception) when (exception.NativeErrorCode == Cancelled)

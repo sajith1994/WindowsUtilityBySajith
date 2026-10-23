@@ -10,7 +10,7 @@ public sealed record RemoteAlert(DateTime At, string PcName, string Title, strin
 /// </summary>
 public sealed class RemoteAlertTracker
 {
-    public const double MemoryThresholdPercent = 95;
+    public const double MemoryThresholdPercent = PcIssues.MemoryThresholdPercent;
     public const double DiskNearlyFullFreeFraction = 0.10;
     public const double DiskFullFreeFraction = 0.02;
     public const long DiskFullFreeBytes = 1L << 30;

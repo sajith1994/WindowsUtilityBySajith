@@ -52,7 +52,7 @@ public partial class MainWindow
     {
         HubWindow hub = new("cpu", "", "CPU & Cooling",
             "Live processor readings, temperature history, fans, sensors and the thermal load test in one place.");
-        hub.AddTab("Live graph", new LiveGraphPanel(GraphComponent.Cpu));
+        hub.AddTab("Live graph", new LiveGraphPanel(GraphComponent.Cpu, FreshServiceSnapshot));
         hub.AddWindowTab("Temperature history", new CpuTemperatureLogWindow(_cpuTemperatureLogService));
         hub.AddTab("Sensors & tools", ActionPanel(
             ("Sensor", CpuSensorHelpText.Text),
@@ -72,7 +72,7 @@ public partial class MainWindow
     {
         HubWindow hub = new("gpu", "", "Graphics",
             "Live graphics readings, the installed adapters and displays, and the GPU load test.");
-        hub.AddTab("Live graph", new LiveGraphPanel(GraphComponent.Gpu));
+        hub.AddTab("Live graph", new LiveGraphPanel(GraphComponent.Gpu, FreshServiceSnapshot));
         hub.AddTab("Adapters & displays", ListPanel(
             ("Graphics adapters", GpuInventorySummaryText.Text, GpuInventoryList.ItemsSource),
             ("Displays", DisplayInventorySummaryText.Text, DisplayInventoryList.ItemsSource)));
@@ -115,13 +115,15 @@ public partial class MainWindow
                             : "Disk tools were not opened (the administrator prompt was cancelled).")
                 }));
         }
-        hub.AddTab("Clone, back up & restore", ActionPanel(
-            ("Clone a disk", "Copy a whole disk to a new SSD: every partition is copied (Windows from a snapshot while it runs), the new disk is made to start Windows, and a bigger SSD's extra space goes to Windows. The old disk is only read."),
-            ("Back up & restore", "Back up Windows to an image file on another partition, an external disk or a network share; restore it to a new SSD later, or open it as a disk to copy files out. Automatic backups (a system image or a folder) run every day, week or month. A single partition can also be copied on its own."),
-            ("Administrator", PrivilegedOperations.IsAdministrator ? "Opens in its own window." : "Opens in its own window after Windows asks for an administrator password."),
+        hub.AddTab("Back up & clone", ActionPanel(
+            ("Back up & restore", "Back up Windows to an image file (restore it to a new SSD later, or copy files out of it) or your folders, now or automatically, to another partition, an external disk or a network share. No administrator password needed."),
+            ("Clone & migrate", "Copy a whole disk to a new SSD while Windows runs (the new disk starts Windows), or copy single partitions. These write to whole disks, so they need an administrator."),
+            null,
             new[]
             {
-                ActionButton("Open clone, back up & restore", "", "Plan and run a disk clone, a backup, a restore or a partition copy.", OpenDiskCloneWindow)
+                ActionButton("Back up & restore", "", "System image and folder backups, automatic backups, restore.", () => OpenBackupsWindow()),
+                ActionButton("Clone a disk", "", "Copy a whole disk to a new SSD.", () => OpenDiskCloneWindow()),
+                ActionButton("Copy one partition", "", "Copy a single partition.", () => OpenDiskCloneWindow(1))
             }));
         hub.AddTab("Cleanup & consoles", ActionPanel(null, null, null, new[]
         {
@@ -146,18 +148,31 @@ public partial class MainWindow
         return hub;
     }, tab);
 
-    private void OpenDiskCloneWindow()
+    /// <param name="tab">0 clone a disk, 1 copy one partition, 2 back up chosen partitions, 3 restore a backup.</param>
+    private void OpenDiskCloneWindow(int tab = 0)
     {
         if (PrivilegedOperations.IsAdministrator)
         {
-            new DiskCloneWindow { Owner = this }.Show();
+            new DiskCloneWindow(tab) { Owner = this }.Show();
             return;
         }
 
-        StatusText.Text = ElevatedTool.Open(ElevatedTool.DiskClone)
+        StatusText.Text = ElevatedTool.Open(ElevatedTool.DiskClone, tab.ToString())
             ? "Opened clone & migrate as administrator."
-            : "Clone, back up & restore was not opened (the administrator prompt was cancelled).";
+            : "Clone & migrate was not opened (the administrator prompt was cancelled).";
     }
+
+    /// <summary>Backups need no administrator password: images go through the background service, folders run as the user.</summary>
+    /// <param name="tab">0 system image, 1 folders, 2 restore and clone.</param>
+    private void OpenBackupsWindow(int tab = 0) => new BackupsWindow(tab) { Owner = this }.Show();
+
+    private void OpenBackupsButton_Click(object sender, RoutedEventArgs e) => OpenBackupsWindow();
+
+    private void OpenRestoreButton_Click(object sender, RoutedEventArgs e) => OpenDiskCloneWindow(3);
+
+    private void OpenCloneButton_Click(object sender, RoutedEventArgs e) => OpenDiskCloneWindow();
+
+    private void OpenPartitionCopyButton_Click(object sender, RoutedEventArgs e) => OpenDiskCloneWindow(1);
 
     private void OpenLogsHubButton_Click(object sender, RoutedEventArgs e) => OpenLogsHub();
 

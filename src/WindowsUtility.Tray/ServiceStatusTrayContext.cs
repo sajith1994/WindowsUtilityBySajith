@@ -20,6 +20,7 @@ internal sealed class ServiceStatusTrayContext : ApplicationContext
     private readonly ToolStripMenuItem _heartbeatStatusItem;
     private readonly Icon _baseIcon;
     private Icon? _renderedStatusIcon;
+    private readonly FolderBackupScheduler _folderBackups = new();
 
     private string _serviceStatus = "Checking";
     private string _monitoringStatus = "Checking";
@@ -66,6 +67,9 @@ internal sealed class ServiceStatusTrayContext : ApplicationContext
         _refreshTimer.Start();
 
         RefreshStatus(showBalloon: true);
+
+        // This user's folder backups (Back up & restore > Folder backups) run here while they are signed in.
+        _folderBackups.Start();
     }
 
     private void RefreshStatus(bool showBalloon)
@@ -393,6 +397,7 @@ internal sealed class ServiceStatusTrayContext : ApplicationContext
 
     protected override void ExitThreadCore()
     {
+        _folderBackups.Dispose();
         _refreshTimer.Stop();
         _refreshTimer.Dispose();
         _notifyIcon.Visible = false;

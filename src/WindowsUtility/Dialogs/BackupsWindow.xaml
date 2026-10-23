@@ -1,0 +1,224 @@
+<Window x:Class="WindowsUtility.Dialogs.BackupsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Back up &amp; restore"
+        Width="1040"
+        Height="820"
+        MinWidth="760"
+        MinHeight="600"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="0,0,0,10">
+            <TextBlock Text="Back up &amp; restore" FontSize="20" FontWeight="SemiBold" />
+            <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0"
+                       Text="Back up the whole of Windows to an image you can restore to a new SSD, or keep copies of your folders. Backups go to another partition, an external disk or a network share, now or automatically. Nothing here asks for an administrator password." />
+        </StackPanel>
+
+        <TabControl Grid.Row="1" x:Name="Tabs">
+            <!-- System image: run by the background service -->
+            <TabItem Header="System image">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                        <StackPanel>
+                            <TextBlock Text="Back up Windows now" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,10"
+                                       Text="Every partition of the disk Windows runs from, into one image file (only the used space takes room). Windows keeps running while it is copied. Restore it to a new SSD from the Restore &amp; clone tab." />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBox x:Name="NowDestinationBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" TextChanged="NowDestination_Changed" ToolTip="A folder on another partition, an external disk, or a network share such as \\nas\backups\this-pc" />
+                                <Button Grid.Column="1" Content="Browse..." Tag="&#xE8B7;" Style="{StaticResource IconCompactButton}" Margin="8,0,0,0" Click="BrowseNowDestinationButton_Click" />
+                                <Button Grid.Column="2" x:Name="BackUpNowButton" Content="Back up now" Tag="&#xE8C8;" Style="{StaticResource IconPrimaryButton}" Margin="8,0,0,0" MinHeight="32" Click="BackUpNowButton_Click" />
+                            </Grid>
+                            <Grid x:Name="NowSharePanel" Visibility="Collapsed" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="User name for the share (if it asks for one)" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                    <TextBox x:Name="NowUserBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Password" FontWeight="SemiBold" Margin="0,0,0,6" />
+                                    <PasswordBox x:Name="NowPasswordBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel Grid.Row="1" Margin="0,14,0,0">
+                        <TextBlock Text="Automatic system image backups" FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ImageNoteText" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,8"
+                                   Text="The background service makes them with administrator rights, also when nobody is signed in, and keeps only the newest ones. A backup missed while the PC was off runs when it is on again. Setting one up needs an administrator account, but no password prompt." />
+                        <WrapPanel>
+                            <Button Content="Add" Tag="&#xE710;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" Click="AddImageButton_Click" />
+                            <Button x:Name="EditImageButton" Content="Edit" Tag="&#xE70F;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="EditImageButton_Click" />
+                            <Button x:Name="ToggleImageButton" Content="Turn off" Tag="&#xE7E8;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="ToggleImageButton_Click" />
+                            <Button x:Name="RunImageButton" Content="Run now" Tag="&#xE768;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="RunImageButton_Click" />
+                            <Button x:Name="RemoveImageButton" Content="Remove" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="RemoveImageButton_Click" />
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid Grid.Row="2" x:Name="ImageGrid" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" CanUserResizeRows="False" SelectionMode="Single" Margin="0,4,0,0" SelectionChanged="Grid_SelectionChanged">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="150" />
+                            <DataGridTextColumn Header="Where" Binding="{Binding Where}" Width="*" />
+                            <DataGridTextColumn Header="When" Binding="{Binding When}" Width="170" />
+                            <DataGridTextColumn Header="Last run" Binding="{Binding LastRun}" Width="1.4*" />
+                            <DataGridTextColumn Header="Next run" Binding="{Binding NextRun}" Width="130" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Folders: this user's, run as them by the status icon -->
+            <TabItem Header="Folders">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Copies of your folders: new and changed files are copied, nothing is deleted at the destination, so an accidentally deleted file stays in the backup. Live keeps the copy up to date half a minute after you change something. They run while you are signed in (the Windows Utility status icon runs them, as you)." />
+                        <WrapPanel>
+                            <Button Content="Add" Tag="&#xE710;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" Click="AddFolderButton_Click" />
+                            <Button x:Name="EditFolderButton" Content="Edit" Tag="&#xE70F;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="EditFolderButton_Click" />
+                            <Button x:Name="ToggleFolderButton" Content="Turn off" Tag="&#xE7E8;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="ToggleFolderButton_Click" />
+                            <Button x:Name="RunFolderButton" Content="Run now" Tag="&#xE768;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="RunFolderButton_Click" />
+                            <Button x:Name="OpenFolderCopyButton" Content="Open the copy" Tag="&#xE838;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="OpenFolderCopyButton_Click" />
+                            <Button x:Name="RemoveFolderButton" Content="Remove" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="RemoveFolderButton_Click" />
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" x:Name="FolderGrid" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" CanUserResizeRows="False" SelectionMode="Single" Margin="0,4,0,0" SelectionChanged="Grid_SelectionChanged">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="130" />
+                            <DataGridTextColumn Header="Folder" Binding="{Binding What}" Width="*" />
+                            <DataGridTextColumn Header="Copied to" Binding="{Binding Where}" Width="*" />
+                            <DataGridTextColumn Header="When" Binding="{Binding When}" Width="170" />
+                            <DataGridTextColumn Header="Last run" Binding="{Binding LastRun}" Width="1.3*" />
+                            <DataGridTextColumn Header="Next run" Binding="{Binding NextRun}" Width="120" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Restore & clone: administrator tools -->
+            <TabItem Header="Restore &amp; clone">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="0,12,8,0">
+                        <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,12"
+                                   Text="These write to whole disks, so they open in their own window and Windows asks for an administrator password." />
+                        <WrapPanel>
+                            <Button Content="Restore a backup to a disk" Tag="&#xE777;" Style="{StaticResource IconPrimaryButton}" Margin="0,0,10,10" MinHeight="36" Click="RestoreButton_Click"
+                                    ToolTip="Put a system image back onto a disk (a new SSD after a failure), made to start Windows, or open a backup to copy single files out." />
+                            <Button Content="Clone a disk to a new SSD" Tag="&#xE8C8;" Style="{StaticResource IconCompactButton}" Margin="0,0,10,10" MinHeight="36" Click="CloneButton_Click"
+                                    ToolTip="Copy the whole disk to another disk directly (no image file); the new disk starts Windows." />
+                            <Button Content="Copy one partition" Tag="&#xE8C8;" Style="{StaticResource IconCompactButton}" Margin="0,0,10,10" MinHeight="36" Click="PartitionButton_Click"
+                                    ToolTip="Copy a single partition into free space or over another partition." />
+                            <Button Content="Back up chosen partitions" Tag="&#xE8C8;" Style="{StaticResource IconCompactButton}" Margin="0,0,10,10" MinHeight="36" Click="ChosenPartitionsButton_Click"
+                                    ToolTip="A system image with only the partitions you tick, or of another disk." />
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- Editor for both kinds -->
+        <Border Grid.Row="2" x:Name="Editor" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,10,0,0">
+            <StackPanel>
+                <TextBlock x:Name="EditorTitle" Text="New backup" FontSize="14" FontWeight="SemiBold" />
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Name" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <TextBox x:Name="NameBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" x:Name="DiskPanel">
+                        <TextBlock Text="Disk to back up (all its partitions)" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <ComboBox x:Name="DiskComboBox" DisplayMemberPath="Text" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" x:Name="SourcePanel" Visibility="Collapsed">
+                        <TextBlock Text="Folder to back up" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="SourceBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" />
+                            <Button Grid.Column="1" Content="Browse..." Tag="&#xE8B7;" Style="{StaticResource IconCompactButton}" Margin="8,0,0,0" Click="BrowseSourceButton_Click" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="Save the backup in" FontWeight="SemiBold" Margin="0,10,0,6" />
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBox x:Name="DestinationBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" TextChanged="Destination_Changed" />
+                    <Button Grid.Column="1" Content="Browse..." Tag="&#xE8B7;" Style="{StaticResource IconCompactButton}" Margin="8,0,0,0" Click="BrowseDestinationButton_Click" />
+                </Grid>
+                <Grid x:Name="SharePanel" Visibility="Collapsed" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="User name for the share (if it asks for one)" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <TextBox x:Name="UserBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock x:Name="PasswordLabel" Text="Password (kept encrypted)" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <PasswordBox x:Name="PasswordBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+                <WrapPanel Margin="0,10,0,0">
+                    <StackPanel Margin="0,0,16,6">
+                        <TextBlock Text="How often" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <ComboBox x:Name="FrequencyComboBox" Width="190" SelectionChanged="Frequency_Changed" />
+                    </StackPanel>
+                    <StackPanel x:Name="IntervalPanel" Margin="0,0,16,6">
+                        <TextBlock x:Name="IntervalLabel" Text="Every" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <ComboBox x:Name="IntervalComboBox" Width="120" DisplayMemberPath="Text" />
+                    </StackPanel>
+                    <StackPanel x:Name="TimePanel" Margin="0,0,16,6">
+                        <TextBlock Text="At" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <StackPanel Orientation="Horizontal">
+                            <ComboBox x:Name="HourComboBox" Width="70" />
+                            <TextBlock Text=":" VerticalAlignment="Center" Margin="4,0" />
+                            <ComboBox x:Name="MinuteComboBox" Width="70" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel x:Name="MonthDayPanel" Margin="0,0,16,6" Visibility="Collapsed">
+                        <TextBlock Text="On day" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <ComboBox x:Name="MonthDayComboBox" Width="70" />
+                    </StackPanel>
+                    <StackPanel x:Name="KeepPanel" Margin="0,0,16,6">
+                        <TextBlock Text="Backups to keep" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <ComboBox x:Name="KeepComboBox" Width="70" />
+                    </StackPanel>
+                </WrapPanel>
+                <ItemsControl x:Name="WeekDaysList" Visibility="Collapsed" Margin="0,2,0,0">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Content="{Binding Text}" IsChecked="{Binding IsChecked, Mode=TwoWay}" Margin="0,0,14,6" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="EditorNote" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Button x:Name="SaveButton" Content="Save" Tag="&#xE74E;" Style="{StaticResource IconPrimaryButton}" MinHeight="34" Click="SaveButton_Click" />
+                    <Button Content="Cancel" Tag="&#xE711;" Style="{StaticResource IconCompactButton}" Margin="10,0,0,0" Click="CancelButton_Click" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusLine" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Tip: keep at least one backup on a disk that is not inside this PC." />
+            <Button Grid.Column="1" Content="Close" Tag="&#xE711;" Style="{StaticResource IconButton}" Width="100" MinHeight="36" Click="CloseButton_Click" Margin="12,0,0,0" />
+        </Grid>
+    </Grid>
+</Window>
