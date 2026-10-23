@@ -131,21 +131,11 @@ public class BackupScheduleTests
         }
     }
 
-    [Fact]
-    public void RobocopySummary_IsReadIntoOneLine()
-    {
-        const string output = """
-                           Total    Copied   Skipped  Mismatch    FAILED    Extras
-                Dirs :        12         1        11         0         0         0
-               Files :      1234        56      1176         0         2         0
-               Bytes :   1.521 g   120.5 m   1.403 g         0    15.2 k         0
-            """;
-        Assert.Equal("1234 files, 56 copied, 1176 unchanged, 2 failed, 120.5 mB copied", FolderBackupRunner.Summarize(output));
-        Assert.Equal("no summary from robocopy", FolderBackupRunner.Summarize("nothing"));
-    }
+
 }
 
 file static class ScheduleExtensions
 {
     public static BackupSchedule WithTime(this BackupSchedule schedule, int minutes) => new() { Frequency = schedule.Frequency, TimeOfDayMinutes = minutes, WeekDays = schedule.WeekDays };
 }
+

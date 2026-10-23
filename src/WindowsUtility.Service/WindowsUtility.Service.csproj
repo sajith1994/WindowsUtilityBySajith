@@ -61,6 +61,7 @@
     <Compile Include="..\WindowsUtility\Services\BackupScheduleStore.cs" Link="Services\BackupScheduleStore.cs" />
     <Compile Include="..\WindowsUtility\Services\BackupRunner.cs" Link="Services\BackupRunner.cs" />
     <Compile Include="..\WindowsUtility\Services\FolderBackupRunner.cs" Link="Services\FolderBackupRunner.cs" />
+    <Compile Include="..\WindowsUtility\Services\FolderBackupHistory.cs" Link="Services\FolderBackupHistory.cs" />
     <!-- The phone page when the dashboard is not running: the dashboard's own way of checking the PCs. -->
     <Compile Include="..\WindowsUtility\Services\RemoteMonitorClient.cs" Link="Services\RemoteMonitorClient.cs" />
     <Compile Include="..\WindowsUtility\Services\RemotePcView.cs" Link="Services\RemotePcView.cs" />

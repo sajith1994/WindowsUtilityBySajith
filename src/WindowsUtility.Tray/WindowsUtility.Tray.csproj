@@ -28,6 +28,7 @@
     <Compile Include="..\WindowsUtility\Models\BackupSchedule.cs" Link="Models\BackupSchedule.cs" />
     <Compile Include="..\WindowsUtility\Services\BackupScheduleStore.cs" Link="Services\BackupScheduleStore.cs" />
     <Compile Include="..\WindowsUtility\Services\FolderBackupRunner.cs" Link="Services\FolderBackupRunner.cs" />
+    <Compile Include="..\WindowsUtility\Services\FolderBackupHistory.cs" Link="Services\FolderBackupHistory.cs" />
     <Compile Include="..\WindowsUtility\Services\FolderBackupScheduler.cs" Link="Services\FolderBackupScheduler.cs" />
   </ItemGroup>
 </Project>

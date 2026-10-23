@@ -95,12 +95,15 @@ public class BackupFeatureTests
             await scheduler.RunDueAsync(DateTime.Now, CancellationToken.None);
             Assert.Equal("third", File.ReadAllText(Path.Combine(destination, "Work", "c.txt")));
 
-            // Deleting from the folder deletes nothing in the backup.
+            // Deleting from the folder removes it from the copy, but keeps it in the history for a restore.
             File.Delete(Path.Combine(source, "a.txt"));
             await Task.Delay(1000);
             scheduler.NoteChange(live.Id, DateTime.UtcNow.AddSeconds(-31));
             await scheduler.RunDueAsync(DateTime.Now, CancellationToken.None);
-            Assert.True(File.Exists(Path.Combine(destination, "Work", "a.txt")));
+            string target = Path.Combine(destination, "Work");
+            Assert.False(File.Exists(Path.Combine(target, "a.txt")));
+            Assert.Contains(Directory.GetFiles(FolderBackupHistory.HistoryFolder(target), "a.txt", SearchOption.AllDirectories), path => File.ReadAllText(path) == "first");
+            Assert.True(FolderBackupHistory.Versions(target).Count >= 2);
         }
         finally
         {

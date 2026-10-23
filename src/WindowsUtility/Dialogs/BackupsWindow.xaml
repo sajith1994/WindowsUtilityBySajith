@@ -88,12 +88,13 @@
                     </Grid.RowDefinitions>
                     <StackPanel>
                         <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
-                                   Text="Copies of your folders: new and changed files are copied, nothing is deleted at the destination, so an accidentally deleted file stays in the backup. Live keeps the copy up to date half a minute after you change something. They run while you are signed in (the Windows Utility status icon runs them, as you)." />
+                                   Text="Copies of your folders that follow the folder: new and changed files are copied, and every file that is replaced or removed is kept, with its date, in the copy's history, so you can go back to how the folder was on any earlier run (Restore from a date). Live keeps the copy up to date half a minute after you change something. They run while you are signed in (the Windows Utility status icon runs them, as you)." />
                         <WrapPanel>
                             <Button Content="Add" Tag="&#xE710;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" Click="AddFolderButton_Click" />
                             <Button x:Name="EditFolderButton" Content="Edit" Tag="&#xE70F;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="EditFolderButton_Click" />
                             <Button x:Name="ToggleFolderButton" Content="Turn off" Tag="&#xE7E8;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="ToggleFolderButton_Click" />
                             <Button x:Name="RunFolderButton" Content="Run now" Tag="&#xE768;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="RunFolderButton_Click" />
+                            <Button x:Name="RestoreFolderButton" Content="Restore from a date" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="RestoreFolderButton_Click" />
                             <Button x:Name="OpenFolderCopyButton" Content="Open the copy" Tag="&#xE838;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="OpenFolderCopyButton_Click" />
                             <Button x:Name="RemoveFolderButton" Content="Remove" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}" Margin="0,0,8,6" IsEnabled="False" Click="RemoveFolderButton_Click" />
                         </WrapPanel>
@@ -131,6 +132,39 @@
                 </ScrollViewer>
             </TabItem>
         </TabControl>
+
+        <!-- Restore a folder backup as it was at an earlier run -->
+        <Border Grid.Row="2" x:Name="RestorePanel" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,10,0,0">
+            <StackPanel>
+                <TextBlock x:Name="RestoreTitle" Text="Restore from a date" FontSize="14" FontWeight="SemiBold" />
+                <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,10"
+                           Text="Each run of the backup remembers how the folder was then. Choose the run from before the mistake, and where the folder as it was should go: back over the original folder (files changed since are replaced; the backup's history keeps the current ones), or into another folder to pick from." />
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="The folder as it was on" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <ComboBox x:Name="VersionComboBox" DisplayMemberPath="Title" SelectionChanged="Version_Changed" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Put it" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <ComboBox x:Name="RestoreWhereComboBox" SelectionChanged="RestoreWhere_Changed">
+                            <ComboBoxItem Content="Back into the original folder" />
+                            <ComboBoxItem Content="Into another folder..." />
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+                <Grid x:Name="RestoreOtherPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBox x:Name="RestoreOtherBox" Height="32" Padding="6,2" VerticalContentAlignment="Center" />
+                    <Button Grid.Column="1" Content="Browse..." Tag="&#xE8B7;" Style="{StaticResource IconCompactButton}" Margin="8,0,0,0" Click="BrowseRestoreOtherButton_Click" />
+                </Grid>
+                <TextBlock x:Name="VersionSummary" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Button x:Name="DoRestoreButton" Content="Restore" Tag="&#xE81C;" Style="{StaticResource IconPrimaryButton}" MinHeight="34" IsEnabled="False" Click="DoRestoreButton_Click" />
+                    <Button Content="Cancel" Tag="&#xE711;" Style="{StaticResource IconCompactButton}" Margin="10,0,0,0" Click="CancelRestoreButton_Click" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
 
         <!-- Editor for both kinds -->
         <Border Grid.Row="2" x:Name="Editor" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,10,0,0">
@@ -196,6 +230,10 @@
                     <StackPanel x:Name="KeepPanel" Margin="0,0,16,6">
                         <TextBlock Text="Backups to keep" FontWeight="SemiBold" Margin="0,0,0,6" />
                         <ComboBox x:Name="KeepComboBox" Width="70" />
+                    </StackPanel>
+                    <StackPanel x:Name="HistoryPanel" Margin="0,0,16,6" Visibility="Collapsed">
+                        <TextBlock Text="Keep replaced and removed files for" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <ComboBox x:Name="HistoryComboBox" Width="130" DisplayMemberPath="Text" />
                     </StackPanel>
                 </WrapPanel>
                 <ItemsControl x:Name="WeekDaysList" Visibility="Collapsed" Margin="0,2,0,0">

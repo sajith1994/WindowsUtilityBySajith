@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO;
-using System.Text.RegularExpressions;
 using WindowsUtility.Models;
 
 namespace WindowsUtility.Services;
@@ -8,9 +7,10 @@ namespace WindowsUtility.Services;
 public sealed record BackupRunResult(bool Succeeded, string Message);
 
 /// <summary>
-/// Copies a folder backup with robocopy, as the signed-in user (so only what they can read is copied, only to where
-/// they can write): new and changed files only; nothing is deleted at the destination. Used by the status icon on
-/// schedule and for live sync, and by "Run now" in the dashboard. One run of a backup at a time across processes.
+/// Copies a folder backup as the signed-in user (so only what they can read is copied, only to where they can write).
+/// The copy mirrors the folder; what it replaces or removes is kept, dated, in the copy's history (see
+/// <see cref="FolderBackupHistory"/>). Used by the status icon on schedule and for live sync, and by "Run now" in the
+/// dashboard. One run of a backup at a time across processes.
 /// </summary>
 public static class FolderBackupRunner
 {
@@ -90,42 +90,175 @@ public static class FolderBackupRunner
 
         string target = TargetFolder(schedule);
         Directory.CreateDirectory(target);
-        log?.Invoke($"Copying {source} to {target} (new and changed files; nothing is deleted there).");
+        log?.Invoke($"Copying {source} to {target}; replaced and removed files go to its {FolderBackupHistory.HistoryFolderName} folder.");
+        CopyOutcome outcome = await Task.Run(() => Copy(source, target, schedule.HistoryDays, DateTime.UtcNow, cancellationToken), cancellationToken);
+        string text = outcome.Describe();
+        log?.Invoke(text);
+        return new BackupRunResult(outcome.Failed == 0, text);
+    }
 
-        // /E all folders, /XO only files newer than the copy, /R:1 one retry, /XJ no junctions (they loop),
-        // /NP /NFL /NDL /NJH the summary only.
-        ProcessStartInfo startInfo = new("robocopy.exe")
+    internal sealed record CopyOutcome(int Total, int Copied, int Unchanged, int Failed, int Removed, long BytesCopied, string FirstError)
+    {
+        public string Describe()
         {
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        foreach (string argument in new[] { source, target, "/E", "/COPY:DAT", "/DCOPY:DAT", "/XO", "/R:1", "/W:2", "/XJ", "/NP", "/NFL", "/NDL", "/NJH" })
+            string summary = $"{Total} files, {Copied} copied, {Unchanged} unchanged" + (Removed > 0 ? $", {Removed} replaced or removed (kept in the history)" : string.Empty)
+                + $", {FormatBytes(BytesCopied)} copied";
+            return Failed == 0 ? $"Folder copied: {summary}." : $"{Failed} file{(Failed == 1 ? "" : "s")} could not be copied ({FirstError}); {summary}.";
+        }
+    }
+
+    /// <summary>
+    /// Makes the copy mirror the folder: new and changed files are copied (the replaced copy moves to this run's
+    /// history folder), files no longer in the folder move there too, and a list of every file as it is now is
+    /// written for "restore as of". Files in use are skipped and counted. Junctions and symbolic links are not followed.
+    /// </summary>
+    internal static CopyOutcome Copy(string source, string target, int historyDays, DateTime nowUtc, CancellationToken cancellationToken)
+    {
+        string history = FolderBackupHistory.RunFolder(target, nowUtc);
+        int copied = 0, unchanged = 0, failed = 0, removed = 0;
+        long bytes = 0;
+        string firstError = string.Empty;
+        List<BackupFileVersion> manifest = new();
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (FileInfo file in EnumerateFiles(new DirectoryInfo(source)))
         {
-            startInfo.ArgumentList.Add(argument);
+            cancellationToken.ThrowIfCancellationRequested();
+            string relative = Path.GetRelativePath(source, file.FullName);
+            seen.Add(relative);
+            string copy = Path.Combine(target, relative);
+            try
+            {
+                FileInfo existing = new(copy);
+                if (existing.Exists && FolderBackupHistory.SameFile(file.Length, file.LastWriteTimeUtc, existing))
+                {
+                    unchanged++;
+                }
+                else
+                {
+                    if (existing.Exists)
+                    {
+                        MoveToHistory(target, history, relative);
+                        removed++;
+                    }
+
+                    Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
+                    File.Copy(file.FullName, copy, overwrite: true);
+                    File.SetLastWriteTimeUtc(copy, file.LastWriteTimeUtc);
+                    copied++;
+                    bytes += file.Length;
+                }
+
+                manifest.Add(new BackupFileVersion(relative, file.Length, file.LastWriteTimeUtc));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                failed++;
+                if (firstError.Length == 0)
+                {
+                    firstError = $"{relative}: {exception.Message}";
+                }
+            }
         }
 
-        using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("robocopy could not be started.");
-        Task<string> output = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        Task<string> error = process.StandardError.ReadToEndAsync(cancellationToken);
+        // Files the folder no longer has: kept, dated, in the history.
+        foreach (FileInfo gone in EnumerateFiles(new DirectoryInfo(target), skip: FolderBackupHistory.HistoryFolderName))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string relative = Path.GetRelativePath(target, gone.FullName);
+            if (seen.Contains(relative))
+            {
+                continue;
+            }
+
+            try
+            {
+                MoveToHistory(target, history, relative);
+                removed++;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                ApplicationLogService.WriteException("Folder backup: moving a removed file to the history", exception);
+            }
+        }
+
+        RemoveEmptyFolders(new DirectoryInfo(target), skip: FolderBackupHistory.HistoryFolderName);
+        FolderBackupHistory.WriteManifest(target, nowUtc, manifest);
+        FolderBackupHistory.Prune(target, historyDays, nowUtc);
+        return new CopyOutcome(manifest.Count + failed, copied, unchanged, failed, removed, bytes, firstError);
+    }
+
+    private static void MoveToHistory(string target, string historyRun, string relative)
+    {
+        string kept = Path.Combine(historyRun, relative);
+        Directory.CreateDirectory(Path.GetDirectoryName(kept)!);
+        File.Move(Path.Combine(target, relative), kept, overwrite: true);
+    }
+
+    private static IEnumerable<FileInfo> EnumerateFiles(DirectoryInfo folder, string? skip = null)
+    {
+        IEnumerable<FileSystemInfo> entries;
         try
         {
-            await process.WaitForExitAsync(cancellationToken);
+            entries = folder.EnumerateFileSystemInfos();
         }
-        catch (OperationCanceledException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            throw;
+            yield break;
         }
 
-        string summary = Summarize(await output);
-        // robocopy exit codes: bits 0-2 report copies and extras, 8 and 16 mean failures.
-        bool ok = process.ExitCode < 8;
-        string text = ok ? $"Folder copied: {summary}" : $"Some files could not be copied ({summary}). {(await error).Trim()}".Trim();
-        log?.Invoke(text);
-        return new BackupRunResult(ok, text);
+        foreach (FileSystemInfo entry in entries)
+        {
+            if (entry.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                continue; // junctions and links can loop, and point outside the folder
+            }
+
+            if (entry is DirectoryInfo directory)
+            {
+                if (skip is not null && directory.Name.Equals(skip, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                foreach (FileInfo nested in EnumerateFiles(directory))
+                {
+                    yield return nested;
+                }
+            }
+            else if (entry is FileInfo file)
+            {
+                yield return file;
+            }
+        }
     }
+
+    private static void RemoveEmptyFolders(DirectoryInfo folder, string? skip)
+    {
+        foreach (DirectoryInfo child in folder.EnumerateDirectories().Where(child => !child.Attributes.HasFlag(FileAttributes.ReparsePoint)
+                     && (skip is null || !child.Name.Equals(skip, StringComparison.OrdinalIgnoreCase))))
+        {
+            RemoveEmptyFolders(child, null);
+            try
+            {
+                if (!child.EnumerateFileSystemInfos().Any())
+                {
+                    child.Delete();
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
+    internal static string FormatBytes(long bytes) => bytes switch
+    {
+        >= 1024L * 1024 * 1024 => $"{bytes / 1024.0 / 1024 / 1024:0.0} GB",
+        >= 1024L * 1024 => $"{bytes / 1024.0 / 1024:0.0} MB",
+        >= 1024 => $"{bytes / 1024.0:0} KB",
+        _ => $"{bytes} B"
+    };
 
     /// <summary>Signs in to a network share (\\server\share\...) with a name and password for this session.</summary>
     public static async Task ConnectShareAsync(string path, string user, string password, CancellationToken cancellationToken)
@@ -151,20 +284,6 @@ public static class FolderBackupRunner
         {
             throw new InvalidOperationException($"Windows could not connect to {share}: {output.Trim()}");
         }
-    }
-
-    /// <summary>"1234 files, 56 copied, 1176 unchanged, 2 failed, 120.5 mB copied" from robocopy's summary table.</summary>
-    internal static string Summarize(string robocopyOutput)
-    {
-        Match files = Regex.Match(robocopyOutput, @"Files\s*:\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)");
-        Match bytes = Regex.Match(robocopyOutput, @"Bytes\s*:\s*([\d.]+\s*[kmgt]?)\s+([\d.]+\s*[kmgt]?)", RegexOptions.IgnoreCase);
-        if (!files.Success)
-        {
-            return "no summary from robocopy";
-        }
-
-        string copied = bytes.Success ? $", {bytes.Groups[2].Value.Trim()}B copied" : string.Empty;
-        return $"{files.Groups[1].Value} files, {files.Groups[2].Value} copied, {files.Groups[3].Value} unchanged, {files.Groups[5].Value} failed{copied}";
     }
 
     /// <summary>

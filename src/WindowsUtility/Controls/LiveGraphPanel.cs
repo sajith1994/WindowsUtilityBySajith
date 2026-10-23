@@ -315,7 +315,8 @@ public sealed class LiveGraphPanel : Grid, IDisposable
                     service is { CpuIsAvailable: true, CpuIsCpuSpecific: true, CpuTemperatureCelsius: double serviceCelsius } ? serviceCelsius
                         : temperature.IsAvailable ? temperature.ValueCelsius : null,
                     clock.IsAvailable && clock.Megahertz.HasValue ? clock.Megahertz.Value / 1000.0 : null,
-                    power.IsAvailable ? power.Watts : service?.CpuPackagePowerWatts,
+                    // Without administrator rights the local power sensor reads 0 W; the service's reading is the real one.
+                    service?.CpuPackagePowerWatts is double serviceWatts && serviceWatts > 0 ? serviceWatts : power.IsAvailable ? power.Watts : null,
                     FirstFanRpm(fans, FanGroup.Cpu) ?? service?.CpuFanRpm
                 };
             }
@@ -332,7 +333,7 @@ public sealed class LiveGraphPanel : Grid, IDisposable
                 {
                     load.IsAvailable ? load.LoadPercent : null,
                     temperature.IsAvailable ? temperature.ValueCelsius : null,
-                    power.IsAvailable ? power.Watts : service?.GpuPowerWatts,
+                    service?.GpuPowerWatts is double serviceGpuWatts && serviceGpuWatts > 0 ? serviceGpuWatts : power.IsAvailable ? power.Watts : null,
                     memory.UsedMegabytes.HasValue ? memory.UsedMegabytes.Value / 1024.0 : null,
                     FirstFanRpm(fans, FanGroup.Gpu)
                 };

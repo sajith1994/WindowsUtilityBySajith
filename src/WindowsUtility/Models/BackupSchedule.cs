@@ -61,6 +61,9 @@ public sealed class BackupSchedule
 
     /// <summary>Interval: minutes between runs (at least 5; system images at least 60).</summary>
     public int IntervalMinutes { get; set; } = 60;
+
+    /// <summary>Folder backups: how long replaced and deleted files stay in the backup's history (0 = for ever).</summary>
+    public int HistoryDays { get; set; } = 30;
 }
 
 /// <summary>How the last run of a schedule went, written by whoever ran it.</summary>

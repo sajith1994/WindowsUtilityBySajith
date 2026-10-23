@@ -36,6 +36,15 @@ public partial class BackupsWindow : Window
 
     public sealed record IntervalChoice(string Text, int Minutes);
 
+    public sealed record HistoryChoice(string Text, int Days);
+
+    private static readonly HistoryChoice[] HistoryChoices =
+    {
+        new("7 days", 7), new("14 days", 14), new("30 days", 30), new("90 days", 90), new("a year", 365), new("for ever", 0)
+    };
+
+    private BackupSchedule? _restoring;
+
     public sealed class DayPick
     {
         public DayPick(DayOfWeek day, bool isChecked)
@@ -58,6 +67,7 @@ public partial class BackupsWindow : Window
         MinuteComboBox.ItemsSource = new[] { "00", "15", "30", "45" };
         MonthDayComboBox.ItemsSource = Enumerable.Range(1, 28).ToList();
         KeepComboBox.ItemsSource = Enumerable.Range(1, 10).ToList();
+        HistoryComboBox.ItemsSource = HistoryChoices;
         Loaded += (_, _) =>
         {
             // Folder backups 2.0.88 kept in the shared file move into this user's own list.
@@ -144,6 +154,7 @@ public partial class BackupsWindow : Window
         EditFolderButton.IsEnabled = folder is not null;
         ToggleFolderButton.IsEnabled = folder is not null;
         RunFolderButton.IsEnabled = folder is not null && !_busy;
+        RestoreFolderButton.IsEnabled = folder is not null && !_busy;
         OpenFolderCopyButton.IsEnabled = folder is not null;
         RemoveFolderButton.IsEnabled = folder is not null;
         ToggleFolderButton.Content = folder?.Schedule is { Enabled: false } ? "Turn on" : "Turn off";
@@ -294,6 +305,132 @@ public partial class BackupsWindow : Window
         }
     }
 
+    // ---- Restore a folder as of a run ------------------------------------------------------------------------------
+
+    private void RestoreFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (FolderGrid.SelectedItem is not ScheduleRow { Schedule: { } schedule })
+        {
+            return;
+        }
+
+        Editor.Visibility = Visibility.Collapsed;
+        _restoring = schedule;
+        RestoreTitle.Text = $"Restore \"{schedule.Name}\" from a date";
+        List<BackupVersion> versions;
+        try
+        {
+            versions = FolderBackupHistory.Versions(FolderBackupRunner.TargetFolder(schedule));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            versions = new List<BackupVersion>();
+            StatusLine.Text = exception.Message;
+        }
+
+        VersionComboBox.ItemsSource = versions;
+        VersionComboBox.SelectedIndex = versions.Count > 0 ? 0 : -1;
+        RestoreWhereComboBox.SelectedIndex = 0;
+        RestoreOtherBox.Text = string.Empty;
+        VersionSummary.Text = versions.Count == 0 ? "This backup has not run since the history was added; its next run starts the history." : string.Empty;
+        RestorePanel.Visibility = Visibility.Visible;
+        Version_Changed(this, null!);
+    }
+
+    private void Version_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_restoring is null)
+        {
+            return;
+        }
+
+        if (VersionComboBox.SelectedItem is not BackupVersion version)
+        {
+            DoRestoreButton.IsEnabled = false;
+            return;
+        }
+
+        try
+        {
+            List<BackupFileVersion> files = FolderBackupHistory.Files(version);
+            VersionSummary.Text = $"{files.Count} files, {FolderBackupRunner.FormatBytes(files.Sum(file => file.Size))}, as the folder was on {version.Title}.";
+            DoRestoreButton.IsEnabled = !_busy;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            VersionSummary.Text = $"This run's list could not be read: {exception.Message}";
+            DoRestoreButton.IsEnabled = false;
+        }
+    }
+
+    private void RestoreWhere_Changed(object sender, SelectionChangedEventArgs e) =>
+        RestoreOtherPanel.Visibility = RestoreWhereComboBox.SelectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+
+    private void BrowseRestoreOtherButton_Click(object sender, RoutedEventArgs e) => BrowseFolder(RestoreOtherBox, "Choose the folder to restore into");
+
+    private async void DoRestoreButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_restoring is not { } schedule || VersionComboBox.SelectedItem is not BackupVersion version)
+        {
+            return;
+        }
+
+        bool original = RestoreWhereComboBox.SelectedIndex == 0;
+        string destination = original ? schedule.SourceFolder.TrimEnd('\\') : RestoreOtherBox.Text.Trim();
+        if (destination.Length == 0)
+        {
+            WpfMessageBox.Show(this, "Choose the folder to restore into.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        string target = FolderBackupRunner.TargetFolder(schedule);
+        if (destination.Equals(target, StringComparison.OrdinalIgnoreCase) || destination.StartsWith(target + "\\", StringComparison.OrdinalIgnoreCase))
+        {
+            WpfMessageBox.Show(this, "Restore into the original folder or another folder, not into the backup itself.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (WpfMessageBox.Show(this,
+                original
+                    ? $"Put {schedule.SourceFolder} back as it was on {version.Title}?\n\nFiles changed since then are replaced (the backup's next run keeps today's versions in its history). Files added since then stay."
+                    : $"Copy the folder as it was on {version.Title} into {destination}?",
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _busy = true;
+        DoRestoreButton.IsEnabled = false;
+        UpdateButtons();
+        try
+        {
+            (int restored, int unchanged, List<string> missing) = await Task.Run(() => FolderBackupHistory.Restore(target, version, destination,
+                (file, done, total) => Dispatcher.BeginInvoke(() => StatusLine.Text = $"Restoring {done} of {total}: {file}"), CancellationToken.None));
+            string text = $"Restored {restored} file{(restored == 1 ? "" : "s")} as of {version.Title} into {destination}; {unchanged} were already the same."
+                + (missing.Count > 0 ? $" {missing.Count} could not be found any more (history older than the days kept): {string.Join(", ", missing.Take(3))}{(missing.Count > 3 ? "..." : "")}" : string.Empty);
+            StatusLine.Text = text;
+            WpfMessageBox.Show(this, text, Title, MessageBoxButton.OK, missing.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            RestorePanel.Visibility = Visibility.Collapsed;
+            _restoring = null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            StatusLine.Text = exception.Message;
+            WpfMessageBox.Show(this, exception.Message, Title, MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _busy = false;
+            UpdateButtons();
+        }
+    }
+
+    private void CancelRestoreButton_Click(object sender, RoutedEventArgs e)
+    {
+        RestorePanel.Visibility = Visibility.Collapsed;
+        _restoring = null;
+    }
+
     private void OpenFolderCopyButton_Click(object sender, RoutedEventArgs e)
     {
         if (FolderGrid.SelectedItem is not ScheduleRow { Schedule: { } schedule })
@@ -337,8 +474,12 @@ public partial class BackupsWindow : Window
 
     private async void OpenEditor(BackupSchedule schedule)
     {
+        RestorePanel.Visibility = Visibility.Collapsed;
+        _restoring = null;
         _editing = schedule;
         bool folder = schedule.Kind == BackupKind.Folder;
+        HistoryPanel.Visibility = folder ? Visibility.Visible : Visibility.Collapsed;
+        HistoryComboBox.SelectedItem = HistoryChoices.FirstOrDefault(choice => choice.Days == schedule.HistoryDays) ?? HistoryChoices[2];
         bool existing = (folder ? _folderSchedules : _imageSchedules).Any(each => each.Id == schedule.Id);
         EditorTitle.Text = (existing ? "Edit " : "New ") + (folder ? "folder backup" : "automatic system image backup");
         NameBox.Text = schedule.Name;
@@ -379,7 +520,7 @@ public partial class BackupsWindow : Window
             && (choice.Frequency != BackupFrequency.Interval || (choice.UnitMinutes == 60) == inHours)) ?? frequencies[0];
         SelectInterval(schedule.IntervalMinutes);
         EditorNote.Text = folder
-            ? "Runs as you while you are signed in. New and changed files are copied into a folder of the same name at the destination; nothing there is deleted."
+            ? "Runs as you while you are signed in. The copy, in a folder of the same name at the destination, follows the folder; files it replaces or removes are kept with their date in its _History folder, for Restore from a date."
             : "Made by the background service with administrator rights, also when nobody is signed in; only the newest backups are kept in the destination.";
         Editor.Visibility = Visibility.Visible;
 
@@ -458,6 +599,7 @@ public partial class BackupsWindow : Window
         schedule.DayOfMonth = MonthDayComboBox.SelectedItem as int? ?? 1;
         schedule.WeekDays = (WeekDaysList.ItemsSource as IEnumerable<DayPick> ?? Array.Empty<DayPick>()).Where(pick => pick.IsChecked).Select(pick => pick.Day).ToList();
         schedule.Keep = KeepComboBox.SelectedItem as int? ?? 3;
+        schedule.HistoryDays = (HistoryComboBox.SelectedItem as HistoryChoice)?.Days ?? 30;
         DiskChoice? disk = DiskComboBox.SelectedItem as DiskChoice;
         schedule.WindowsDisk = disk?.Disk is null;
         schedule.DiskName = disk?.Disk?.Name ?? string.Empty;

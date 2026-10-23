@@ -260,6 +260,21 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.90] - 2026-10-23
+
+### Added
+- **Folder backups keep a history and can be restored from a date.** The copy now follows the folder (a file you
+  delete leaves the copy too), and every file the copy replaces or removes is kept, with its date, in the copy's
+  `_History` folder. Each run remembers how the folder was. **Restore from a date** (Back up & restore > Folders)
+  puts the folder back as it was on any earlier run, over the original folder or into another folder, e.g. to undo a
+  change made two or three days ago. "Keep replaced and removed files for" 7 days to for ever (30 days by default)
+  limits how much the history takes.
+- Folder backups copy with the program itself instead of robocopy, so the result says exactly what was copied,
+  replaced, removed or could not be read.
+
+### Fixed
+- The CPU live graph showed package power as 0 W: the dashboard's own power sensor reads 0 without administrator
+  rights, so the graph now uses the background service's reading (also for GPU power), as the Processor tile does.
 ## [2.0.89] - 2026-10-23
 
 ### Added
