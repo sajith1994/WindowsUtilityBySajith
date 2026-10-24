@@ -92,6 +92,29 @@ public sealed class BackupScheduleState
 /// <summary>When a schedule runs. Pure logic, local time.</summary>
 public static class BackupScheduling
 {
+    /// <summary>What the list shows for a run the PC or the service stopped before it finished.</summary>
+    public const string InterruptedMessage = "Interrupted: the PC or the service stopped before it finished. It runs again at its next time; Run now starts it sooner.";
+
+    /// <summary>
+    /// Only the background service runs image backups, one at a time, so when it starts no backup can be running.
+    /// A state still marked running was left by a run the PC or the service stopped mid-way (a power cut, a
+    /// restart). Marks it as such; returns false when the state was not running.
+    /// </summary>
+    public static bool MarkInterrupted(BackupScheduleState state)
+    {
+        if (!state.Running)
+        {
+            return false;
+        }
+
+        state.Running = false;
+        state.LastSucceeded = false;
+        state.Stage = string.Empty;
+        state.Fraction = 0;
+        state.LastMessage = InterruptedMessage;
+        return true;
+    }
+
     /// <summary>The first time the schedule is due strictly after a moment.</summary>
     public static DateTime NextRun(BackupSchedule schedule, DateTime afterLocal)
     {

@@ -12,6 +12,26 @@ public class BackupScheduleTests
     private static readonly DateTime Now = new(2026, 10, 22, 15, 30, 0, DateTimeKind.Local);
 
     [Fact]
+    public void ARunLeftRunningByAStoppedPc_IsMarkedInterrupted()
+    {
+        // The service saved this progress just before the PC lost power; the list showed it for ever.
+        BackupScheduleState cutShort = new() { Id = Guid.NewGuid(), Name = "Windows image", Running = true, Stage = "Copying EFI system", Fraction = 0.0006, LastMessage = "Running...", LastRunUtc = Now.ToUniversalTime() };
+        Assert.True(BackupScheduling.MarkInterrupted(cutShort));
+        Assert.False(cutShort.Running);
+        Assert.False(cutShort.LastSucceeded);
+        Assert.Equal(string.Empty, cutShort.Stage);
+        Assert.Equal(0, cutShort.Fraction);
+        Assert.Equal(BackupScheduling.InterruptedMessage, cutShort.LastMessage);
+        Assert.Equal(Now.ToUniversalTime(), cutShort.LastRunUtc); // when it ran is kept, so the schedule stays due as before
+
+        // A finished run is left alone.
+        BackupScheduleState finished = new() { Id = Guid.NewGuid(), LastSucceeded = true, LastMessage = "Full backup saved: a.vhdx", Fraction = 1 };
+        Assert.False(BackupScheduling.MarkInterrupted(finished));
+        Assert.True(finished.LastSucceeded);
+        Assert.Equal("Full backup saved: a.vhdx", finished.LastMessage);
+    }
+
+    [Fact]
     public void ADailySchedule_RunsAtItsTimeTodayOrTomorrow()
     {
         BackupSchedule schedule = new() { Frequency = BackupFrequency.Daily, TimeOfDayMinutes = 20 * 60 };

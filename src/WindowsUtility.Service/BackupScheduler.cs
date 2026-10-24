@@ -21,12 +21,16 @@ internal sealed class BackupScheduler
     private readonly object _scheduleLock = new();
     private readonly object _stateLock = new();
 
+    /// <summary>The backup running at this moment (one at a time), so "Run now" knows without trusting a saved state.</summary>
+    private volatile BackupSchedule? _active;
+
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         try
         {
             BackupScheduleStore.SecureProtectedDirectory();
             MigrateLegacySchedules();
+            ClearInterruptedRuns();
             PublishSchedules();
             PublishStates();
         }
@@ -115,7 +119,9 @@ internal sealed class BackupScheduler
     public string RunNow(Guid id)
     {
         BackupSchedule schedule = _store.LoadSchedules().FirstOrDefault(each => each.Id == id) ?? throw new InvalidOperationException("That backup was not found.");
-        if (_store.LoadState(id) is { Running: true })
+        // What this service is doing decides, not the saved state: a state left "running" by a run the PC stopped
+        // mid-way must not refuse every Run now until the next scheduled time.
+        if (IsActiveOrQueued(id))
         {
             return $"\"{schedule.Name}\" is already running.";
         }
@@ -168,10 +174,12 @@ internal sealed class BackupScheduler
         foreach (BackupSchedule schedule in schedules.Where(each => each.Kind == BackupKind.SystemImage))
         {
             BackupScheduleState? state = states.FirstOrDefault(each => each.Id == schedule.Id);
-            // A state left "running" by a service that stopped mid-way cannot still be true after half a day.
-            if (state is { Running: true } && state.LastRunUtc is DateTime started && DateTime.UtcNow - started > TimeSpan.FromHours(12))
+            // Backups run one at a time on this loop, so none is running now: a state still "running" was left by a
+            // run that was cut short. Saved, so the list stops showing it as running.
+            if (state is not null && BackupScheduling.MarkInterrupted(state))
             {
-                state.Running = false;
+                ServiceLog.Write("Image backups", $"\"{schedule.Name}\" was interrupted before it finished; it runs again at its next time.");
+                Record(state);
             }
 
             if (BackupScheduling.IsDue(schedule, state, DateTime.Now, created))
@@ -185,6 +193,10 @@ internal sealed class BackupScheduler
     {
         DateTime started = DateTime.UtcNow;
         string name = schedule.Name;
+        _active = schedule;
+        // Progress arrives on pool threads, so a report can come in after the run has ended; once the final state is
+        // saved, a late report must not put the run back to "running" for good.
+        bool finished = false;
         Record(new BackupScheduleState { Id = schedule.Id, Name = name, LastRunUtc = started, Running = true, Stage = "Starting...", LastMessage = "Running..." });
         ServiceLog.Write("Image backups", $"Starting \"{name}\" to {schedule.Destination} ({BackupScheduling.Describe(schedule)}).");
         DateTime reportedAt = DateTime.MinValue;
@@ -200,23 +212,69 @@ internal sealed class BackupScheduler
             if (DateTime.UtcNow - reportedAt >= TimeSpan.FromSeconds(3))
             {
                 reportedAt = DateTime.UtcNow;
-                Record(new BackupScheduleState { Id = schedule.Id, Name = name, LastRunUtc = started, Running = true, Stage = update.Stage, Fraction = update.Fraction, LastMessage = "Running..." });
+                lock (_stateLock)
+                {
+                    if (!finished)
+                    {
+                        Record(new BackupScheduleState { Id = schedule.Id, Name = name, LastRunUtc = started, Running = true, Stage = update.Stage, Fraction = update.Fraction, LastMessage = "Running..." });
+                    }
+                }
             }
         });
 
-        BackupRunResult result;
         try
         {
-            result = await _runner.RunImageAsync(schedule, password, progress, cancellationToken);
+            BackupRunResult result;
+            try
+            {
+                result = await _runner.RunImageAsync(schedule, password, progress, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                Finish(new BackupScheduleState { Id = schedule.Id, Name = name, LastRunUtc = started, LastSucceeded = false, LastMessage = "Stopped: the service was stopping." });
+                throw;
+            }
+
+            Finish(new BackupScheduleState { Id = schedule.Id, Name = name, LastRunUtc = started, LastSucceeded = result.Succeeded, LastMessage = result.Message, Fraction = result.Succeeded ? 1 : 0 });
+            ServiceLog.Write("Image backups", $"\"{name}\" {(result.Succeeded ? "finished" : "failed")}: {result.Message}");
         }
-        catch (OperationCanceledException)
+        finally
         {
-            Record(new BackupScheduleState { Id = schedule.Id, Name = name, LastRunUtc = started, LastSucceeded = false, LastMessage = "Stopped: the service was stopping." });
-            throw;
+            _active = null;
         }
 
-        Record(new BackupScheduleState { Id = schedule.Id, Name = name, LastRunUtc = started, LastSucceeded = result.Succeeded, LastMessage = result.Message, Fraction = result.Succeeded ? 1 : 0 });
-        ServiceLog.Write("Image backups", $"\"{name}\" {(result.Succeeded ? "finished" : "failed")}: {result.Message}");
+        void Finish(BackupScheduleState final)
+        {
+            lock (_stateLock)
+            {
+                finished = true;
+                Record(final);
+            }
+        }
+    }
+
+    /// <summary>Whether this service is running or about to run the schedule (the saved state is not trusted for this).</summary>
+    private bool IsActiveOrQueued(Guid id) =>
+        _active?.Id == id || _requested.Any(request => request.Schedule.Id == id);
+
+    /// <summary>
+    /// At start, no backup is running, so every state still marked running was left by a run the PC or the service
+    /// stopped mid-way (a power cut, a restart). Without this the list showed it running at the same percentage for
+    /// ever, and "Run now" answered that it was already running.
+    /// </summary>
+    private void ClearInterruptedRuns()
+    {
+        lock (_stateLock)
+        {
+            foreach (BackupScheduleState state in _store.LoadStates())
+            {
+                if (BackupScheduling.MarkInterrupted(state))
+                {
+                    ServiceLog.Write("Image backups", $"\"{state.Name}\" was interrupted before it finished (the PC or the service stopped); it runs again at its next time.");
+                    _store.UpdateState(state);
+                }
+            }
+        }
     }
 
     /// <summary>

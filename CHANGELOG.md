@@ -260,6 +260,16 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.94] - 2026-10-24
+
+### Fixed
+- **An image backup cut short by a power cut or restart no longer shows as running for ever.** The service saves a
+  backup's progress while it runs; when the PC stopped mid-way, that last saved progress (for example "Copying EFI
+  system 0%") stayed in the list, and "Run now" answered that the backup was already running until its next scheduled
+  time. The service now marks such a run "Interrupted" when it starts, and "Run now" goes by what the service is
+  really doing rather than by the saved state. A progress report arriving just after a run ended can no longer put
+  the run back to "running" either.
+
 ## [2.0.93] - 2026-10-24
 
 ### Fixed
