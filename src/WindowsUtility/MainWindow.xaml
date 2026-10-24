@@ -415,86 +415,158 @@
                         </Border>
                         </controls:DashboardTile>
 
-                            <!-- One card per physical component. Click to open live graphs. -->
+                            <!-- One tile per physical component: live readings on top (click them for graphs), then the
+                                 component's inventory and settings. Each part keeps its own click target, so the
+                                 sliders and buttons below the line never open the graphs window. -->
                             <controls:DashboardTile TileId="cpu" Title="Processor" Span="2">
-                            <Border Style="{StaticResource MetricCardStyle}" Cursor="Hand"
-                                    MouseLeftButtonUp="CpuCard_Click" ToolTip="Open live CPU graphs">
+                            <Border Style="{StaticResource MetricCardStyle}">
                                 <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE957;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="Processor" Style="{StaticResource InfoLabelStyle}" />
-                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
-                                                   VerticalAlignment="Center" Margin="6,0,0,0" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="CpuTemperatureText" Text="Checking..." FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
-                                    <UniformGrid Columns="2" Margin="0,0,0,4">
+                                    <Border Background="Transparent" Cursor="Hand" MouseLeftButtonUp="CpuCard_Click" ToolTip="Open live CPU graphs">
                                         <StackPanel>
-                                            <TextBlock Text="Usage" Style="{StaticResource CardDescriptionStyle}" />
-                                            <TextBlock x:Name="CpuUsageText" Text="--%" FontSize="15" FontWeight="SemiBold" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE957;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                                <TextBlock Text="Processor" Style="{StaticResource InfoLabelStyle}" />
+                                                <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
+                                                           VerticalAlignment="Center" Margin="6,0,0,0" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="CpuTemperatureText" Text="Checking..." FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
+                                            <UniformGrid Columns="2" Margin="0,0,0,4">
+                                                <StackPanel>
+                                                    <TextBlock Text="Usage" Style="{StaticResource CardDescriptionStyle}" />
+                                                    <TextBlock x:Name="CpuUsageText" Text="--%" FontSize="15" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="Package power" Style="{StaticResource CardDescriptionStyle}" />
+                                                    <TextBlock x:Name="CpuPackagePowerText" Text="Checking..." FontSize="15" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </UniformGrid>
+                                            <TextBlock x:Name="CpuUsageDetailText" Text="CPU model" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                            <TextBlock x:Name="CpuTemperatureDetailText" Text="Detecting sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                            <TextBlock x:Name="CpuPackagePowerAverageText" Text="Average this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
+                                            <TextBlock x:Name="CpuPackagePowerMaxText" Text="Max this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
+                                            <TextBlock x:Name="CpuPackagePowerSensorText" Text="Detecting power sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                            <TextBlock x:Name="CpuFanSpeedText" Text="CPU fan: Checking..." Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                            <TextBlock x:Name="CaseFanSpeedText" Text="Case fans: Checking..." Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
                                         </StackPanel>
-                                        <StackPanel>
-                                            <TextBlock Text="Package power" Style="{StaticResource CardDescriptionStyle}" />
-                                            <TextBlock x:Name="CpuPackagePowerText" Text="Checking..." FontSize="15" FontWeight="SemiBold" />
+                                    </Border>
+
+                                    <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,14,0,12" />
+                                    <TextBlock Text="Sensor &amp; alerts" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,4" />
+                                    <TextBlock x:Name="CpuSensorHelpText"
+                                               Style="{StaticResource CardDescriptionStyle}"
+                                               MaxHeight="38"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <Grid Margin="0,12,0,12">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Alert above" Style="{StaticResource InfoLabelStyle}" />
+                                        <Slider Grid.Column="1" x:Name="CpuTemperatureAlertSlider" Minimum="70" Maximum="105" TickFrequency="1" IsSnapToTickEnabled="True" Margin="10,0" ValueChanged="CpuTemperatureAlertSlider_ValueChanged" />
+                                        <TextBlock Grid.Column="2" x:Name="CpuTemperatureAlertValueText" Text="98 °C" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Grid Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ToggleButton x:Name="CpuTemperatureSoundAlertCheckBox" Content="Sound alert" Style="{StaticResource ToggleSwitch}" FontSize="11" Checked="CpuTemperatureSoundAlertCheckBox_Changed" Unchecked="CpuTemperatureSoundAlertCheckBox_Changed" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <TextBlock Text="Repeat" Style="{StaticResource InfoLabelStyle}" />
+                                            <ComboBox x:Name="CpuTemperatureAlertIntervalComboBox" Width="82" Margin="8,0,0,0" FontSize="11" SelectionChanged="CpuTemperatureAlertIntervalComboBox_SelectionChanged">
+                                                <ComboBoxItem Content="1 min" Tag="60"/><ComboBoxItem Content="2 min" Tag="120"/><ComboBoxItem Content="5 min" Tag="300"/><ComboBoxItem Content="10 min" Tag="600"/>
+                                            </ComboBox>
                                         </StackPanel>
+                                    </Grid>
+                                    <UniformGrid Columns="3">
+                                        <Button Content="History" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewCpuTemperatureLogButton_Click" Margin="0,0,6,0"/>
+                                        <Button Content="Rescan" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RescanCpuSensorsButton_Click" Margin="0,0,6,0"/>
+                                        <Button Content="Fan diagnostics" Tag="&#xE9D9;" Style="{StaticResource IconCompactButton}" Click="FanDiagnosticsButton_Click" Margin="0"/>
                                     </UniformGrid>
-                                    <TextBlock x:Name="CpuUsageDetailText" Text="CPU model" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
-                                    <TextBlock x:Name="CpuTemperatureDetailText" Text="Detecting sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
-                                    <TextBlock x:Name="CpuPackagePowerAverageText" Text="Average this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
-                                    <TextBlock x:Name="CpuPackagePowerMaxText" Text="Max this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
-                                    <TextBlock x:Name="CpuPackagePowerSensorText" Text="Detecting power sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
-                                    <TextBlock x:Name="CpuFanSpeedText" Text="CPU fan: Checking..." Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
-                                    <TextBlock x:Name="CaseFanSpeedText" Text="Case fans: Checking..." Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    <Button x:Name="RestartAsAdministratorButton" Visibility="Collapsed" Content="Restart elevated" Click="RestartAsAdministratorButton_Click" />
                                 </StackPanel>
                             </Border>
                             </controls:DashboardTile>
 
                             <controls:DashboardTile TileId="gpu" Title="Graphics" Span="2">
-                            <Border Style="{StaticResource MetricCardStyle}" Cursor="Hand"
-                                    MouseLeftButtonUp="GpuCard_Click" ToolTip="Open live GPU graphs">
+                            <Border Style="{StaticResource MetricCardStyle}">
                                 <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE7F8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="Graphics" Style="{StaticResource InfoLabelStyle}" />
-                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
-                                                   VerticalAlignment="Center" Margin="6,0,0,0" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="GpuTemperatureText" Text="Temperature: Checking..." FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
-                                    <UniformGrid Columns="2" Margin="0,0,0,4">
+                                    <Border Background="Transparent" Cursor="Hand" MouseLeftButtonUp="GpuCard_Click" ToolTip="Open live GPU graphs">
                                         <StackPanel>
-                                            <TextBlock Text="Utilisation" Style="{StaticResource CardDescriptionStyle}" />
-                                            <TextBlock x:Name="GpuUtilisationText" Text="Checking..." FontSize="15" FontWeight="SemiBold" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE7F8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                                <TextBlock Text="Graphics" Style="{StaticResource InfoLabelStyle}" />
+                                                <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
+                                                           VerticalAlignment="Center" Margin="6,0,0,0" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="GpuTemperatureText" Text="Temperature: Checking..." FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
+                                            <UniformGrid Columns="2" Margin="0,0,0,4">
+                                                <StackPanel>
+                                                    <TextBlock Text="Utilisation" Style="{StaticResource CardDescriptionStyle}" />
+                                                    <TextBlock x:Name="GpuUtilisationText" Text="Checking..." FontSize="15" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="Power" Style="{StaticResource CardDescriptionStyle}" />
+                                                    <TextBlock x:Name="GpuPowerText" Text="Checking..." FontSize="15" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </UniformGrid>
+                                            <TextBlock x:Name="GpuMemoryText" Text="VRAM: Checking..." Style="{StaticResource CardDescriptionStyle}" />
+                                            <TextBlock x:Name="GpuPowerAverageText" Text="Average this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
+                                            <TextBlock x:Name="GpuPowerMaxText" Text="Max this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
+                                            <TextBlock x:Name="GpuFanSpeedText" Text="GPU fans: Checking..." Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                            <TextBlock x:Name="GpuPowerSensorText" Text="Detecting GPU power sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
                                         </StackPanel>
+                                    </Border>
+
+                                    <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,14,0,12" />
+                                    <Border Background="Transparent" Cursor="Hand" MouseLeftButtonUp="GraphicsAdaptersCard_Click" ToolTip="Open Graphics: live graph, adapters and displays">
                                         <StackPanel>
-                                            <TextBlock Text="Power" Style="{StaticResource CardDescriptionStyle}" />
-                                            <TextBlock x:Name="GpuPowerText" Text="Checking..." FontSize="15" FontWeight="SemiBold" />
+                                            <TextBlock Text="Graphics adapters" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,4" />
+                                            <TextBlock x:Name="GpuInventorySummaryText" Text="Checking graphics adapters..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,6"/>
+                                            <ItemsControl x:Name="GpuInventoryList">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3" ToolTip="{Binding}"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </StackPanel>
-                                    </UniformGrid>
-                                    <TextBlock x:Name="GpuMemoryText" Text="VRAM: Checking..." Style="{StaticResource CardDescriptionStyle}" />
-                                    <TextBlock x:Name="GpuPowerAverageText" Text="Average this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
-                                    <TextBlock x:Name="GpuPowerMaxText" Text="Max this session: -- W" Style="{StaticResource CardDescriptionStyle}" />
-                                    <TextBlock x:Name="GpuFanSpeedText" Text="GPU fans: Checking..." Style="{StaticResource CardDescriptionStyle}" TextWrapping="Wrap" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
-                                    <TextBlock x:Name="GpuPowerSensorText" Text="Detecting GPU power sensor" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                    </Border>
                                 </StackPanel>
                             </Border>
                             </controls:DashboardTile>
 
                             <controls:DashboardTile TileId="memory" Title="Memory" Span="2">
-                            <Border Style="{StaticResource MetricCardStyle}" Cursor="Hand"
-                                    MouseLeftButtonUp="MemoryCard_Click" ToolTip="Open live memory graph">
+                            <Border Style="{StaticResource MetricCardStyle}">
                                 <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE7F1;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="Memory" Style="{StaticResource InfoLabelStyle}" />
-                                        <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
-                                                   VerticalAlignment="Center" Margin="6,0,0,0" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="RamUsageText" Text="--%" FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
-                                    <TextBlock x:Name="RamUsageDetailText" Text="RAM speed" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
-                                    <TextBlock x:Name="RamModuleCountText" Text="Modules: checking..." Style="{StaticResource CardDescriptionStyle}" />
+                                    <Border Background="Transparent" Cursor="Hand" MouseLeftButtonUp="MemoryCard_Click" ToolTip="Open live memory graph">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE7F1;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                                <TextBlock Text="Memory" Style="{StaticResource InfoLabelStyle}" />
+                                                <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
+                                                           VerticalAlignment="Center" Margin="6,0,0,0" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="RamUsageText" Text="--%" FontSize="22" FontWeight="SemiBold" Margin="0,10,0,3" />
+                                            <TextBlock x:Name="RamUsageDetailText" Text="RAM speed" Style="{StaticResource CardDescriptionStyle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                            <TextBlock x:Name="RamModuleCountText" Text="Modules: checking..." Style="{StaticResource CardDescriptionStyle}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,14,0,12" />
+                                    <Border Background="Transparent" Cursor="Hand" MouseLeftButtonUp="InstalledMemoryCard_Click" ToolTip="Open Memory: live graph, modules and incidents">
+                                        <StackPanel>
+                                            <TextBlock Text="Installed memory" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,4" />
+                                            <TextBlock x:Name="RamModuleSummaryText" Text="Checking RAM modules..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,6"/>
+                                            <ItemsControl x:Name="RamModuleInventoryList">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </Border>
                             </controls:DashboardTile>
-                            <controls:DashboardTile TileId="diskactivity" Title="Disk activity" Span="2">
+
+                            <controls:DashboardTile TileId="storage" Title="Storage &amp; disk activity" Span="2">
                             <Border Style="{StaticResource MetricCardStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
@@ -518,6 +590,28 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+
+                                    <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,8,0,12" />
+                                    <Border Background="Transparent" Cursor="Hand" MouseLeftButtonUp="StorageCard_Click" ToolTip="Open Storage &amp; disks: health, speed, disk tools and cleanup">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                <TextBlock Text="&#xE958;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
+                                                <TextBlock Text="Storage inventory &amp; usage" Style="{StaticResource InfoLabelStyle}" />
+                                                <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Opacity="0.5"
+                                                           VerticalAlignment="Center" Margin="6,0,0,0" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="StorageInventorySummaryText" Text="Checking physical disks and volumes..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,10"/>
+                                            <TextBlock Text="Physical disks" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,4"/>
+                                            <ItemsControl x:Name="PhysicalDiskInventoryList" Margin="0,0,0,10">
+                                                <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/></DataTemplate></ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock Text="Volumes / used capacity" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,4"/>
+                                            <ItemsControl x:Name="StorageVolumeInventoryList">
+                                                <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/></DataTemplate></ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock x:Name="HardwareInventoryUpdatedText" Text="Hardware inventory refreshes when System Stats is refreshed." Style="{StaticResource CardDescriptionStyle}" Margin="0,10,0,0"/>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </Border>
                             </controls:DashboardTile>
@@ -699,91 +793,35 @@
                             </Border>
                             </controls:DashboardTile>
 
-                            <controls:DashboardTile TileId="cpusensor" Title="CPU Sensor &amp; Alerts" Span="2">
-                            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                        <TextBlock Text="&#xE957;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="CPU Sensor &amp; Alerts" Style="{StaticResource CardTitleStyle}" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="CpuSensorHelpText"
-                                               Style="{StaticResource CardDescriptionStyle}"
-                                               MaxHeight="38"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
-                                    <Grid Margin="0,14,0,12">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="58"/></Grid.ColumnDefinitions>
-                                        <TextBlock Text="Alert above" Style="{StaticResource InfoLabelStyle}" />
-                                        <Slider Grid.Column="1" x:Name="CpuTemperatureAlertSlider" Minimum="70" Maximum="105" TickFrequency="1" IsSnapToTickEnabled="True" Margin="10,0" ValueChanged="CpuTemperatureAlertSlider_ValueChanged" />
-                                        <TextBlock Grid.Column="2" x:Name="CpuTemperatureAlertValueText" Text="98 °C" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                                    </Grid>
-                                    <Grid Margin="0,0,0,14">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <ToggleButton x:Name="CpuTemperatureSoundAlertCheckBox" Content="Sound alert" Style="{StaticResource ToggleSwitch}" FontSize="11" Checked="CpuTemperatureSoundAlertCheckBox_Changed" Unchecked="CpuTemperatureSoundAlertCheckBox_Changed" />
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                            <TextBlock Text="Repeat" Style="{StaticResource InfoLabelStyle}" />
-                                            <ComboBox x:Name="CpuTemperatureAlertIntervalComboBox" Width="82" Margin="8,0,0,0" FontSize="11" SelectionChanged="CpuTemperatureAlertIntervalComboBox_SelectionChanged">
-                                                <ComboBoxItem Content="1 min" Tag="60"/><ComboBoxItem Content="2 min" Tag="120"/><ComboBoxItem Content="5 min" Tag="300"/><ComboBoxItem Content="10 min" Tag="600"/>
-                                            </ComboBox>
-                                        </StackPanel>
-                                    </Grid>
-                                    <UniformGrid Columns="3">
-                                        <Button Content="History" Tag="&#xE81C;" Style="{StaticResource IconCompactButton}" Click="ViewCpuTemperatureLogButton_Click" Margin="0,0,6,0"/>
-                                        <Button Content="Rescan" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" Click="RescanCpuSensorsButton_Click" Margin="0,0,6,0"/>
-                                        <Button Content="Fan diagnostics" Tag="&#xE9D9;" Style="{StaticResource IconCompactButton}" Click="FanDiagnosticsButton_Click" Margin="0"/>
-                                    </UniformGrid>
-                                    <Button x:Name="RestartAsAdministratorButton" Visibility="Collapsed" Content="Restart elevated" Click="RestartAsAdministratorButton_Click" />
-                                </StackPanel>
-                            </Border>
-                            </controls:DashboardTile>
-
-                            <controls:DashboardTile TileId="identity" Title="PC Identity" Span="2">
-                            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0">
+                            <!-- This PC: identity, Windows and licence, and the connected displays. -->
+                            <controls:DashboardTile TileId="windows" Title="PC &amp; Windows" Span="2">
+                            <Border Style="{StaticResource CardStyle}" Margin="0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                         <TextBlock Text="&#xE770;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="PC Identity" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock Text="PC &amp; Windows" Style="{StaticResource CardTitleStyle}" />
                                     </StackPanel>
                                     <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="PC name" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="0" Grid.Column="1" x:Name="PcNameText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
-                                        <TextBlock Grid.Row="1" Text="Brand" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="1" Grid.Column="1" x:Name="PcBrandText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
-                                        <TextBlock Grid.Row="2" Text="Model" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="2" Grid.Column="1" x:Name="PcModelText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                                        <TextBlock Grid.Row="3" Text="System SKU" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="3" Grid.Column="1" x:Name="PcSkuText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                                        <TextBlock Grid.Row="4" Text="Serial number" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="4" Grid.Column="1" x:Name="PcSerialText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="PC name" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" x:Name="PcNameText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="1" Text="Brand" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" x:Name="PcBrandText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="2" Text="Model" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" x:Name="PcModelText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="3" Text="System SKU" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" x:Name="PcSkuText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="4" Text="Serial number" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/><TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" x:Name="PcSerialText" Text="Checking..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <TextBlock Grid.Row="5" Text="Windows" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" x:Name="WindowsVersionText" Text="Checking Windows version..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+                                        <TextBlock Grid.Row="6" Text="Activation" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
+                                        <TextBlock Grid.Row="6" Grid.Column="1" x:Name="SystemWindowsActivationStatusText" Text="Checking activation..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                        <Button Grid.Row="6" Grid.Column="2" Content="Activation settings" Tag="&#xE713;" Style="{StaticResource IconCompactButton}" Click="OpenWindowsActivationSettingsButton_Click" Margin="10,0,0,0"/>
                                     </Grid>
-                                </StackPanel>
-                            </Border>
-                            </controls:DashboardTile>
 
-                            <controls:DashboardTile TileId="ram" Title="Installed Memory" Span="2">
-                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0" Cursor="Hand" MouseLeftButtonUp="InstalledMemoryCard_Click" ToolTip="Open Memory: live graph, modules and incidents">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                        <TextBlock Text="&#xE7F1;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="Installed Memory" Style="{StaticResource CardTitleStyle}" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="RamModuleSummaryText" Text="Checking RAM modules..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,8"/>
-                                    <ItemsControl x:Name="RamModuleInventoryList">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
-                            </controls:DashboardTile>
-
-                            <controls:DashboardTile TileId="displays" Title="Displays" Span="2">
-                            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,14,0,12" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                         <TextBlock Text="&#xE7F4;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="Displays" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock Text="Displays" Style="{StaticResource InfoLabelStyle}" />
                                     </StackPanel>
-                                    <TextBlock x:Name="DisplayInventorySummaryText" Text="Checking connected displays..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,8"/>
+                                    <TextBlock x:Name="DisplayInventorySummaryText" Text="Checking connected displays..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,6"/>
                                     <ItemsControl x:Name="DisplayInventoryList">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -794,69 +832,6 @@
                                 </StackPanel>
                             </Border>
                             </controls:DashboardTile>
-
-                            <controls:DashboardTile TileId="gpuinventory" Title="Graphics Adapters" Span="2">
-                            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Margin="0" Cursor="Hand" MouseLeftButtonUp="GraphicsAdaptersCard_Click" ToolTip="Open Graphics: live graph, adapters and displays">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                        <TextBlock Text="&#xE7F8;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                        <TextBlock Text="Graphics Adapters" Style="{StaticResource CardTitleStyle}" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="GpuInventorySummaryText" Text="Checking graphics adapters..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,8"/>
-                                    <ItemsControl x:Name="GpuInventoryList">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3" ToolTip="{Binding}"/>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
-                            </controls:DashboardTile>
-
-                        <controls:DashboardTile TileId="storage" Title="Storage Inventory &amp; Usage" Span="4">
-                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0" Cursor="Hand" MouseLeftButtonUp="StorageCard_Click" ToolTip="Open Storage &amp; disks: health, speed, disk tools and cleanup">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                    <TextBlock Text="&#xE958;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                    <TextBlock Text="Storage Inventory &amp; Usage" Style="{StaticResource CardTitleStyle}" />
-                                </StackPanel>
-                                <TextBlock x:Name="StorageInventorySummaryText" Text="Checking physical disks and volumes..." Style="{StaticResource CardDescriptionStyle}" Margin="0,0,0,10"/>
-                                <TextBlock Text="Physical disks" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,4"/>
-                                <ItemsControl x:Name="PhysicalDiskInventoryList" Margin="0,0,0,10">
-                                    <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/></DataTemplate></ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <TextBlock Text="Volumes / used capacity" Style="{StaticResource InfoLabelStyle}" Margin="0,0,0,4"/>
-                                <ItemsControl x:Name="StorageVolumeInventoryList">
-                                    <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource InfoValueStyle}" TextWrapping="Wrap" Margin="0,3"/></DataTemplate></ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <TextBlock x:Name="HardwareInventoryUpdatedText" Text="Hardware inventory refreshes when System Stats is refreshed." Style="{StaticResource CardDescriptionStyle}" Margin="0,10,0,0"/>
-                            </StackPanel>
-                        </Border>
-                        </controls:DashboardTile>
-
-                        <controls:DashboardTile TileId="windows" Title="Windows Overview" Span="4">
-                        <Border Style="{StaticResource CardStyle}" Margin="0,18,0,0">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE95E;" Style="{StaticResource IconGlyphStyle}" Foreground="{DynamicResource PrimaryBrush}" />
-                                    <TextBlock Text="Windows Overview" Style="{StaticResource CardTitleStyle}" />
-                                </StackPanel>
-                                <TextBlock Text="Operating system and licence state. Network-specific diagnostics live in Network Center."
-                                           Style="{StaticResource CardDescriptionStyle}"
-                                           Margin="0,7,0,10" />
-                                <Grid>
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-                                    <TextBlock Grid.Row="0" Text="Windows" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="WindowsVersionText" Text="Checking Windows version..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
-                                    <TextBlock Grid.Row="1" Text="Activation" Style="{StaticResource InfoLabelStyle}" Margin="0,4"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="SystemWindowsActivationStatusText" Text="Checking activation..." Style="{StaticResource InfoValueStyle}" Margin="0,4" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                                    <Button Grid.Row="1" Grid.Column="2" Content="Activation settings" Tag="&#xE713;" Style="{StaticResource IconCompactButton}" Click="OpenWindowsActivationSettingsButton_Click" Margin="10,0,0,0"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                        </controls:DashboardTile>
 
                         </controls:DashboardPanel>
                     </StackPanel>

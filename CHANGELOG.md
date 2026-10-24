@@ -260,6 +260,20 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.95] - 2026-10-25
+
+### Changed
+- **System Stats has one tile per part of the PC.** Each component's live readings and its details are now in one
+  tile instead of two:
+  - **Processor** holds the CPU sensor and temperature-alert settings.
+  - **Memory** lists the installed modules.
+  - **Graphics** lists the graphics adapters.
+  - **Storage & disk activity** shows the live disk activity above the disks and volumes.
+  - **PC & Windows** brings together the PC's identity, the Windows version and activation, and the displays.
+- The top of each tile still opens its live graphs, and the inventory part still opens the matching window. The
+  alert slider, switches and buttons are outside those areas, so using them no longer risks opening a window.
+- A saved custom layout keeps working: the merged tiles take the place and size of the tile they absorbed.
+
 ## [2.0.94] - 2026-10-24
 
 ### Fixed
