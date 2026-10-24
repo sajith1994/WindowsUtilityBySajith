@@ -22,6 +22,19 @@
                 <TextBlock Text="Clone, back up and restore" FontSize="20" FontWeight="SemiBold" />
                 <TextBlock Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0"
                            Text="Copy a whole disk to a new SSD, copy one partition, or back up Windows to an image file on another partition, an external disk or a network share, to restore later to a new SSD or to copy files out of. Partitions in use are copied from a Windows snapshot while Windows runs. The disk copied from is only read." />
+                <!-- Shown only when this PC's start menu lists Windows that is not in the PC, or this Windows twice (typical after starting from a clone). -->
+                <Border x:Name="BootMenuNotice" Visibility="Collapsed" Background="{DynamicResource SecondarySurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,10,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Windows asks which Windows to start" FontWeight="SemiBold" />
+                            <TextBlock x:Name="BootMenuText" TextWrapping="Wrap" Margin="0,3,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" x:Name="CleanBootMenuButton" Content="Clean up the start menu" Tag="&#xE74D;" Style="{StaticResource IconCompactButton}"
+                                VerticalAlignment="Center" Margin="12,0,0,0" Click="CleanBootMenuButton_Click" />
+                    </Grid>
+                </Border>
             </StackPanel>
             <Button Grid.Column="1" x:Name="RefreshButton" Content="Refresh disks" Tag="&#xE72C;" Style="{StaticResource IconCompactButton}" VerticalAlignment="Top" Click="RefreshButton_Click" />
         </Grid>

@@ -1235,6 +1235,7 @@ public sealed class DiskCloneService
             }
 
             Log(progress, $"Boot files written to the disk ({firmware}).");
+            await CleanCopiedBootMenuAsync(diskNumber, windowsPartition, $@"{boot}:\{(style == "GPT" ? @"EFI\Microsoft\Boot\BCD" : @"Boot\BCD")}", progress, cancellationToken);
 
             // Give the copied Windows its letter on this partition.
             string details = await RunPowerShellAsync($"$p = Get-Partition -DiskNumber {diskNumber} -PartitionNumber {windowsPartition}; $d = Get-Disk -Number {diskNumber}; '{{0}}|{{1}}|{{2}}' -f $p.Guid, [uint32]$d.Signature, [uint64]$p.Offset", cancellationToken);
@@ -1279,6 +1280,47 @@ public sealed class DiskCloneService
                     Log(progress, $"The temporary letter {letter}: could not be removed ({exception.Message}).");
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// The boot store came with the EFI partition from the old disk, so it still lists the old disk's Windows next to
+    /// the entry bcdboot just added; started in another PC, it would ask "Choose an operating system" every time.
+    /// Every Windows entry that is not on this disk, or that starts the copied Windows a second time, is removed.
+    /// A problem here is logged, not fatal: the disk starts either way.
+    /// </summary>
+    private static async Task CleanCopiedBootMenuAsync(int diskNumber, int windowsPartition, string storePath, IProgress<CloneProgress> progress, CancellationToken cancellationToken)
+    {
+        try
+        {
+            string output = await RunPowerShellAsync(
+                $"Get-Partition -DiskNumber {diskNumber} | ForEach-Object {{ '{{0}}|{{1}}' -f $_.PartitionNumber, (($_.AccessPaths | Where-Object {{ $_ -like '\\\\?\\Volume*' }}) -join '') }}", cancellationToken);
+            Dictionary<int, string> devices = new();
+            foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                string[] parts = line.Split('|');
+                if (parts.Length == 2 && int.TryParse(parts[0], out int number) && BootMenu.DeviceNameOf(parts[1]) is string device)
+                {
+                    devices[number] = device;
+                }
+            }
+
+            if (!devices.TryGetValue(windowsPartition, out string? windowsDevice))
+            {
+                Log(progress, "The boot menu was not tidied: the Windows partition's volume was not found.");
+                return;
+            }
+
+            List<BootMenuEntry> removed = BootMenu.Clean(storePath, windowsDevice,
+                partition => devices.Values.Contains(partition, StringComparer.OrdinalIgnoreCase));
+            if (removed.Count > 0)
+            {
+                Log(progress, $"Boot menu tidied: {removed.Count} entr{(removed.Count == 1 ? "y" : "ies")} for the old disk's Windows removed, so the new disk starts without asking which Windows.");
+            }
+        }
+        catch (Exception exception) when (exception is ManagementException or InvalidOperationException or COMException or UnauthorizedAccessException)
+        {
+            Log(progress, $"The boot menu was not tidied ({exception.Message}); Windows may ask which Windows to start. \"Clean up the start menu\" fixes that from the new disk.");
         }
     }
 

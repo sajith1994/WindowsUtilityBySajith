@@ -62,8 +62,79 @@ public partial class DiskCloneWindow : Window
     {
         InitializeComponent();
         ModeTabs.SelectedIndex = Math.Clamp(tab, 0, ModeTabs.Items.Count - 1);
-        Loaded += async (_, _) => await LoadDisksAsync();
+        Loaded += async (_, _) =>
+        {
+            await LoadDisksAsync();
+            await CheckBootMenuAsync();
+        };
         Closing += Window_Closing;
+    }
+
+    // ---- This PC's start menu ------------------------------------------------------------------------------------
+
+    private List<BootMenuEntry> _staleBootEntries = new();
+
+    /// <summary>Shows the notice when this PC's start menu has entries for Windows not in the PC, or this Windows twice.</summary>
+    private async Task CheckBootMenuAsync()
+    {
+        try
+        {
+            (List<BootMenuEntry> entries, List<BootMenuEntry> stale) = await Task.Run(() =>
+            {
+                List<BootMenuEntry> all = BootMenu.Read(string.Empty);
+                return (all, BootMenu.RunningWindowsPartition() is string running ? BootMenu.Stale(all, running) : new List<BootMenuEntry>());
+            });
+            _staleBootEntries = stale;
+            BootMenuNotice.Visibility = stale.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            BootMenuText.Text = $"The menu shown at start lists {entries.Count} Windows. "
+                + $"{stale.Count} of them {(stale.Count == 1 ? "is" : "are")} for Windows that is not in this PC or that starts this same Windows again "
+                + "(the old PC's entry, copied along by a clone). Removing "
+                + (stale.Count == 1 ? "it" : "them")
+                + " makes this PC start straight into this Windows. Other Windows installed on this PC stay in the menu.";
+        }
+        catch (Exception exception) when (exception is System.Management.ManagementException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException)
+        {
+            ApplicationLogService.WriteException("Reading the start menu", exception);
+            BootMenuNotice.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async void CleanBootMenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_staleBootEntries.Count == 0 || BootMenu.RunningWindowsPartition() is not string running)
+        {
+            return;
+        }
+
+        string list = string.Join("\n", _staleBootEntries.Select(entry => $"  • {entry.DisplayText}{(entry.Partition is not null ? " (this Windows again)" : string.Empty)}"));
+        if (WpfMessageBox.Show(this,
+                $"Remove from the start menu:\n\n{list}\n\nThe Windows running now stays and starts without the menu. A copy of the menu is saved first.",
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        string backup = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "WindowsUtility", "boot-menu-backups",
+            $"BCD-{DateTime.Now:yyyy-MM-dd-HHmmss}");
+        try
+        {
+            List<BootMenuEntry> removed = await Task.Run(() =>
+            {
+                BootMenu.Export(string.Empty, backup);
+                return BootMenu.Clean(string.Empty, running);
+            });
+            ApplicationLogService.WriteMessage("Start menu", $"Removed {string.Join(", ", removed.Select(entry => $"{entry.Description} {entry.Id}"))}; copy of the menu saved to {backup}.");
+            WpfMessageBox.Show(this,
+                $"{removed.Count} entr{(removed.Count == 1 ? "y" : "ies")} removed. The PC now starts straight into this Windows.\n\nThe menu as it was is saved in:\n{backup}\n(to put it back: bcdedit /import \"{backup}\")",
+                Title, MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception exception) when (exception is System.Management.ManagementException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException or IOException)
+        {
+            ApplicationLogService.WriteException("Cleaning the start menu", exception);
+            WpfMessageBox.Show(this, $"The start menu could not be changed: {exception.Message}", Title, MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        await CheckBootMenuAsync();
     }
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e) => await LoadDisksAsync();

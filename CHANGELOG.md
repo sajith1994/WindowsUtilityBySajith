@@ -260,6 +260,21 @@
 
 - Application, background service, tray companion, manifest and installer version: 2.0.8.
 
+## [2.0.93] - 2026-10-24
+
+### Fixed
+- **A cloned disk no longer asks "Choose an operating system" at every start.** The EFI partition is copied with
+  the old PC's boot menu, so the clone listed the old disk's Windows next to its own; started in another PC, Windows
+  showed both every time. Clone, Restore and "Make this disk start Windows" now remove from the new disk's menu
+  every Windows entry that is not on that disk or that starts the copied Windows a second time.
+
+### Added
+- **Clean up the start menu.** When the PC was started from a clone made before this version, the Clone window shows
+  "Windows asks which Windows to start" with a button that removes the menu's entries for Windows not in the PC, and
+  further entries for the running Windows. Other Windows installed on the PC stay. A copy of the menu is saved first
+  (in ProgramData\WindowsUtility\boot-menu-backups, put back with bcdedit /import). The menu is read and changed
+  through Windows' boot configuration interface, so it works the same in every language.
+
 ## [2.0.92] - 2026-10-23
 
 ### Fixed
