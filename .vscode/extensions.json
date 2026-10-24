@@ -1,0 +1,36 @@
+{
+  // VS Code prompts to install these when the folder is opened.
+  // Install all at once: see README "Development in VS Code" or run the
+  // `code --install-extension` lines from the recommendation list.
+  "recommendations": [
+    // C# / .NET 10 solution (WPF app, Windows service, tray app, xUnit tests)
+    "ms-dotnettools.csdevkit",
+    "ms-dotnettools.csharp",
+    "josefpihrt-vscode.roslynator",
+    "kreativ-software.csharpextensions",
+    "usernamehw.errorlens",
+
+    // WPF XAML (28 .xaml files) — IntelliSense + XML formatting
+    "noesistechnologies.noesisgui-tools",
+    "redhat.vscode-xml",
+
+    // .csproj / Directory.Build.props editing and NuGet version hints
+    "tintoy.msbuild-project-tools",
+    "pflannery.vscode-versionlens",
+
+    // Build + release scripts (PowerShell, Inno Setup .iss)
+    "ms-vscode.powershell",
+    "idleberg.innosetup",
+
+    // GitHub: Actions workflow, PRs/issues, blame/history
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "eamodio.gitlens",
+
+    // Docs (README, CHANGELOG, notes) and general hygiene
+    "davidanson.vscode-markdownlint",
+    "streetsidesoftware.code-spell-checker",
+    "editorconfig.editorconfig",
+    "gruntfuggly.todo-tree"
+  ]
+}
